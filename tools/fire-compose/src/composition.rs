@@ -62,6 +62,14 @@ fn path(name: &str) -> Result<&str> {
     }
 }
 
+fn class_path(name: &str) -> Result<&str> {
+    if ["Real", "Integer", "Boolean", "String"].contains(&name) {
+        Ok(name)
+    } else {
+        path(name)
+    }
+}
+
 // Subscripts are positive integer literals, never arbitrary source expressions.
 fn reference(name: &str) -> Result<&str> {
     for segment in name.split('.') {
@@ -180,7 +188,7 @@ impl CompositionSpec {
                 .unwrap_or_default();
             text.push_str(&format!(
                 "  {prefix}{} {}{dimensions}(\n    {}){binding};\n",
-                path(&c.class)?,
+                class_path(&c.class)?,
                 c.name,
                 modifiers(&c.modifiers)?
             ));

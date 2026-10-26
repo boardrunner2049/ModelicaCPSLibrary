@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use toml::{map::Map, Value};
 
-type Table = Map<String, Value>;
+pub(crate) type Table = Map<String, Value>;
 const IDENTITY: [[f64; 3]; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
 
 #[derive(Clone, Debug, Serialize)]
@@ -27,6 +27,10 @@ pub struct ResolvedFireConfig {
     pub models: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub interface: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub imu: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub acoustic: Table,
 }
 
 impl ResolvedFireConfig {
@@ -95,7 +99,7 @@ impl ResolvedFireConfig {
     }
 }
 
-fn table<'a>(v: &'a Value, allowed: &[&str], label: &str) -> Result<&'a Table> {
+pub(crate) fn table<'a>(v: &'a Value, allowed: &[&str], label: &str) -> Result<&'a Table> {
     let t = v
         .as_table()
         .ok_or_else(|| format!("{label}: expected a table"))?;
@@ -111,7 +115,7 @@ fn section(t: &Table, key: &str) -> Value {
         .cloned()
         .unwrap_or_else(|| Value::Table(Table::new()))
 }
-fn number(v: &Value, label: &str, positive: bool, nonnegative: bool) -> Result<f64> {
+pub(crate) fn number(v: &Value, label: &str, positive: bool, nonnegative: bool) -> Result<f64> {
     let x = v
         .as_float()
         .or_else(|| v.as_integer().map(|n| n as f64))
@@ -130,7 +134,7 @@ fn number(v: &Value, label: &str, positive: bool, nonnegative: bool) -> Result<f
     }
     Ok(x)
 }
-fn integer(v: &Value, label: &str, min: i64) -> Result<usize> {
+pub(crate) fn integer(v: &Value, label: &str, min: i64) -> Result<usize> {
     let n = v
         .as_integer()
         .ok_or_else(|| format!("{label}: expected integer >= {min}"))?;
@@ -139,7 +143,7 @@ fn integer(v: &Value, label: &str, min: i64) -> Result<usize> {
     }
     usize::try_from(n).map_err(|_| format!("{label}: integer is too large"))
 }
-fn array(v: &Value, dims: &[usize], label: &str) -> Result<()> {
+pub(crate) fn array(v: &Value, dims: &[usize], label: &str) -> Result<()> {
     if dims.is_empty() {
         number(v, label, false, false)?;
         return Ok(());
@@ -565,6 +569,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         "models",
         "interface",
         "acquisition",
+        "imu",
+        "vulnerabilities",
     ];
     if version != 3 {
         return Err(
@@ -582,7 +588,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
             .get("acquisition")
             .is_some_and(|v| v.as_str().is_none())
     {
-        return Err("only continuous acquisition is supported; sampling is deprecated".into());
+        return Err("global acquisition must remain continuous; select independent IMU acquisition via models.imu.model".into());
     }
     let name = root
         .get("model_name")
@@ -647,6 +653,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let landing_gear = resolve_landing_gear(&section(root, "landing_gear"))?;
     let initial = resolve_initial(&section(root, "initial"))?;
     let interface = resolve_interface(&section(root, "interface"))?;
+    let imu = crate::imu::resolve(&section(root, "imu"), &models)?;
+    let acoustic = crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?;
     Ok(ResolvedFireConfig {
         schema_version: version,
         acquisition: acquisition.into(),
@@ -662,6 +670,8 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         initial,
         models,
         interface,
+        imu,
+        acoustic,
     })
 }
 
@@ -1032,7 +1042,10 @@ fn resolve_models(raw: &Value) -> Result<Table> {
     ) {
         return Err("models: incompatible ESC/motor combination; use pass_through/first_order_speed, average_voltage/first_order_voltage_to_speed, average_unidirectional/dynamic_dc_equivalent, or average_three_phase|switching_three_phase/three_phase_pm".into());
     }
-    for key in ["imu", "magnetometer", "gnss", "barometer"] {
+    if let Some(raw) = t.get("imu") {
+        out.insert("imu".into(), Value::Table(crate::imu::selection(raw)?));
+    }
+    for key in ["magnetometer", "gnss", "barometer"] {
         if let Some(raw) = t.get(key) {
             let v = table(raw, &["response"], &format!("models.{key}"))?;
             if v.get("response").and_then(Value::as_str) != Some("ideal") {

@@ -153,6 +153,33 @@ pub fn emit(
         "event_requirements":{"sampled_sensors":config.acquisition=="sampled","sampled_actuators":profile=="vio" && config.acquisition=="sampled","ground_contact":ground_contact},
         "verification":{"configuration":"passed","modelica_check":"not_run","fmi_generation":"not_run","fmu_simulation":"not_run","firmware":"not_run"}
     });
+    manifest_value["imu"] = json!({"level":config.imu_level(),"class":config.imu_class(),
+        "parameters":config.imu,"other_sensors":"continuous_ideal",
+        "readout":if config.imu_model()=="ideal" {"continuous"} else {"sampled"},
+        "calibration":"user_supplied_not_hardware_validated"});
+    manifest_value["imu"]["fidelity_definition"] = json!("digital_errors_electromechanical_v2");
+    manifest_value["imu"]["legacy"] = json!(matches!(
+        config.imu_model(),
+        "statistical" | "device" | "acoustic"
+    ));
+    if !config.acoustic.is_empty() {
+        manifest_value["acoustic_vulnerability"] = json!({"configuration":config.acoustic,
+            "pressure_contract":if config.acoustic["model"].as_str()==Some("modal_force") {"instantaneous_Pa"} else {"slow_RMS_envelope_Pa"},
+            "package_model":"static_modal_force_gain","calibration":"illustrative_or_user_identified"});
+    }
+    if config.imu_model() != "ideal" {
+        manifest_value["core_contract"] = json!("ned_frd_sampled_imu_v1");
+        manifest_value["physics"]["sensors"] = json!("selected_imu_other_sensors_ideal");
+        manifest_value["physics"]["acquisition"] = json!("sampled_imu_continuous_others");
+        manifest_value["event_requirements"]["sampled_sensors"] = json!(true);
+        manifest_value["imu"]["metadata_outputs"] = json!([
+            "imuSampleTime",
+            "imuDeliveryTime",
+            "imuSequence",
+            "imuValid"
+        ]);
+        manifest_value["imu"]["samplePeriod_s"] = json!(config.imu["samplePeriod"]);
+    }
     if profile == "vio" {
         manifest_value["input_adapter"] = json!({
             "class":"fire_modelica_models.Adapters.VirtualIO.PwmInput",

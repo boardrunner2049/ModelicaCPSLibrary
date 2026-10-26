@@ -1,1 +1,15 @@
+PartialSensor
 Sensor
+Parameters
+normalDraw
+quantize
+PartialSampledSensor
+StatisticalSensor
+PartialDeviceSensor
+DeviceSensor
+AcousticSensor
+DigitalSensor
+ErrorSensor
+VibratoryGyro
+CapacitiveAccelerometer
+ElectromechanicalSensor

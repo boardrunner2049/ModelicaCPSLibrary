@@ -1,0 +1,78 @@
+# Illustrative IMU parameters; not a calibrated ICM-42688-P or any other hardware model.
+# NED world / FRD chassis; continuous P0/R0 with four-point compliant landing gear.
+schema_version = 3
+model_name = "ConfiguredQuadI3Acoustic"
+
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12] # Feet start 2 cm above the ground.
+q_start = [0.7071067811865476, 0.0, 0.0, 0.7071067811865476]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"
+
+# Shared VirtualIO PWM calibration for both P0 and P1.
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0
+
+[models.imu]
+model = "electromechanical"
+
+[imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+seed = 2718
+streamId = 1
+
+[imu.gyroPhysics]
+mass = 2.5e-9
+driveFrequency = 1000.0
+senseFrequency = 1500.0
+driveQ = 30.0
+senseQ = 20.0
+driveAmplitude = 2e-7
+
+[imu.accelPhysics]
+mass = 1e-8
+frequency = 2000.0
+quality = 0.7
+
+[vulnerabilities.acoustic]
+model = "modal_force"
+effectiveArea = 1e-10
+incidenceAngle = 0.0
+driveCoupling = [0.0,0.0,0.0]
+senseCoupling = [0.0,0.0,1.0]

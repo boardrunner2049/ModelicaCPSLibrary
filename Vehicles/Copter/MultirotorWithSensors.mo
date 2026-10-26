@@ -1,5 +1,5 @@
 within fire_modelica_models.Vehicles.Copter;
-model MultirotorWithSensors "Continuous ideal sensor profile; no protocol/firmware driver"
+model MultirotorWithSensors "Default ideal sensors with independently replaceable IMU; no protocol/firmware driver"
   extends MultirotorPlant;
   input Real magneticField_w[3](each unit="T") = {0,20e-6,45e-6};
   input Real pressure(unit="Pa") = 101325 "Constant ambient pressure baseline [Pa]";

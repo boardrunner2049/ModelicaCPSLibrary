@@ -16,13 +16,13 @@ fields must already use the new frames. Schema 1/2 must be migrated with the tra
 in `docs/architecture.md`; changing only the schema number is insufficient.
 
 `acquisition="continuous"` is optional and is the only supported value.
-`[models]` selects `esc`, `motor`, and `rotor` separately, plus `response="ideal"` for each sensor.
+`[models]` selects `esc`, `motor`, and `rotor` separately, plus independent IMU selection as described below.
 P0 defaults are `pass_through`, `first_order_speed`, `quadratic_blade`. P1 uses
 `average_voltage`, `first_order_voltage_to_speed`, `quadratic_blade`. P2 uses
 `average_unidirectional`, `dynamic_dc_equivalent`, `quadratic_blade`. Incompatible ESC/motor
 signal types are rejected. Rotor `kT/kQ` belong in `[rotor]`, separate from `[motor]`.
-Other response profiles, legacy `[ground]` / `geometry.nLegs` settings, sample periods
-and acquisition timestamps are deprecated. Static aggregate or assembled mass budgets remain supported.
+Other sensor responses remain ideal. Legacy `[ground]` / `geometry.nLegs` and archived
+sampling modifiers remain unsupported; IMU has its own clock/metadata contract. Static aggregate or assembled mass budgets remain supported.
 Mass `componentId` values (and arm `componentIds`) remain configuration metadata.
 The composer rejects duplicate nonempty IDs across the selected assembled parts before
 emission and preserves the resolved IDs in the manifest's `config.mass`. Empty IDs are
@@ -68,6 +68,23 @@ This is source composition, not arbitrary contract-aware RBC linking.
 
 `check` runs OpenModelica checkModel and translateModel. Use `tools/probe_export.py`
 for actual FMI 2.0 CS generation/stepping. Neither proves Rumoca/FastDyn firmware integration.
+
+## IMU fidelity v2 and independent acoustics
+
+Use `[models.imu] model="ideal"|"digital"|"errors"|"electromechanical"` for I0–I3.
+The readout/error/physics settings, mandatory fields and equations are documented
+in [IMU README](../../Systems/Sensing/IMU/README.md). The current `quad_i1/i2/i3`
+examples use this ordering. `statistical/device/acoustic` are preserved legacy
+selections and manifests label them `legacy_I1/I2/I3`.
+
+Optional `[vulnerabilities.acoustic] model="equivalent_rate"` attaches an RMS-envelope
+surrogate to I1/I2; `model="modal_force"` attaches instantaneous pressure coupling to I3.
+The composer rejects incompatible/unused fields and records pressure semantics.
+Without acoustic configuration, I3 exports zero-start modal force inputs; with it,
+I3 exports pressure instead. `imuGyroLocked[3]` is separate from sample validity.
+Emission verifies configuration only; native/FMU/firmware verification remains
+`not_run` until actually executed. See the [acoustic examples](../../Vulnerabilities/Acoustic/README.md).
+
 
 ## P1 voltage-driven selection
 

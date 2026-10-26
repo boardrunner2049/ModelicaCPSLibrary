@@ -1,6 +1,6 @@
 within fire_modelica_models.Systems.Sensing;
 
-model SensorSuite "Optional four-sensor assembly; continuous ideal measurements at rigid mounts"
+model SensorSuite "Optional four-sensor assembly with independently replaceable IMU"
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
   parameter Real R_bImu[3,3] = identity(3) "IMU frame to body";
   parameter Real R_bMag[3,3] = identity(3) "Magnetometer frame to body";
@@ -26,7 +26,8 @@ model SensorSuite "Optional four-sensor assembly; continuous ideal measurements 
   input Real temperature(unit="K") "Ambient temperature supplied by the environment [K]";
   output fire_modelica_models.Interfaces.SensorMeasurements measurements;
 
-  IMU.Sensor imu( r_b=rImu_b, R_bs=R_bImu,
+  replaceable model ImuModel = IMU.Sensor constrainedby IMU.PartialSensor;
+  ImuModel imu( r_b=rImu_b, R_bs=R_bImu,
     accelBias=accelBias, gyroBias=gyroBias);
   Magnetometer.Sensor magnetometer( R_bs=R_bMag, bias=magBias);
   GNSS.Sensor gnss( positionBias=positionBias, velocityBias=velocityBias);

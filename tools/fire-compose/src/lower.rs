@@ -95,6 +95,9 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             )?,
         ));
     }
+    if c.imu_model() != "ideal" || !c.imu.is_empty() {
+        m.push(Modifier::Nested("sensors".into(), imu_modifiers(c)?));
+    }
     m.extend(fields(&c.initial)?);
     m.push(Modifier::Bind(
         "landingGear".into(),
@@ -222,6 +225,44 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         components.push(speed);
         (None, vec![], "normalizedCommand")
     };
+    if c.imu_temperature() {
+        let mut temperature = instance(
+            "Modelica.Units.SI.Temperature",
+            "imuTemperature",
+            vec![],
+            vec![],
+        );
+        temperature.prefix = Prefix::Input;
+        temperature.modifiers.push(Modifier::Bind(
+            "start".into(),
+            literal(
+                c.imu
+                    .get("referenceTemperature")
+                    .unwrap_or(&toml::Value::Float(293.15)),
+            )?,
+        ));
+        temperature.binding = Some(literal(
+            c.imu
+                .get("referenceTemperature")
+                .unwrap_or(&toml::Value::Float(293.15)),
+        )?);
+        components.push(temperature);
+    }
+    if c.imu_model() == "acoustic" {
+        let mut pressure = instance(
+            "Modelica.Units.SI.Pressure",
+            "imuAcousticPressure",
+            vec![],
+            vec![],
+        );
+        pressure.prefix = Prefix::Input;
+        pressure
+            .modifiers
+            .push(Modifier::Bind("start".into(), Value::Real(0.)));
+        pressure.binding = Some(Value::Real(0.0));
+        components.push(pressure);
+    }
+    acoustic_components(c, &mut components)?;
     components.push(instance(c.esc_class(), "escs", vec![nr], fields(&c.esc)?));
     let mut motor_fields = fields(&c.motor)?;
     if dynamic {
@@ -269,6 +310,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             }),
         ),
     ];
+    imu_boundary(c, &mut components, &mut equalities);
     if c.voltage_driven() {
         let mut voltage = instance("Modelica.Units.SI.Voltage", "dcVoltage", vec![], vec![]);
         voltage.prefix = if vio {
@@ -435,4 +477,174 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         equalities,
         connections,
     })
+}
+
+fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
+    let mut sensor = Vec::new();
+    let mut parameters = Vec::new();
+    for (key, value) in &c.imu {
+        if ["gyroPhysics", "accelPhysics"].contains(&key.as_str()) {
+            let record = if key == "gyroPhysics" {
+                "GyroParameters"
+            } else {
+                "AccelerometerParameters"
+            };
+            sensor.push(Modifier::Bind(
+                key.clone(),
+                Value::Record(
+                    format!("fire_modelica_models.Physical.Sensors.MEMS.{record}"),
+                    fields(value.as_table().unwrap())?,
+                ),
+            ));
+            continue;
+        }
+        let field = Modifier::Bind(key.clone(), literal(value)?);
+        if ["accelBias", "gyroBias"].contains(&key.as_str())
+            || crate::imu::ACOUSTIC.contains(&key.as_str())
+        {
+            sensor.push(field);
+        } else {
+            parameters.push(field);
+        }
+    }
+    if c.imu_model() != "ideal" {
+        sensor.push(Modifier::Bind(
+            "p".into(),
+            Value::Record(
+                "fire_modelica_models.Systems.Sensing.IMU.Parameters".into(),
+                parameters,
+            ),
+        ));
+    }
+    if c.imu_temperature() {
+        sensor.push(Modifier::Bind(
+            "sensorTemperature".into(),
+            reference("imuTemperature"),
+        ));
+    }
+    if c.imu_model() == "acoustic" {
+        sensor.push(Modifier::Bind(
+            "acousticPressure".into(),
+            reference("imuAcousticPressure"),
+        ));
+    }
+    if c.imu_model() == "electromechanical" {
+        for (field, input) in [
+            ("gyroDriveForce", "imuGyroDriveForce"),
+            ("gyroSenseForce", "imuGyroSenseForce"),
+            ("accelForce", "imuAccelForce"),
+        ] {
+            let value = if c.acoustic.is_empty() {
+                input.to_string()
+            } else {
+                format!("acousticVulnerability.{field}")
+            };
+            sensor.push(Modifier::Bind(field.into(), reference(&value)));
+        }
+    } else if !c.acoustic.is_empty() {
+        sensor.push(Modifier::Bind(
+            "equivalentError".into(),
+            reference("acousticVulnerability.equivalentError"),
+        ));
+    }
+    Ok(vec![
+        Modifier::RedeclareModel {
+            name: "ImuModel".into(),
+            class: c.imu_class().into(),
+            modifiers: vec![],
+        },
+        Modifier::Nested("imu".into(), sensor),
+    ])
+}
+
+fn imu_boundary(
+    c: &ResolvedFireConfig,
+    components: &mut Vec<Instance>,
+    equalities: &mut Vec<(String, Value)>,
+) {
+    if c.imu_model() == "ideal" {
+        return;
+    }
+    for (name, class, field) in [
+        ("imuSampleTime", "Modelica.Units.SI.Time", "sampleTime"),
+        ("imuDeliveryTime", "Modelica.Units.SI.Time", "deliveryTime"),
+        ("imuSequence", "Integer", "sequence"),
+        ("imuValid", "Boolean", "valid"),
+    ] {
+        let mut output = instance(class, name, vec![], vec![]);
+        output.prefix = Prefix::Output;
+        components.push(output);
+        equalities.push((
+            name.into(),
+            reference(&format!("plant.sensors.imu.{field}")),
+        ));
+    }
+}
+
+fn acoustic_components(c: &ResolvedFireConfig, components: &mut Vec<Instance>) -> Result<()> {
+    if c.imu_model() == "electromechanical" {
+        let mut lock = instance("Boolean", "imuGyroLocked", vec![3], vec![]);
+        lock.prefix = Prefix::Output;
+        lock.binding = Some(reference("plant.sensors.imu.gyroLocked"));
+        components.push(lock);
+        if c.acoustic.is_empty() {
+            for name in ["imuGyroDriveForce", "imuGyroSenseForce", "imuAccelForce"] {
+                let mut force = instance("Modelica.Units.SI.Force", name, vec![3], vec![]);
+                force.prefix = Prefix::Input;
+                force.modifiers.push(Modifier::Bind(
+                    "start".into(),
+                    literal(&toml::Value::Array(vec![toml::Value::Float(0.); 3]))?,
+                ));
+                components.push(force);
+            }
+        }
+    }
+    if c.acoustic.is_empty() {
+        return Ok(());
+    }
+    let physical = c.acoustic["model"].as_str() == Some("modal_force");
+    let input = if physical {
+        "imuAcousticPressure"
+    } else {
+        "imuAcousticRmsPressure"
+    };
+    let mut pressure = instance("Modelica.Units.SI.Pressure", input, vec![], vec![]);
+    pressure.prefix = Prefix::Input;
+    pressure
+        .modifiers
+        .push(Modifier::Bind("start".into(), Value::Real(0.)));
+    components.push(pressure);
+    let mut modifiers = Vec::new();
+    for (key, value) in &c.acoustic {
+        if key == "model" {
+            continue;
+        }
+        if key == "gyroPhysics" {
+            modifiers.push(Modifier::Bind(
+                key.clone(),
+                Value::Record(
+                    "fire_modelica_models.Physical.Sensors.MEMS.GyroParameters".into(),
+                    fields(value.as_table().unwrap())?,
+                ),
+            ));
+        } else {
+            modifiers.push(Modifier::Bind(key.clone(), literal(value)?));
+        }
+    }
+    modifiers.push(Modifier::Bind(
+        if physical { "pressure" } else { "rmsPressure" }.into(),
+        reference(input),
+    ));
+    let class = if physical {
+        "PressureToForce"
+    } else {
+        "EquivalentGyroResponse"
+    };
+    components.push(instance(
+        &format!("fire_modelica_models.Vulnerabilities.Acoustic.{class}"),
+        "acousticVulnerability",
+        vec![],
+        modifiers,
+    ));
+    Ok(())
 }

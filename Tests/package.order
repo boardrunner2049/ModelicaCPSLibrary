@@ -31,3 +31,9 @@ ThreePhaseAveraging
 ThreePhaseConversion
 SpiSignals
 SpiDisruption
+ImuStatistical
+ImuDevice
+ImuAcoustic
+ImuElectromechanical
+ImuDigitalErrors
+ImuAcousticCoupling

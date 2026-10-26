@@ -1,7 +1,9 @@
 //! FIRE configuration frontend. Modelica semantics remain owned by the compiler.
+pub mod acoustic;
 pub mod artifact;
 pub mod composition;
 pub mod config;
+pub mod imu;
 pub mod lower;
 
 pub type Result<T> = std::result::Result<T, String>;

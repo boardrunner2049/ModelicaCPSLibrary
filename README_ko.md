@@ -13,7 +13,8 @@ world NED / chassis·body FRD가 기본입니다.
 - `Exports.FMU`: 외부 PWM·센서 포트와 진단 출력을 정의하며 P0/P1/P2 plant는 composer가 조립합니다.
 
 `demand`는 **추력 비율이 아닌 목표 회전속도 비율**입니다. 모터 lag는 한 번만 적용됩니다.
-센서는 연속 이상 관측식이며 기본 bias는 0입니다. 샘플링·hold·timestamp·응답 필터는 없습니다.
+기본 센서는 연속 이상 관측식과 bias 0을 사용합니다. 선택적 IMU profile이
+샘플링·hold·timestamp·응답 필터를 추가합니다.
 4점 착륙다리는 기본 활성화되어 수평 지면에서 기체를 지지합니다.
 `landingGear(enabled=false)`를 지정하면 지면을 통과하는 자유낙하 모델이 됩니다.
 P1은 ideal voltage-only ESC와 전압 기반 속도 응답을 추가합니다.
@@ -25,6 +26,30 @@ TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 
 직접 작성하는 Modelica의 `MassProperties(...)` 및 파생 record 생성자에서는 `componentId`
 수정자를 제거해야 합니다. Composer를 거치지 않는 경우 부품 중복 계상은 호출자가 확인해야 하며,
 질량·회전행렬·관성의 물리적 유효성 검사는 기존 Modelica 함수에서 계속 수행합니다.
+
+## 센서 fidelity (2026-10-26, 개정)
+
+**I0 이상값 → I1 디지털 출력 근사 → I2 교정·통계 오차 → I3 기계·전기 물리 모델**로
+구성합니다. 추진계와 독립적으로 `[models.imu]`의 `model`을
+`ideal`, `digital`, `errors`, `electromechanical` 중 선택합니다.
+[IMU 사용법·수식·한계](Systems/Sensing/IMU/README.md)에 상세 계약을 기록했습니다.
+
+I1은 대역폭·ADC·IIR·decimation·전달 지연을, I2는 교정·온도·시변 bias·잡음을 추가합니다.
+I2 오차를 0으로 두면 같은 설정의 I1과 일치합니다. I3는 3축 자이로의 drive/sense 진동,
+정전용량 검출, AGC·PLL·복조와 3축 가속도계 proof mass를 구현합니다.
+전기부는 carrier를 평균화한 C/V 및 제어 루프 모델이며, transistor 회로나 실제 칩 복제는 아닙니다.
+Sense는 개방형이며 force rebalance는 후속입니다.
+
+[독립 음향 vulnerability](Vulnerabilities/Acoustic/README.md)는
+`[vulnerabilities.acoustic]`에서 선택합니다. I1/I2는 `equivalent_rate`로 RMS envelope를,
+I3는 `modal_force`로 순간 음압을 받아 MEMS에 힘을 전달합니다.
+패키지는 유효면적·결합계수·방향 투영만 사용하며 추가 패키지 동역학이나 FEM은 없습니다.
+
+`configs/quad_i1.toml`–`quad_i3.toml` 및 `quad_i2_acoustic.toml`, `quad_i3_acoustic.toml`을
+사용할 수 있습니다. 계수는 예시이며 ICM-42688-P 실측 보정값이 아닙니다.
+기존 `statistical`, `device`, `acoustic` 선택은 동작을 보존하며 manifest에서 legacy로 구분합니다.
+I0 기본식은 유지합니다. [검증 범위](docs/validation.md)는 native/FMI2와 hardware·Rumoca/FMI3·
+FastDyn firmware 통합을 구분합니다. H-Flow의 PAA3905E1·AFBR-S50LV85D 및 GNSS 확장은 설계안입니다.
 
 ## P0 유지와 P1 선택
 

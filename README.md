@@ -15,13 +15,43 @@ The baseline consists of **continuous P0 motors + R0 rotors + a single 6DOF rigi
 - `Exports.FMU`: common external PWM/sensor ports and diagnostic outputs; the composer supplies the selected P0–P4 propulsion composition.
 
 `demand` is a **target rotor-speed ratio, not a thrust ratio**. Motor lag is applied once.
-Sensors use continuous ideal measurement equations with zero bias by default. There is no
-sampling, hold, timestamp, or response filter. Landing gear is enabled by default and supports
+Default sensors use continuous ideal measurement equations with zero bias and no
+sampling, hold, timestamp or response filter. Optional IMU profiles add these mechanisms. Landing gear is enabled by default and supports
 the vehicle on a stationary horizontal plane. Set `landingGear(enabled=false)` for freefall
 through the plane. P1 adds an ideal voltage-only ESC and voltage-to-speed surrogate.
 P2 adds inductive motor current, torque and load feedback. P3/P4 add three-phase
 commutation and a shared DC link, with averaged or switched inverters. General terrain,
 drag, battery chemistry/SOC and protocol models remain outside the active path.
+
+## Sensor fidelity (2026-10-26, revised)
+
+IMU fidelity is independent of propulsion: **I0 ideal, I1 digital output, I2
+calibration/statistical errors, I3 electromechanical MEMS and electronics**.
+Select `[models.imu] model="ideal"|"digital"|"errors"|"electromechanical"`.
+See [IMU equations, configuration and limits](Systems/Sensing/IMU/README.md).
+
+| Family | Implemented scope | Remaining scope |
+|---|---|---|
+| IMU | I0–I3; I3 includes drive/sense, capacitive readout, AGC, PLL and open-loop sense demodulation | Hardware parameter identification; optional force rebalance |
+| GNSS | G0 ideal | G1–G3 and spoofing |
+| LiDAR rangefinder | Design for AFBR-S50LV85D | L0–L3 implementation |
+| Optical flow | Design for PAA3905E1 | F0–F3 implementation |
+
+I1–I3 share ADC/IIR/decimation and sample metadata. I2 adds nominal errors. I3
+replaces input physics with three gyros and three proof masses; its C/V electronics
+are carrier-averaged blocks, not transistor circuits or a proprietary chip replica.
+Examples `configs/quad_i1.toml` through `quad_i3.toml` are illustrative.
+
+[Acoustic vulnerabilities](Vulnerabilities/Acoustic/README.md) are independently
+selected under `[vulnerabilities.acoustic]`: `equivalent_rate` for I1/I2 or
+`modal_force` for I3. Package coupling is a static pressure-to-force gain and
+projection; no package FEM is introduced. The two acoustic examples demonstrate
+RMS-envelope and instantaneous-pressure inputs respectively.
+
+Legacy `statistical`, `device`, `acoustic` selections retain their behavior and are
+marked legacy in manifests. I0 remains unchanged. See [validation](docs/validation.md)
+for native/FMI2 evidence and solver requirements; hardware, Rumoca/FMI3 and FastDyn
+firmware integration are not certified. H-Flow flow/range assembly remains proposed.
 
 ## P0 and P1 propulsion
 

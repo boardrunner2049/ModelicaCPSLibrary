@@ -1,0 +1,21 @@
+within fire_modelica_models.Systems.Sensing.IMU;
+record Parameters "Explicit error/readout settings; six channels are accel xyz then gyro xyz"
+  parameter Real samplePeriod(unit="s", min=Modelica.Constants.small) = 0.001;
+  parameter Integer seed = 1 "Replay seed; no global or wall-clock RNG";
+  parameter Integer streamId = 1 "Assign distinct streams to independent IMUs";
+  parameter Integer latencySamples(min=0) = 0 "Fixed delivery delay in output periods";
+  parameter Real scale[6] = zeros(6) "Fractional scale error";
+  parameter Real accelMisalignment[3,3] = zeros(3,3);
+  parameter Real gyroMisalignment[3,3] = zeros(3,3);
+  parameter Real gyroGSensitivity[3,3] = zeros(3,3) "(rad/s)/(m/s2)";
+  parameter Real noiseStd[6](each min=0) = zeros(6) "Per-tick standard deviation; NOT a noise density";
+  parameter Real biasStd[6](each min=0) = zeros(6) "Stationary Gauss-Markov standard deviation";
+  parameter Real biasTau[6](each unit="s", each min=Modelica.Constants.small) = fill(100,6);
+  parameter Real referenceTemperature(unit="K") = 293.15;
+  parameter Real temperatureCoefficient[6] = zeros(6) "Channel units/K";
+  parameter Real analogTau[6](each unit="s", each min=Modelica.Constants.small) = fill(0.001,6);
+  parameter Integer adcDecimation(min=1) = 1 "ADC ticks per output; internal period = samplePeriod/adcDecimation";
+  parameter Real fullScale[6](each min=Modelica.Constants.small) = {156.9064,156.9064,156.9064,34.9066,34.9066,34.9066};
+  parameter Real quantum[6](each min=0) = zeros(6) "ADC LSB; zero explicitly bypasses quantization";
+  parameter Real digitalTau[6](each unit="s", each min=0) = zeros(6) "Matched-pole first-order IIR; zero bypass";
+end Parameters;

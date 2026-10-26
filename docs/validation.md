@@ -369,3 +369,89 @@ The composer suite passes 20 tests, with its 9 native integration tests skipped.
 Its source-bundle expectation includes the new adapter. No SPI copter profile,
 boardrunner bridge, physical EMI model or Rumoca/FMI runtime integration is
 claimed by these checks.
+
+## IMU I0–I3, revised fidelity (2026-10-26)
+
+The fidelity definition is `digital_errors_electromechanical_v2`: I0 stays ideal,
+I1 is deterministic digital readout, I2 adds calibration/statistical errors, and
+I3 resolves gyro/accelerometer mechanics and averaged electronics. Acoustic
+pressure-to-force coupling is selected independently. The prior statistical,
+device and pressure-driven classes remain available as `legacy_I1/I2/I3`; their
+old equations do not define the new tiers. See
+[IMU equations and limits](../Systems/Sensing/IMU/README.md) and
+[acoustic coupling](../Vulnerabilities/Acoustic/README.md).
+
+Validation with OpenModelica 1.26.1 and Modelica 4.0.0:
+
+- Full native suite: **42 simulations passed**, plus four expected invalid-chassis
+  rejections. Existing ideal sensors, geometry and propulsion regressions pass.
+  The composer suite passes **23 tests**, including native integration cases.
+- `ImuDigitalErrors` checks exact equality of I1 and zero-error I2 with the same
+  bandwidth/ADC/IIR/decimation/delay, and calibrated I2 static values.
+- `ImuElectromechanical` checks all six axes and ensures true rate is not added
+  directly to I3 output. The largest final gyro error for rates {0.2,-0.3,0.1}
+  rad/s is **2.061e-4 rad/s**. A separate gyro starting at 10% amplitude with a
+  1003 Hz mechanical drive and 1000 Hz reference reaches 1002.868 Hz and
+  1.99860e-7 m amplitude versus the 2e-7 m target at 1 s.
+- `ImuAcousticCoupling` checks power/pressure units, zero exposure/coupling,
+  AGC response to drive disturbance and the reduced model against the physical
+  gyro. A 1001 Hz, 0.01 Pa RMS tone gives a maximum reduced/physical difference
+  of **0.001637 rad/s** after startup (0.15–0.49 s). With tolerance 1e-10, limiting
+  DASSL steps to 20 versus 10 microseconds produces agreement within 1e-4 rad/s.
+  These illustrative coefficients are not measured hardware susceptibility.
+- Legacy regressions retain statistical and device coverage: white-noise variance
+  0.038471 versus target 0.04; bias lag correlation 0.959793 versus
+  `exp(-0.001/0.02)=0.951229`; RNG replay is exact across solver settings.
+  They also cover analog response, temperature, clipping/rounding, IIR, delay and
+  decimation. The legacy acoustic case checks 110 Hz/100 Hz aliasing (10 Hz),
+  linear transfer and quadratic rectification; analytic error is 7.47e-9.
+- Generated current I1/I2/I3 × quad/hexa × `plant`/`vio`: **12 native cases pass**,
+  including exported acquisition/delivery timestamps, sequence and validity.
+- Current I1–I3 quad FMI2 CS binaries build and step with CVODE. At a 70 microsecond
+  communication step each delivers eight samples in 21 ms, with 2.5 ms modeled
+  latency and no missing/duplicated sequence numbers. Fresh instances reproduce
+  identical outputs. Temperature, raw force inputs, lock diagnostics and typed
+  metadata are checked in the FMU XML and runtime outputs.
+- Separate acoustic configurations build and simulate natively and as FMI2 CS.
+  Changing exported pressure from zero to 0.01 Pa RMS produces peak differences
+  of 0.2230 rad/s (I2 envelope path) and 0.2244 rad/s (I3 instantaneous waveform
+  path). This checks input causality and effect, not FMI/native transfer accuracy.
+  The pressure experiment runs for approximately 0.12 s with a
+  `20/sqrt(2)` microsecond communication step and a 1001 Hz carrier.
+- Composer checks reject invalid/unused fields, missing physical settings,
+  malformed arrays, invalid clocks/seeds, nonfinite coefficients and incompatible
+  vulnerability/tier combinations. Readout changes invalidate cached verification;
+  old selectors are marked legacy. Rust unit tests and clippy with warnings denied
+  pass.
+
+Reproduce from the FIRE root:
+
+```sh
+FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p test_imu.py -v
+FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p test_composer.py -v
+python3 tools/verify.py --output build/imu-v2-native
+cargo test --locked --offline --manifest-path tools/fire-compose/Cargo.toml
+cargo clippy --locked --offline --manifest-path tools/fire-compose/Cargo.toml --all-targets -- -D warnings
+```
+
+Evidence: `build/imu-v2-native/report.json`,
+`build/imu-validation/{current,physics,fmi2,acoustic-fmi2}/report.json` and
+corresponding `run.log` files. Composer/native regression and focused final
+physical/FMI logs are under `build/imu-v2-smoke`.
+
+FMI2 CS tests explicitly build with `--fmiFlags=s:cvode` and use the probe's
+existing OpenModelica output-cache refresh. An **unresolved runtime restriction**
+was observed with OpenModelica 1.26.1 CVODE: the I2 acoustic configuration returned
+`fmi2Fatal` while stepping from 7.48 to 7.50 ms on an exact 20 microsecond grid,
+even with zero acoustic input. The root cause has not been established. The
+acoustic input test therefore uses the non-aligned grid above; passing that test
+is not evidence that arbitrary communication steps, or exact ADC-event stops,
+work. The separate timing/replay test covers its stated 70 microsecond grid only.
+Default forward Euler at a coarse step is unsuitable for the I3 oscillators.
+Pressure waveform inputs must resolve the acoustic carrier regardless of the
+internal adaptive solver; the reduced RMS-envelope path avoids that carrier-rate
+input requirement.
+
+Physical transfer/convergence evidence above is native DASSL evidence. These tests
+do not certify hardware calibration, proprietary chip circuitry, force rebalance,
+Rumoca/FMI3, FastDyn firmware timestamp/batch handling or H-Flow integration.
