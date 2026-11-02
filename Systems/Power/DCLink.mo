@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Power;
+within ModelicaCPSLibrary.Systems.Power;
 model DCLink "Shared ideal source, series resistance and DC-link capacitance"
   parameter Modelica.Units.SI.Resistance sourceResistance;
   parameter Modelica.Units.SI.Capacitance dcLinkCapacitance;

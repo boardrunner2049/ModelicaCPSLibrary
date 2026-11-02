@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing;
+within ModelicaCPSLibrary.Systems.Sensing;
 function normalDraw "Explicit local RNG; n independent standard normal variates"
   input Integer n;
   input Integer stateIn[Modelica.Math.Random.Generators.Xorshift128plus.nState];

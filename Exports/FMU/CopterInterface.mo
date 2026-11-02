@@ -1,4 +1,4 @@
-within fire_modelica_models.Exports.FMU;
+within ModelicaCPSLibrary.Exports.FMU;
 partial model CopterInterface "Common P0/P1 VirtualIO PWM and sensor boundary; composer binds plant semantics"
   extends PartialCopterInterface;
   Adapters.VirtualIO.PwmInput commands(nChannels=geometry.nActuators,

@@ -1,4 +1,4 @@
-within fire_modelica_models;
+within ModelicaCPSLibrary;
 package Physical
   extends Modelica.Icons.Package;
 end Physical;

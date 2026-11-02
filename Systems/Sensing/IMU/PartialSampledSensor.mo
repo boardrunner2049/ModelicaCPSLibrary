@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 partial model PartialSampledSensor "Local RNG, clocked errors, ADC/IIR and fixed sample delivery queue"
   extends PartialSensor;
   parameter Parameters p;

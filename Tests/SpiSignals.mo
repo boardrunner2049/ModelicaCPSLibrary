@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model SpiSignals "All four SPI modes and both bit orders; repeated data and continuous CS"
   parameter Boolean cpol[8] = {false,false,true,true,false,false,true,true};
   parameter Boolean cpha[8] = {false,true,false,true,false,true,false,true};

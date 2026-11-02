@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuDigitalErrors "I2 zero-error reduction to I1, including ADC, decimation and queue"
   parameter Systems.Sensing.IMU.Parameters p(samplePeriod=0.004,adcDecimation=4,latencySamples=2,
     analogTau=fill(0.002,6),digitalTau=fill(0.003,6),quantum=fill(0.01,6));

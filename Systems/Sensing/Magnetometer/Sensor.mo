@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.Magnetometer;
+within ModelicaCPSLibrary.Systems.Sensing.Magnetometer;
 
 model Sensor "Continuous mounted magnetic field; magnetic inputs and bias are in Tesla"
   parameter Real R_bs[3,3] = identity(3) "Body-to-sensor relative attitude; v_b = R_bs*v_s";

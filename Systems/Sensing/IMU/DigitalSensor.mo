@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 model DigitalSensor "I1: deterministic bandwidth, ADC, IIR, decimation and delivery"
   extends PartialDeviceSensor(final enableErrors=false);
   input Real equivalentError[6] = zeros(6) "External vulnerability before readout, sensor-local SI";

@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Propulsion.Motors;
+within ModelicaCPSLibrary.Systems.Propulsion.Motors;
 model ThreePhasePM "Floating-star three-phase PM motor and rigid shaft; shared by P3 and P4"
   parameter Modelica.Units.SI.Resistance RPhase;
   parameter Modelica.Units.SI.Inductance LPhase "Effective phase inductance in the balanced subspace";

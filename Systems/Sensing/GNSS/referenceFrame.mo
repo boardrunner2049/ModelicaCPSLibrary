@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function referenceFrame "WGS84 origin and NED-to-ECEF rotation"
   input Reference reference;
   output Real origin[3];

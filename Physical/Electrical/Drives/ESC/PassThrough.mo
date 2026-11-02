@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 model PassThrough "Stateless normalized command forwarding"
   input Real escCommand(unit="1") "Normalized command in [0,1]";
   output Real normalizedCommand(unit="1");

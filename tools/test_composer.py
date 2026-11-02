@@ -1,6 +1,7 @@
 """Minimum NED/FRD frontend and artifact behavior: python3 -m unittest discover -s tools -p test_composer.py."""
 import json
 import hashlib
+from itertools import product
 import math
 import os
 import csv
@@ -145,14 +146,14 @@ class RustComposerTests(unittest.TestCase):
             self.assertEqual(manifest['core_contract'], 'ned_frd_continuous_v1')
             self.assertEqual(manifest['frames']['body'], 'FRD')
             self.assertFalse(any(k.startswith('deprecated/') for k in manifest['source']['files']))
-            self.assertFalse((output / 'sources/fire_modelica_models/deprecated').exists())
+            self.assertFalse((output / 'sources/ModelicaCPSLibrary/deprecated').exists())
             self.assertEqual(manifest['verification']['fmu_simulation'], 'not_run')
-            self.assertTrue((output / 'sources/fire_modelica_models/package.mo').is_file())
+            self.assertTrue((output / 'sources/ModelicaCPSLibrary/package.mo').is_file())
             manifest['verification']['modelica_check'] = 'test-result'
             (output / 'TestHexa.manifest.json').write_text(json.dumps(manifest))
-            stale = output / 'sources/fire_modelica_models/RemovedModel.mo'
+            stale = output / 'sources/ModelicaCPSLibrary/RemovedModel.mo'
             stale.write_text('model RemovedModel end RemovedModel;')
-            adapters = output / 'sources/fire_modelica_models/Adapters'
+            adapters = output / 'sources/ModelicaCPSLibrary/Adapters'
             for obsolete in ('VIO', 'FastDyn'):
                 package = adapters / obsolete
                 package.mkdir()
@@ -185,21 +186,21 @@ class RustComposerTests(unittest.TestCase):
                     manifest = json.loads(next(output.glob('*.manifest.json')).read_text())
                     self.assertEqual(manifest['profile'], 'vio')
                     adapter = manifest['input_adapter']
-                    self.assertEqual(adapter['class'], 'fire_modelica_models.Adapters.VirtualIO.PwmInput')
+                    self.assertEqual(adapter['class'], 'ModelicaCPSLibrary.Adapters.VirtualIO.PwmInput')
                     self.assertEqual(adapter['output_contract'], 'normalized_pwm_command_v1')
                     self.assertEqual(adapter['command_meaning'], mapping)
                     self.assertEqual(adapter['propulsion_input'], 'escs.escCommand')
                     self.assertEqual((adapter['pwm_min_us'], adapter['pwm_max_us']), (1100, 1900))
-                    self.assertIn('extends fire_modelica_models.Exports.FMU.CopterInterface', source)
+                    self.assertIn('extends ModelicaCPSLibrary.Exports.FMU.CopterInterface', source)
                     self.assertIn('escs.escCommand = {commands.normalizedCommand[3],commands.normalizedCommand[2],commands.normalizedCommand[4],commands.normalizedCommand[1]}', source)
                     self.assertNotIn('Adapters.FastDyn', source)
                     if port == 'escCommand':
                         self.assertEqual(manifest['propulsion_contract']['supply'], 'internal_constant')
-                    adapters = output / 'sources/fire_modelica_models/Adapters'
+                    adapters = output / 'sources/ModelicaCPSLibrary/Adapters'
                     self.assertTrue((adapters / 'VirtualIO/package.mo').is_file())
                     self.assertEqual({p.stem for p in (adapters / 'VirtualIO').glob('*.mo')},
                                      {'package', 'PwmInput', 'SensorValues', 'SpiTransfer'})
-                    exports = output / 'sources/fire_modelica_models/Exports/FMU'
+                    exports = output / 'sources/ModelicaCPSLibrary/Exports/FMU'
                     self.assertTrue((exports / 'CopterInterface.mo').is_file())
                     self.assertNotIn('ambientPressure', (exports / 'PartialCopterInterface.mo').read_text())
                     self.assertIn('pressure=101325', source)
@@ -297,7 +298,7 @@ initial equation
     "Composed assembled CG changed");
 end MassRun;
 ''')
-            files = [work/'generated/sources/fire_modelica_models/package.mo',
+            files = [work/'generated/sources/ModelicaCPSLibrary/package.mo',
                      work/'generated/ConfiguredPayload.mo', harness]
             script = work/'simulate.mos'
             script.write_text('loadModel(Modelica,{"4.0.0"});\n'
@@ -333,7 +334,7 @@ equation
   end when;
 end GroundRun;
 ''')
-                files = [work/'generated/sources/fire_modelica_models/package.mo',work/'generated/GroundVehicle.mo',harness]
+                files = [work/'generated/sources/ModelicaCPSLibrary/package.mo',work/'generated/GroundVehicle.mo',harness]
                 script = work/'simulate.mos'
                 script.write_text('loadModel(Modelica,{"4.0.0"});\n'+''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
                     +'simulate(GroundRun,stopTime=2.6,tolerance=1e-8,outputFormat="csv");\ngetErrorString();\n')
@@ -346,43 +347,44 @@ end GroundRun;
 
     def test_previous_namespace_outputs_can_be_regenerated(self):
         raw = 'schema_version=3\nmodel_name="MigratedQuad"'
-        with tempfile.TemporaryDirectory() as work:
-            output = Path(work)
-            run = self.run_config(raw, 'emit', '--output-dir', work)
-            self.assertEqual(run.returncode, 0, run.stderr)
-            model = output / 'MigratedQuad.mo'
-            model.write_text(model.read_text().replace('fire_modelica_models', 'FIRE_Modelica'))
-            manifest_path = output / 'MigratedQuad.manifest.json'
-            manifest = json.loads(manifest_path.read_text())
-            manifest['generator_id'] = 'FIRE_Modelica/tools/fire-compose'
-            manifest['generated_model_sha256'] = hashlib.sha256(model.read_bytes()).hexdigest()
-            manifest['verification']['modelica_check'] = 'old-result'
-            manifest_path.write_text(json.dumps(manifest))
-            old = output / 'sources/FIRE_Modelica'
-            (output / 'sources/fire_modelica_models').rename(old)
-            (old / '.fire-compose').write_text('FIRE_Modelica/tools/fire-compose')
-            run = self.run_config(raw, 'emit', '--output-dir', work)
-            self.assertEqual(run.returncode, 0, run.stderr)
-            self.assertNotIn('FIRE_Modelica', model.read_text())
-            self.assertIn('fire_modelica_models.Vehicles.', model.read_text())
-            self.assertFalse(old.exists())
-            self.assertTrue((output / 'sources/fire_modelica_models/package.mo').is_file())
-            updated = json.loads(manifest_path.read_text())
-            self.assertEqual(updated['generator_id'], 'fire_modelica_models/tools/fire-compose')
-            self.assertEqual(updated['verification']['modelica_check'], 'not_run')
+        for namespace in ('fire_modelica_models', 'FIRE_Modelica'):
+            with self.subTest(namespace=namespace), tempfile.TemporaryDirectory() as work:
+                output = Path(work)
+                run = self.run_config(raw, 'emit', '--output-dir', work)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                model = output / 'MigratedQuad.mo'
+                model.write_text(model.read_text().replace('ModelicaCPSLibrary', namespace))
+                manifest_path = output / 'MigratedQuad.manifest.json'
+                manifest = json.loads(manifest_path.read_text())
+                manifest['generator_id'] = f'{namespace}/tools/fire-compose'
+                manifest['generated_model_sha256'] = hashlib.sha256(model.read_bytes()).hexdigest()
+                manifest['verification']['modelica_check'] = 'old-result'
+                manifest_path.write_text(json.dumps(manifest))
+                old = output / 'sources' / namespace
+                (output / 'sources/ModelicaCPSLibrary').rename(old)
+                (old / '.fire-compose').write_text(f'{namespace}/tools/fire-compose')
+                run = self.run_config(raw, 'emit', '--output-dir', work)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertNotIn(namespace, model.read_text())
+                self.assertIn('ModelicaCPSLibrary.Vehicles.', model.read_text())
+                self.assertFalse(old.exists())
+                self.assertTrue((output / 'sources/ModelicaCPSLibrary/package.mo').is_file())
+                updated = json.loads(manifest_path.read_text())
+                self.assertEqual(updated['generator_id'], 'ModelicaCPSLibrary/tools/fire-compose')
+                self.assertEqual(updated['verification']['modelica_check'], 'not_run')
 
     def test_previous_namespace_cleanup_preserves_unowned_and_symlink_trees(self):
         raw = 'schema_version=3\nmodel_name="PreservedQuad"'
-        for symlink in (False, True):
-            with self.subTest(symlink=symlink), tempfile.TemporaryDirectory() as work:
+        for namespace, symlink in product(('fire_modelica_models', 'FIRE_Modelica'), (False, True)):
+            with self.subTest(namespace=namespace, symlink=symlink), tempfile.TemporaryDirectory() as work:
                 output = Path(work) / 'generated'
                 sources = output / 'sources'
                 sources.mkdir(parents=True)
-                old = sources / 'FIRE_Modelica'
+                old = sources / namespace
                 if symlink:
                     target = Path(work) / 'external'
                     target.mkdir()
-                    (target / '.fire-compose').write_text('FIRE_Modelica/tools/fire-compose')
+                    (target / '.fire-compose').write_text(f'{namespace}/tools/fire-compose')
                     old.symlink_to(target, target_is_directory=True)
                 else:
                     old.mkdir()
@@ -420,7 +422,7 @@ end GroundRun;
                 harness = work/'MotorRun.mo'
                 harness.write_text(f'model MotorRun\n  extends ComposedVehicle(pwm=fill(1500,{count}));\nend MotorRun;\n')
                 script = work/'simulate.mos'
-                files = [work/'generated/sources/fire_modelica_models/package.mo',work/'generated/ComposedVehicle.mo',harness]
+                files = [work/'generated/sources/ModelicaCPSLibrary/package.mo',work/'generated/ComposedVehicle.mo',harness]
                 script.write_text('loadModel(Modelica, {"4.0.0"});\n'+''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
                     +'simulate(MotorRun, stopTime=0.1, tolerance=1e-9, numberOfIntervals=100, outputFormat="csv");\ngetErrorString();\n')
                 run = subprocess.run(['omc',str(script)],cwd=work,text=True,capture_output=True,timeout=120)
@@ -468,7 +470,7 @@ equation
   end when;
 end ChannelsRun;
 ''')
-                files = [work/'generated/sources/fire_modelica_models/package.mo',
+                files = [work/'generated/sources/ModelicaCPSLibrary/package.mo',
                          work/'generated/ChannelsVehicle.mo', harness]
                 script = work/'simulate.mos'
                 script.write_text('loadModel(Modelica,{"4.0.0"});\n'
@@ -504,7 +506,7 @@ end ChannelsRun;
                         self.assertIn('escs.escCommand = {commands.normalizedCommand[', source)
                         self.assertIn('plant.rotorForce_r = rotors.force_r', source)
                         self.assertIn('Exports.FMU.CopterInterface', source)
-                    self.assertTrue((Path(work) / 'sources/fire_modelica_models/Physical/Electrical/Drives/ESC/AverageVoltage.mo').is_file())
+                    self.assertTrue((Path(work) / 'sources/ModelicaCPSLibrary/Physical/Electrical/Drives/ESC/AverageVoltage.mo').is_file())
 
     def test_p1_rejects_missing_and_cross_profile_parameters(self):
         raw = 'schema_version=3\n[models]\nesc="average_voltage"\nmotor="first_order_voltage_to_speed"\nrotor="quadratic_blade"\n[motor]\nKv=62.5\n[power]\ndcVoltage=16\n'
@@ -575,7 +577,7 @@ end ChannelsRun;
                     port = 'pwm' if profile == 'vio' else 'normalizedCommand'
                     harness = work/'P1Run.mo'
                     harness.write_text('model P1Run\n  P1Vehicle vehicle('+port+'={'+','.join(map(str,values))+'});\nend P1Run;\n')
-                    files = [work/'generated/sources/fire_modelica_models/package.mo', work/'generated/P1Vehicle.mo', harness]
+                    files = [work/'generated/sources/ModelicaCPSLibrary/package.mo', work/'generated/P1Vehicle.mo', harness]
                     script = work/'simulate.mos'
                     script.write_text('loadModel(Modelica,{"4.0.0"});\n'
                         + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)
@@ -646,7 +648,7 @@ equation
   end when;
 end SupplyRun;
 """)
-            files = [work/'generated/sources/fire_modelica_models/package.mo',
+            files = [work/'generated/sources/ModelicaCPSLibrary/package.mo',
                      work/'generated/SupplyP0.mo', work/'generated/SupplyP1.mo', harness]
             script = work/'simulate.mos'
             script.write_text('loadModel(Modelica,{"4.0.0"});\n'
@@ -678,7 +680,7 @@ end SupplyRun;
                                       '--profile', 'plant', '--output-dir', str(work/'generated'))
                 self.assertEqual(run.returncode, 0, run.stderr)
                 model_file = next((work/'generated').glob('*.mo'))
-                files = [work/'generated/sources/fire_modelica_models/package.mo', model_file]
+                files = [work/'generated/sources/ModelicaCPSLibrary/package.mo', model_file]
                 script = work/'export.mos'
                 script.write_text('loadModel(Modelica,{"4.0.0"});\n'
                     + ''.join('loadFile('+json.dumps(str(f))+');\n' for f in files)

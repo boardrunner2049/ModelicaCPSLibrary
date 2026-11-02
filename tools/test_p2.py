@@ -62,7 +62,7 @@ class P2ComposerTests(unittest.TestCase):
                 self.assertIn('escs.openCircuitVoltage = motors.backEMF',source)
                 self.assertIn('motors.currentZero = escs.coast',source)
                 self.assertNotIn('tauOmega=',source)
-                self.assertTrue((work/'generated/sources/fire_modelica_models/Physical/Electrical/Passives/SeriesRL.mo').is_file())
+                self.assertTrue((work/'generated/sources/ModelicaCPSLibrary/Physical/Electrical/Passives/SeriesRL.mo').is_file())
 
     @unittest.skipUnless(os.environ.get('FIRE_TEST_OMC')=='1','set FIRE_TEST_OMC=1')
     def test_composed_arrays_mapping_equilibrium_and_cutoff(self):
@@ -92,7 +92,7 @@ class P2ComposerTests(unittest.TestCase):
                     harness=work/'P2Run.mo'
                     harness.write_text('model P2Run\n  P2Vehicle vehicle('+port+'=if time<2 then {'+
                         ','.join(map(str,values))+'} else fill('+str(off)+','+str(channels)+'));\nend P2Run;\n')
-                    files=[work/'generated/sources/fire_modelica_models/package.mo',work/'generated/P2Vehicle.mo',harness]
+                    files=[work/'generated/sources/ModelicaCPSLibrary/package.mo',work/'generated/P2Vehicle.mo',harness]
                     mos=work/'run.mos'
                     mos.write_text('loadModel(Modelica,{"4.0.0"});\n'+''.join('loadFile('+json.dumps(str(p))+');\n' for p in files)+
                         'simulate(P2Run,stopTime=2.2,tolerance=1e-9,numberOfIntervals=2200,outputFormat="csv");\ngetErrorString();\n')

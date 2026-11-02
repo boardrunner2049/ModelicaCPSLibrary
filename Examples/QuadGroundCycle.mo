@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 
 model QuadGroundCycle "Drop, settle, open-loop takeoff, motor cutoff and landing in NED/FRD"
   Vehicles.Copter.MultirotorWithSensors vehicle(

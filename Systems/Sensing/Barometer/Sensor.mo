@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.Barometer;
+within ModelicaCPSLibrary.Systems.Sensing.Barometer;
 
 model Sensor "Ambient pressure/temperature and geometric altitude; no pressure-height inversion"
   parameter Real pressureBias(unit="Pa") = 0;

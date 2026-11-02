@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model GnssStatistical "G0/G1 antenna kinematics, epochs, delayed fix loss and reproducible correlated errors"
   Systems.Sensing.GNSS.Sensor ideal(positionBias={1,2,3},velocityBias={0.1,0.2,0.3});
   Systems.Sensing.GNSS.StatisticalSensor delayed(samplePeriod=0.1,latencySamples=2,

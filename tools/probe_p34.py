@@ -21,7 +21,7 @@ def run(output, omc):
     script = output / 'build.mos'
     script.write_text('loadModel(Modelica,{"4.0.0"});\n'
         + 'loadFile(' + json.dumps(str(ROOT / 'package.mo')) + ');\n'
-        + 'buildModel(fire_modelica_models.Tests.ThreePhaseAveraging,stopTime=0.05,'
+        + 'buildModel(ModelicaCPSLibrary.Tests.ThreePhaseAveraging,stopTime=0.05,'
         'numberOfIntervals=50000,tolerance=1e-9,outputFormat="csv",fileNamePrefix="Averaging",'
         'variableFilter="mean.*|switched.phaseCurrent.*|average.energyError|switched.energyError");\ngetErrorString();\n')
     binary = output / 'Averaging'

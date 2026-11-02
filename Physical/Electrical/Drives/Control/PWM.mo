@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Control;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Control;
 block PWM "Leading-edge high-side PWM, turn-on delay and immediate turn-off"
   parameter Modelica.Units.SI.Frequency frequency;
   parameter Modelica.Units.SI.Time deadTime = 0;

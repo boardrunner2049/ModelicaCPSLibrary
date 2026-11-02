@@ -1,6 +1,12 @@
-# FIRE Minimal Multicopter Models
+# ModelicaCPSLibrary
 
 [Korean version](README_ko.md)
+
+Load `package.mo` and use the `ModelicaCPSLibrary` namespace, for example
+`ModelicaCPSLibrary.Examples.QuadHover`. In FastDyn, this library lives at
+`third_party/courbet_deps/ModelicaCPSLibrary`. Re-run `fire-compose emit` to migrate
+existing generated models and staged sources to the new namespace. The historical
+`deprecated/` archive retains its original names and contents.
 
 The active package implements the initial execution scope defined in
 `MULTICOPTER_INTERFACES.md` v0.8 and `261006_quadrotor-fidelity-port-contract.md`.

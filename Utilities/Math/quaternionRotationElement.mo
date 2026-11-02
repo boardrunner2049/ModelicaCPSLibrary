@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities.Math;
+within ModelicaCPSLibrary.Utilities.Math;
 
 function quaternionRotationElement "Scalar entry of the normalized Hamilton body-to-world rotation"
   input Real q[4] "Scalar-first Hamilton quaternion, body to world";
@@ -16,7 +16,7 @@ algorithm
   // Scalar arithmetic also avoids array-return derivative code in OMC FMI.
   assert(i >= 1 and i <= 3 and j >= 1 and j <= 3, "Rotation index must be 1 through 3");
   n := max(sqrt(q[1]*q[1] + q[2]*q[2] + q[3]*q[3] + q[4]*q[4]),
-    fire_modelica_models.Utilities.Constants.eps);
+    ModelicaCPSLibrary.Utilities.Constants.eps);
   w := q[1]/n;
   x := q[2]/n;
   y := q[3]/n;

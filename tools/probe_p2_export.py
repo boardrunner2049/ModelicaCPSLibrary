@@ -51,7 +51,7 @@ def run(output, omc):
             ' else if time<0.4 then '+vectors[3]+' else '+vectors[4]+');\nend P2Reference;\n')
         mos=work/'build.mos'
         mos.write_text('loadModel(Modelica,{"4.0.0"});\n'+''.join('loadFile('+json.dumps(str(p))+');\n'
-            for p in [generated/'sources/fire_modelica_models/package.mo',generated/(model+'.mo'),harness])+
+            for p in [generated/'sources/ModelicaCPSLibrary/package.mo',generated/(model+'.mo'),harness])+
             'simulate(P2Reference,stopTime=0.5,tolerance=1e-10,numberOfIntervals=10000,outputFormat="csv");\ngetErrorString();\n'+
             f'buildModelFMU({model},version="2.0",fmuType="cs",fileNamePrefix="P2",platforms={{"static"}});\ngetErrorString();\n')
         fmu=work/'P2.fmu'

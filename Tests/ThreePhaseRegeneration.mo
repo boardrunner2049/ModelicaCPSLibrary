@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ThreePhaseRegeneration "Gate-off diodes return energy from an initially spinning motor"
   Support.ThreePhaseDrive drive(omega_start=1600,kQ=0,command=0,
     redeclare Physical.Electrical.Drives.ESC.SwitchingThreePhase esc(pwmFrequency=10000));

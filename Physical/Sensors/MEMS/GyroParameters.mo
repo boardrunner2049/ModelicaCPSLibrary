@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.MEMS;
+within ModelicaCPSLibrary.Physical.Sensors.MEMS;
 record GyroParameters "Illustrative translational two-mode gyro, NOT a vendor calibration"
   parameter Real mass(unit="kg")=2.5e-9;
   parameter Real driveFrequency(unit="Hz")=1000;

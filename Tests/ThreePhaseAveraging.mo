@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ThreePhaseAveraging "Locked-shaft P3/P4 CCM mean-current and loss benchmark"
   Support.LockedThreePhase average(command=0.6);
   Support.LockedThreePhase switched(command=0.6,

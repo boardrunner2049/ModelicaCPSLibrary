@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 
 model Sensor "Continuous specific force and rate for a sensor rigidly mounted on the body"
   extends PartialSensor;

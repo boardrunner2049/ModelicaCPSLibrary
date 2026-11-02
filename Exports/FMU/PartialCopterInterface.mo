@@ -1,4 +1,4 @@
-within fire_modelica_models.Exports.FMU;
+within ModelicaCPSLibrary.Exports.FMU;
 partial model PartialCopterInterface "VirtualIO FMI value contract; the composer supplies one plant"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Real pwm_min = 1100;

@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Chassis;
+within ModelicaCPSLibrary.Physical.Mechanical.Chassis;
 
 package LandingGear "Massless compliant point legs supported by the rigid vehicle mass"
 end LandingGear;

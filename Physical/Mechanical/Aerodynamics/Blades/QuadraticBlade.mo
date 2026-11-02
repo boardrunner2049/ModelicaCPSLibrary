@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades;
+within ModelicaCPSLibrary.Physical.Mechanical.Aerodynamics.Blades;
 model QuadraticBlade "Static thrust and aerodynamic reaction moment at the rotor hub"
   parameter Real kT(unit = "N.s2") = 1e-5 "Thrust divided by squared angular speed";
   parameter Real kQ(unit = "N.m.s2") = 1e-7 "Torque divided by squared angular speed";

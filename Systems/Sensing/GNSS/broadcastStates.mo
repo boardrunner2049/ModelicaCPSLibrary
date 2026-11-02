@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function broadcastStates "Evaluate an array of broadcast records at one reception epoch"
   input BroadcastEphemeris ephemeris[:];
   input Real epoch;

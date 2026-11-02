@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Bridges;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Bridges;
 model AverageHighSide "Power-conserving CCM high-side PWM reduction with asynchronous freewheel loss"
   parameter Modelica.Units.SI.Resistance Ron;
   parameter Modelica.Units.SI.Resistance Rdiode;

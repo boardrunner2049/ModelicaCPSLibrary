@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 partial model PartialDeviceSensor "Device response before ADC; stochastic errors are ADC-equivalent"
   extends PartialSampledSensor(final deviceReadout=true);
 protected

@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function inverseNormal "Small normal matrix inverse with relative pivot/rank rejection"
   input Real A[4,4];
   input Real tolerance=1e-10;

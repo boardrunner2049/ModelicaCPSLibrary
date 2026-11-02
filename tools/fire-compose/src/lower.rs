@@ -32,7 +32,7 @@ fn mass_record(class: &str, v: &toml::Value) -> Result<Value> {
 }
 fn geometry(c: &ResolvedFireConfig) -> Result<Value> {
     Ok(Value::Record(
-        "fire_modelica_models.Vehicles.Copter.Geometry".into(),
+        "ModelicaCPSLibrary.Vehicles.Copter.Geometry".into(),
         fields(&c.geometry)?,
     ))
 }
@@ -46,7 +46,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
         m.push(Modifier::Bind(
             "core".into(),
             mass_record(
-                "fire_modelica_models.Physical.Mechanical.Chassis.CenterBody.RigidCenterBody",
+                "ModelicaCPSLibrary.Physical.Mechanical.Chassis.CenterBody.RigidCenterBody",
                 &c.mass["core"],
             )?,
         ));
@@ -54,19 +54,19 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             (
                 "arms",
                 "arms",
-                "fire_modelica_models.Physical.Mechanical.Chassis.Arms.RigidArm",
+                "ModelicaCPSLibrary.Physical.Mechanical.Chassis.Arms.RigidArm",
                 None,
             ),
             (
                 "payloads",
                 "payloads",
-                "fire_modelica_models.Physical.Mechanical.Chassis.Payloads.FixedPayload",
+                "ModelicaCPSLibrary.Physical.Mechanical.Chassis.Payloads.FixedPayload",
                 Some("nPayloads"),
             ),
             (
                 "additional_parts",
                 "additionalParts",
-                "fire_modelica_models.Physical.Mechanical.MassProperties",
+                "ModelicaCPSLibrary.Physical.Mechanical.MassProperties",
                 Some("nAdditionalParts"),
             ),
         ] {
@@ -90,7 +90,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
         m.push(Modifier::Bind(
             "aggregate".into(),
             mass_record(
-                "fire_modelica_models.Physical.Mechanical.MassProperties",
+                "ModelicaCPSLibrary.Physical.Mechanical.MassProperties",
                 &c.mass["aggregate"],
             )?,
         ));
@@ -102,7 +102,7 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
     m.push(Modifier::Bind(
         "landingGear".into(),
         Value::Record(
-            "fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.Parameters".into(),
+            "ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear.Parameters".into(),
             fields(&c.landing_gear)?,
         ),
     ));
@@ -132,7 +132,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     let mut connections = Vec::new();
     let nr = c.geometry["nRotors"].as_integer().unwrap() as usize;
     let nc = c.geometry["nActuators"].as_integer().unwrap() as usize;
-    let plant_class = "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors";
+    let plant_class = "ModelicaCPSLibrary.Vehicles.Copter.MultirotorWithSensors";
     let mut physical = plant_modifiers(c)?;
     let mut components = Vec::new();
     let (base, modifiers, command) = if vio {
@@ -143,13 +143,13 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
         boundary.extend(fields(&c.interface)?);
         (
-            Some("fire_modelica_models.Exports.FMU.CopterInterface".into()),
+            Some("ModelicaCPSLibrary.Exports.FMU.CopterInterface".into()),
             boundary,
             "commands.normalizedCommand",
         )
     } else {
         let mut layout = instance(
-            "fire_modelica_models.Vehicles.Copter.Geometry",
+            "ModelicaCPSLibrary.Vehicles.Copter.Geometry",
             "geometry",
             vec![],
             vec![],
@@ -192,12 +192,12 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         for (name, class, dimensions) in [
             (
                 "truth",
-                "fire_modelica_models.Interfaces.VehicleState",
+                "ModelicaCPSLibrary.Interfaces.VehicleState",
                 vec![],
             ),
             (
                 "measurements",
-                "fire_modelica_models.Interfaces.SensorMeasurements",
+                "ModelicaCPSLibrary.Interfaces.SensorMeasurements",
                 vec![],
             ),
             ("force_b", "Modelica.Units.SI.Force", vec![3]),
@@ -277,7 +277,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         reference("geometry.spinSign"),
     ));
     components.push(instance(
-        "fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
+        "ModelicaCPSLibrary.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
         "rotors",
         vec![nr],
         blades,
@@ -337,7 +337,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     }
     if dynamic {
         components.push(instance(
-            "fire_modelica_models.Systems.Propulsion.HubReaction",
+            "ModelicaCPSLibrary.Systems.Propulsion.HubReaction",
             "reactions",
             vec![nr],
             vec![
@@ -404,7 +404,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     }
     if three_phase {
         components.push(instance(
-            "fire_modelica_models.Systems.Power.DCLink",
+            "ModelicaCPSLibrary.Systems.Power.DCLink",
             "bus",
             vec![],
             vec![
@@ -492,7 +492,7 @@ fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             sensor.push(Modifier::Bind(
                 key.clone(),
                 Value::Record(
-                    format!("fire_modelica_models.Physical.Sensors.MEMS.{record}"),
+                    format!("ModelicaCPSLibrary.Physical.Sensors.MEMS.{record}"),
                     fields(value.as_table().unwrap())?,
                 ),
             ));
@@ -511,7 +511,7 @@ fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
         sensor.push(Modifier::Bind(
             "p".into(),
             Value::Record(
-                "fire_modelica_models.Systems.Sensing.IMU.Parameters".into(),
+                "ModelicaCPSLibrary.Systems.Sensing.IMU.Parameters".into(),
                 parameters,
             ),
         ));
@@ -623,7 +623,7 @@ fn acoustic_components(c: &ResolvedFireConfig, components: &mut Vec<Instance>) -
             modifiers.push(Modifier::Bind(
                 key.clone(),
                 Value::Record(
-                    "fire_modelica_models.Physical.Sensors.MEMS.GyroParameters".into(),
+                    "ModelicaCPSLibrary.Physical.Sensors.MEMS.GyroParameters".into(),
                     fields(value.as_table().unwrap())?,
                 ),
             ));
@@ -641,7 +641,7 @@ fn acoustic_components(c: &ResolvedFireConfig, components: &mut Vec<Instance>) -
         "EquivalentGyroResponse"
     };
     components.push(instance(
-        &format!("fire_modelica_models.Vulnerabilities.Acoustic.{class}"),
+        &format!("ModelicaCPSLibrary.Vulnerabilities.Acoustic.{class}"),
         "acousticVulnerability",
         vec![],
         modifiers,

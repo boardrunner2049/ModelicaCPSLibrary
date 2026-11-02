@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Electromechanical;
+within ModelicaCPSLibrary.Physical.Electrical.Electromechanical;
 function trapezoid "Unit peak back-EMF; positive plateau at 30 to 150 electrical degrees"
   input Modelica.Units.SI.Angle theta;
   output Real y;

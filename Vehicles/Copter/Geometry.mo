@@ -1,4 +1,4 @@
-within fire_modelica_models.Vehicles.Copter;
+within ModelicaCPSLibrary.Vehicles.Copter;
 record Geometry "Fixed mounts resolved in chassis reference C; SI units"
   parameter Integer nArms(min=1) = 4;
   parameter Integer nRotors(min=1) = nArms;

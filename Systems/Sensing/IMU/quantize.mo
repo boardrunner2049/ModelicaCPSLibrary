@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 function quantize "Symmetric clipping, then nearest ADC code (ties toward positive infinity)"
   input Real u;
   input Real fullScale;

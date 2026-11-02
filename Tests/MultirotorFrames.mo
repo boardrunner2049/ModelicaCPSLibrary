@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model MultirotorFrames "Tilted rotor, shifted CG, hub torque exactly once"
   Vehicles.Copter.MultirotorPlant vehicle(
     geometry(nArms=1,nRotors=2,nActuators=3,

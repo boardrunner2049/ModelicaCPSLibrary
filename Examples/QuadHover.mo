@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model QuadHover "Open-loop force balance with initialized rotor speed; no flight controller"
   parameter Vehicles.Copter.Geometry geometry=Vehicles.Copter.Presets.QuadX();
   Vehicles.Copter.MultirotorWithSensors vehicle(geometry=geometry);

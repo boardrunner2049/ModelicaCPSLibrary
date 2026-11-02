@@ -1,4 +1,4 @@
-within fire_modelica_models.Vehicles.Copter;
+within ModelicaCPSLibrary.Vehicles.Copter;
 model MultirotorPlant "Common NED/FRD mass, rigid body, mounting and contact"
   parameter Vehicles.Copter.Geometry geometry;
   parameter Physical.Mechanical.Chassis.LandingGear.Parameters landingGear;

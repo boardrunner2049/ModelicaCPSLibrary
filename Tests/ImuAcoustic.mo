@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuAcoustic "Illustrative pressure resonance through anti-alias response and ADC; not hardware calibration"
   parameter Real toneFrequency=110;
   parameter Real modeFrequency=100;

@@ -1,14 +1,14 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model ContactPhysics "Inclined contact, friction work, angular tip velocity, and tensile-force rejection"
-  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg inclined(
+  ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg inclined(
     rLeg_b = {0, 0, 0}, stiffness = 1000, damping = 20,
     tangentialDamping = 2, frictionCoefficient = 0.3);
-  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg pulling(
+  ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg pulling(
     rLeg_b = {0, 0, 0}, stiffness = 1000, damping = 20);
-  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg offset(
+  ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg offset(
     rLeg_b = {1, 0, 0}, stiffness = 1000, damping = 20);
-  fire_modelica_models.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg separating(
+  ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear.CompliantPointLeg separating(
     rLeg_b = {0, 0, 0}, stiffness = 1000, damping = 20);
 equation
   inclined.p_w = {0, -0.006, 0.008};

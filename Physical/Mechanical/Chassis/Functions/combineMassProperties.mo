@@ -1,8 +1,8 @@
-within fire_modelica_models.Physical.Mechanical.Chassis.Functions;
+within ModelicaCPSLibrary.Physical.Mechanical.Chassis.Functions;
 
 function combineMassProperties "Rotate and translate each part's full inertia tensor"
-  input fire_modelica_models.Physical.Mechanical.MassProperties parts[:];
-  output fire_modelica_models.Physical.Mechanical.MassProperties combined;
+  input ModelicaCPSLibrary.Physical.Mechanical.MassProperties parts[:];
+  output ModelicaCPSLibrary.Physical.Mechanical.MassProperties combined;
 protected
   Real offset[3];
   Real rotatedInertia[3, 3];

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model GnssObservables "G2 exact PVT, clock errors, corrections, delayed visibility loss and rank rejection"
   parameter Real sat0[6,3]=[24000000,0,0;18000000,16000000,0;18000000,-16000000,0;
     18000000,0,16000000;18000000,0,-16000000;21000000,12000000,12000000];

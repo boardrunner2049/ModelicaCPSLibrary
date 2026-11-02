@@ -35,14 +35,14 @@ class GnssRangeTests(unittest.TestCase):
                   f'loadFile({json.dumps(str(ROOT / "package.mo"))});', 'getErrorString();']
         for name, stop, intervals in cases:
             (OUT / f"{name}_res.csv").unlink(missing_ok=True)
-            script += [f'simulate(fire_modelica_models.Tests.{name},stopTime={stop},'
+            script += [f'simulate(ModelicaCPSLibrary.Tests.{name},stopTime={stop},'
                        f'numberOfIntervals={intervals},tolerance=1e-9,outputFormat="csv",'
                        f'fileNamePrefix="{name}");', 'getErrorString();']
-        script += ['simulate(fire_modelica_models.Tests.GnssStatistical,stopTime=4,'
+        script += ['simulate(ModelicaCPSLibrary.Tests.GnssStatistical,stopTime=4,'
                    'numberOfIntervals=2000,tolerance=1e-10,outputFormat="csv",'
                    'fileNamePrefix="Refined",simflags="-maxStepSize=0.0007");',
                    'getErrorString();',
-                   'simulate(fire_modelica_models.Examples.GnssRange,stopTime=1,'
+                   'simulate(ModelicaCPSLibrary.Examples.GnssRange,stopTime=1,'
                    'numberOfIntervals=500,tolerance=1e-9,outputFormat="csv",'
                    'fileNamePrefix="GnssRange");', 'getErrorString();']
         for name in ("Refined", "GnssRange"):

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ElectromechanicalLoad "Load, inertia and inductance independently affect motor response"
   Physical.Electrical.Drives.ESC.AverageUnidirectional esc[4];
   Systems.Propulsion.Motors.DynamicDCEquivalent motors[4](

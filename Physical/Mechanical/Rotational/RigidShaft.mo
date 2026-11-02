@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Rotational;
+within ModelicaCPSLibrary.Physical.Mechanical.Rotational;
 model RigidShaft "Rigid shaft inertia with viscous friction to its support"
   parameter Modelica.Units.SI.Inertia J;
   parameter Modelica.Units.SI.RotationalDampingConstant b = 0;

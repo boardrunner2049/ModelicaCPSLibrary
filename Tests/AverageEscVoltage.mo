@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model AverageEscVoltage "P1 modulation clamp, supply changes and explicit PWM adapter"
   Physical.Electrical.Drives.ESC.AverageVoltage esc[5];
   Adapters.VirtualIO.PwmInput commands(nChannels=5,

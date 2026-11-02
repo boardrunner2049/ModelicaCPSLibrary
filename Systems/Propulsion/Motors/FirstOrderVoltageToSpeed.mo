@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Propulsion.Motors;
+within ModelicaCPSLibrary.Systems.Propulsion.Motors;
 model FirstOrderVoltageToSpeed "Load-independent voltage-to-speed surrogate"
   parameter Real Kv(unit="rad/(s.V)") = 1000/16 "SI speed gain, not rpm/V";
   parameter Modelica.Units.SI.Time tauOmega = 0.03;

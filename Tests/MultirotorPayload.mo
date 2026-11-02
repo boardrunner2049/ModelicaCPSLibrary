@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model MultirotorPayload "Fixed payload rebases all rotor and sensor mounts"
   Vehicles.Copter.MultirotorWithSensors vehicle(useAssembledMass=true,
     geometry(imuPosition_C={0.05,0,0},gnssPosition_C={0,0,0.1},barometerPosition_C={0,0,0.02}),

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model GnssEphemeris "Analytic circular orbit, week wrap, expiry, WGS84 and signal derivative checks"
   parameter Systems.Sensing.GNSS.BroadcastEphemeris circular(eccentricity=0,inclination=0,omegaDot=0,
     af0=2e-5,af1=3e-10,tgd=1e-8);

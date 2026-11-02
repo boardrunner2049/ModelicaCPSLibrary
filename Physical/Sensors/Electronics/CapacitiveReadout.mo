@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.Electronics;
+within ModelicaCPSLibrary.Physical.Sensors.Electronics;
 model CapacitiveReadout "Differential comb capacitance, carrier-averaged C/V, finite bandwidth and rails"
   parameter Real C0(unit="F");
   parameter Real length(unit="m");

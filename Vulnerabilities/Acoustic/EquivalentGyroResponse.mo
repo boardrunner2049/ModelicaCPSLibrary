@@ -1,6 +1,6 @@
-within fire_modelica_models.Vulnerabilities.Acoustic;
+within ModelicaCPSLibrary.Vulnerabilities.Acoustic;
 model EquivalentGyroResponse "MFQuadrotor-inspired steady carrier response and baseband demodulation; no AGC/PLL transients"
-  parameter fire_modelica_models.Physical.Sensors.MEMS.GyroParameters gyroPhysics;
+  parameter ModelicaCPSLibrary.Physical.Sensors.MEMS.GyroParameters gyroPhysics;
   parameter Real frequency(unit="Hz")=1000;
   parameter Real phase(unit="rad")=0;
   parameter Real effectiveArea(unit="m2")=1e-10;

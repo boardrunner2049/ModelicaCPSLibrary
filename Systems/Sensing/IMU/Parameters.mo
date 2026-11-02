@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 record Parameters "Explicit error/readout settings; six channels are accel xyz then gyro xyz"
   parameter Real samplePeriod(unit="s", min=Modelica.Constants.small) = 0.001;
   parameter Integer seed = 1 "Replay seed; no global or wall-clock RNG";

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model NedFrdContract "Same physical motion in old ENU/FLU and new NED/FRD bases"
   constant Real W[3,3]=[0,1,0;1,0,0;0,0,-1];
   constant Real B[3,3]=diagonal({1,-1,-1});

@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 model StatisticalSensor "G1: correlated PVT white noise and stationary Gauss-Markov errors"
   extends PartialSampledSensor;
   parameter Integer seed=1;

@@ -1,12 +1,12 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model PropulsionStep "Analytical speed step, opposite yaw torques, and demand limits"
-  fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade ccw(
+  ModelicaCPSLibrary.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade ccw(
     kT = 1e-3, kQ = 2e-5, spinSign = 1);
-  fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade cw(
+  ModelicaCPSLibrary.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade cw(
     kT = 1e-3, kQ = 2e-5, spinSign = -1);
-  fire_modelica_models.Systems.Propulsion.Motors.FirstOrderSpeed saturated(
+  ModelicaCPSLibrary.Systems.Propulsion.Motors.FirstOrderSpeed saturated(
     omegaMax = 100, tau = 0.05);
-  fire_modelica_models.Systems.Propulsion.Motors.FirstOrderSpeed stopped(
+  ModelicaCPSLibrary.Systems.Propulsion.Motors.FirstOrderSpeed stopped(
     omegaMax = 100, tau = 0.05);
   Physical.Electrical.Drives.ESC.PassThrough esc;
   Systems.Propulsion.Motors.FirstOrderSpeed motor(omegaMax=100,tau=0.05);

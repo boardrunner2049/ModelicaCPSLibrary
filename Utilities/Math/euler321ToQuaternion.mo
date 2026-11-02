@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities.Math;
+within ModelicaCPSLibrary.Utilities.Math;
 
 function euler321ToQuaternion
   input Real euler[3] "Roll, pitch, yaw [rad]";

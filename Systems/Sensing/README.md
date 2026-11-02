@@ -6,7 +6,7 @@ The default I0 IMU and ideal mag/GNSS/barometer evaluate outputs at the current 
 time. There is no sample period, `sampleTime`, hold, device response, stochastic
 noise or transport state. Fixed biases default to zero in the output frame.
 The old Measurement/Response arrays, first-order filters and sampled wrappers are
-archived under `deprecated/legacy_enu_flu/fire_modelica_models`; they are not active APIs.
+archived under `deprecated/legacy_enu_flu/ModelicaCPSLibrary`; they are not active APIs.
 
 - IMU: `transpose(R_bs) * (transpose(R_wb)*(a_w-gravity_w) + alpha_b x r_b + omega_b x (omega_b x r_b))`; gyro is `transpose(R_bs)*omega_b`.
 - Magnetometer: `transpose(R_bs)*transpose(R_wb)*magneticField_w`, in Tesla.

@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 model AverageThreePhase "P3 six-step asynchronous PWM mean model"
   extends PartialThreePhase;
   Drives.Bridges.AverageHalfBridge legs[3](each Ron=Ron,each Rdiode=Rdiode,

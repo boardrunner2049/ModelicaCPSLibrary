@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function constellationGeometry "Batch signal geometry; keeps tuple array results inside function scope"
   input Real receiver[3];
   input Real satellite[:,3];

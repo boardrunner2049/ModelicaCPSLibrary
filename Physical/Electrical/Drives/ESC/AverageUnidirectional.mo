@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 model AverageUnidirectional "Ideal nonregenerative averaged drive with current decay and coast"
   input Real escCommand(unit="1");
   input Modelica.Units.SI.Voltage dcVoltage;

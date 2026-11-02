@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.MEMS;
+within ModelicaCPSLibrary.Physical.Sensors.MEMS;
 model ResonantCoupling "Identified pressure-driven mechanical modes; no vendor-specific gyro demodulator"
   parameter Real frequency[6](each unit="Hz");
   parameter Real damping[6] "Damping ratio";

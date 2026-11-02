@@ -1,4 +1,4 @@
-within fire_modelica_models.Logical.Communications.SPI;
+within ModelicaCPSLibrary.Logical.Communications.SPI;
 block ByteMaster "One outstanding byte request; ideal CPOL/CPHA signal generation"
   parameter Modelica.Units.SI.Frequency clockFrequency = 1e6;
   parameter Boolean cpol = false;

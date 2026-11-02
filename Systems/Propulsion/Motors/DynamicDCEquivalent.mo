@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Propulsion.Motors;
+within ModelicaCPSLibrary.Systems.Propulsion.Motors;
 model DynamicDCEquivalent "RL motor with back-EMF, shaft inertia and external load"
   parameter Modelica.Units.SI.Resistance R;
   parameter Modelica.Units.SI.Inductance L;

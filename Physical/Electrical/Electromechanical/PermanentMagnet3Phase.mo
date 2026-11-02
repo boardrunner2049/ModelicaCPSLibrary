@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Electromechanical;
+within ModelicaCPSLibrary.Physical.Electrical.Electromechanical;
 model PermanentMagnet3Phase "Lossless non-salient PM conversion, with explicit ABC terminals"
   parameter Integer polePairs(min=1);
   parameter Modelica.Units.SI.ElectricalTorqueConstant ke "Phase peak back-EMF per mechanical rad/s";

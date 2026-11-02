@@ -1,4 +1,4 @@
-within fire_modelica_models.Interfaces;
+within ModelicaCPSLibrary.Interfaces;
 
 record VehicleState "Continuous rigid-body state; independent of sensor measurements"
   Real p_w[3](each unit="m") "CG position in NED world";

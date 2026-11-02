@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 model SwitchingThreePhase "P4 six-switch inverter with high-side PWM and diode freewheel"
   extends PartialThreePhase;
   parameter Modelica.Units.SI.Frequency pwmFrequency;

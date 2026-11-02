@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model QuadVoltageSag "P1 supply drop reduces speed and thrust at a fixed ESC command"
   parameter Real hoverCommand=sqrt(1.5*9.80665/(4*1e-5))/1000;
   Vehicles.Copter.MultirotorWithSensors vehicle(

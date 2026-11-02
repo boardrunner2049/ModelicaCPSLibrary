@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model QuadElectromechanicalCoast "Illustrative P2 quad: hover, cutoff, residual current and restart"
   parameter Real kT=1e-5;
   parameter Real kQ=1.5e-7;

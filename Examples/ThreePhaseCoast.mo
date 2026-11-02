@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model ThreePhaseCoast "P3 single-motor startup, current decay, coast and restart"
   Systems.Power.DCLink bus(sourceResistance=0.02,dcLinkCapacitance=0.002,voltage_start=16,sourceVoltage=16);
   Systems.Propulsion.Motors.ThreePhasePM motor(RPhase=0.2,LPhase=0.001,ke=0.01,

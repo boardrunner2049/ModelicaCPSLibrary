@@ -122,7 +122,7 @@ class ThreePhaseComposerTests(unittest.TestCase):
                             '  assert(abs(error)<1e-4,"Vehicle bus/motor energy balance");\n'
                             'end P34VehicleRun;\n')
                         mos = work / 'run.mos'
-                        paths = [generated / 'sources/fire_modelica_models/package.mo', generated / (model + '.mo'), harness]
+                        paths = [generated / 'sources/ModelicaCPSLibrary/package.mo', generated / (model + '.mo'), harness]
                         mos.write_text('loadModel(Modelica,{"4.0.0"});\n' + ''.join(
                             'loadFile(' + json.dumps(str(p)) + ');\n' for p in paths) +
                             'simulate(P34VehicleRun,stopTime=0.025,tolerance=1e-8,numberOfIntervals=2500,'

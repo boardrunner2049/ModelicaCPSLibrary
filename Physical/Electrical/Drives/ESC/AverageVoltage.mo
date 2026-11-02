@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 model AverageVoltage "Continuous average-voltage ESC with unipolar modulation command"
   input Real escCommand(unit="1") "Voltage modulation command; clamped to [0,1]";
   input Modelica.Units.SI.Voltage dcVoltage "Nonnegative DC supply voltage";

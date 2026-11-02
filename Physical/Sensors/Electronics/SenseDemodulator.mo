@@ -1,6 +1,6 @@
-within fire_modelica_models.Physical.Sensors.Electronics;
+within ModelicaCPSLibrary.Physical.Sensors.Electronics;
 model SenseDemodulator "Open-loop I/Q detection with fixed nominal scale and phase calibration"
-  parameter fire_modelica_models.Physical.Sensors.MEMS.GyroParameters p;
+  parameter ModelicaCPSLibrary.Physical.Sensors.MEMS.GyroParameters p;
   input Real measuredDisplacement(unit="m");
   input Real phase(unit="rad");
   output Real rate(unit="rad/s");

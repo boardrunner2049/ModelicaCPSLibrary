@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model VoltagePropulsion "P1 analytic response, P0 equivalence, voltage sag and coast-down"
   Systems.Propulsion.Motors.FirstOrderSpeed p0(tau=0.03,omegaMax=1000,omega_start=70);
   Systems.Propulsion.Motors.FirstOrderVoltageToSpeed nominal(Kv=62.5,tauOmega=0.03,omega_start=70);

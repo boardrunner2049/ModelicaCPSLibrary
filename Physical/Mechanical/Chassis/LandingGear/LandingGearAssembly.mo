@@ -1,8 +1,8 @@
-within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
+within ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear;
 
 model LandingGearAssembly "Independent contacts on an arbitrary number of legs"
   parameter Integer nLegs(min = 0) = 4;
-  parameter Real rLeg_b[nLegs, 3](each unit = "m") = fire_modelica_models.Utilities.Math.regularPolygon(
+  parameter Real rLeg_b[nLegs, 3](each unit = "m") = ModelicaCPSLibrary.Utilities.Math.regularPolygon(
       nLegs, sqrt(2)*0.17, 0.1, Modelica.Constants.pi/4)
     "Tip offsets from body CG in FRD; independent of rotor count";
   parameter Real stiffness(min = 0, unit = "N/m") = 3000;

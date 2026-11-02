@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Propulsion;
+within ModelicaCPSLibrary.Systems.Propulsion;
 model HubReaction "Aerodynamic hub moment plus axial spin-acceleration reaction"
   parameter Modelica.Units.SI.Inertia J;
   parameter Modelica.Units.SI.Inertia JLoad = 0;

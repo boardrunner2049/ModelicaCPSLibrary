@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities;
+within ModelicaCPSLibrary.Utilities;
 
 package Constants
   constant Real pi = Modelica.Constants.pi;

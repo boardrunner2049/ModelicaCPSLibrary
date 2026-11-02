@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities.Math;
+within ModelicaCPSLibrary.Utilities.Math;
 
 function quaternionProduct
   input Real q1[4] "Left quaternion {w, x, y, z}";

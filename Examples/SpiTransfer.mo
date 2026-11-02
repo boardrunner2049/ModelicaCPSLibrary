@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model SpiTransfer "Two bytes under one CS assertion; ideal signal interface demonstration"
   Adapters.VirtualIO.SpiTransfer link(clockFrequency=1e6);
   Logical.Communications.SPI.ByteSlave device;

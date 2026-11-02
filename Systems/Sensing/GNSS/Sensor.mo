@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 model Sensor "G0: ideal continuous local NED antenna position and velocity"
   extends PartialSensor;
 equation

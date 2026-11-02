@@ -176,7 +176,7 @@ def run(output, omc):
         harness = generated / 'ExportCopter.mo'
         script = work / "export.mos"
         script.write_text('loadModel(Modelica,{"4.0.0"});\n'
-            f'loadFile({json.dumps(str(generated / "sources/fire_modelica_models/package.mo"))});\n'
+            f'loadFile({json.dumps(str(generated / "sources/ModelicaCPSLibrary/package.mo"))});\n'
             f'loadFile({json.dumps(str(harness))});\n'
             'buildModelFMU(ExportCopter,version="2.0",fmuType="cs",fileNamePrefix="ExportCopter",platforms={"static"});\ngetErrorString();\n')
         fmu = work / "ExportCopter.fmu"

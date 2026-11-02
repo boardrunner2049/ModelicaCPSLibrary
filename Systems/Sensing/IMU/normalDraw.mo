@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 function normalDraw "Twelve independent standard normals and explicit next RNG state"
   input Integer stateIn[Modelica.Math.Random.Generators.Xorshift128plus.nState];
   output Real z[12];

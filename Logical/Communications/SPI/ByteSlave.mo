@@ -1,4 +1,4 @@
-within fire_modelica_models.Logical.Communications.SPI;
+within ModelicaCPSLibrary.Logical.Communications.SPI;
 block ByteSlave "Ideal SPI byte endpoint; device-specific register decoding is external"
   parameter Boolean cpol = false;
   parameter Boolean cpha = false;

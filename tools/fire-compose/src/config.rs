@@ -70,31 +70,29 @@ impl ResolvedFireConfig {
     pub fn esc_class(&self) -> &'static str {
         match self.models["esc"].as_str().unwrap() {
             "switching_three_phase" => {
-                "fire_modelica_models.Physical.Electrical.Drives.ESC.SwitchingThreePhase"
+                "ModelicaCPSLibrary.Physical.Electrical.Drives.ESC.SwitchingThreePhase"
             }
             "average_three_phase" => {
-                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageThreePhase"
+                "ModelicaCPSLibrary.Physical.Electrical.Drives.ESC.AverageThreePhase"
             }
             "average_unidirectional" => {
-                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageUnidirectional"
+                "ModelicaCPSLibrary.Physical.Electrical.Drives.ESC.AverageUnidirectional"
             }
-            "average_voltage" => {
-                "fire_modelica_models.Physical.Electrical.Drives.ESC.AverageVoltage"
-            }
-            _ => "fire_modelica_models.Physical.Electrical.Drives.ESC.PassThrough",
+            "average_voltage" => "ModelicaCPSLibrary.Physical.Electrical.Drives.ESC.AverageVoltage",
+            _ => "ModelicaCPSLibrary.Physical.Electrical.Drives.ESC.PassThrough",
         }
     }
 
     pub fn motor_class(&self) -> &'static str {
         match self.models["motor"].as_str().unwrap() {
-            "three_phase_pm" => "fire_modelica_models.Systems.Propulsion.Motors.ThreePhasePM",
+            "three_phase_pm" => "ModelicaCPSLibrary.Systems.Propulsion.Motors.ThreePhasePM",
             "dynamic_dc_equivalent" => {
-                "fire_modelica_models.Systems.Propulsion.Motors.DynamicDCEquivalent"
+                "ModelicaCPSLibrary.Systems.Propulsion.Motors.DynamicDCEquivalent"
             }
             "first_order_voltage_to_speed" => {
-                "fire_modelica_models.Systems.Propulsion.Motors.FirstOrderVoltageToSpeed"
+                "ModelicaCPSLibrary.Systems.Propulsion.Motors.FirstOrderVoltageToSpeed"
             }
-            _ => "fire_modelica_models.Systems.Propulsion.Motors.FirstOrderSpeed",
+            _ => "ModelicaCPSLibrary.Systems.Propulsion.Motors.FirstOrderSpeed",
         }
     }
 }

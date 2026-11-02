@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.Range;
+within ModelicaCPSLibrary.Systems.Sensing.Range;
 partial model PartialSensor "Unit world ray and plane n*x=h; caller owns mount transform"
   parameter Real minRange(unit="m")=0;
   parameter Real maxRange(unit="m")=100;

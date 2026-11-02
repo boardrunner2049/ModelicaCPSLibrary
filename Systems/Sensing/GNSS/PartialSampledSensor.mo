@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 partial model PartialSampledSensor "Common G1/G2 PVT, covariance and epoch delivery contract"
   extends PartialSensor;
   parameter Real samplePeriod(unit="s")=0.2;

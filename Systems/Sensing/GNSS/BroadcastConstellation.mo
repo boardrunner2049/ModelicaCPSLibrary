@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 model BroadcastConstellation "Ephemeris provider at reception epoch; supply parsed broadcast records"
   parameter Integer nSat(min=1)=4;
   parameter BroadcastEphemeris ephemeris[nSat];

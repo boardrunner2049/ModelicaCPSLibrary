@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Contact;
+within ModelicaCPSLibrary.Physical.Mechanical.Contact;
 
 model ContactMode "Geometric contact state, including initially touching points"
   input Real gap(unit = "m") "Positive outside the surface";

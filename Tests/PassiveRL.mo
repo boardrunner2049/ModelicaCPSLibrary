@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model PassiveRL "Signed RL transient and passive energy balance"
   Physical.Electrical.Passives.SeriesRL branch(R=2,L=0.02,i_start=-1);
   Modelica.Electrical.Analog.Sources.SignalVoltage source;

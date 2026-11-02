@@ -1,4 +1,4 @@
-within fire_modelica_models.Adapters.VirtualIO;
+within ModelicaCPSLibrary.Adapters.VirtualIO;
 model SensorValues "Stateless Sensor-local to FRD; GNSS already NED value conversion"
   parameter Vehicles.Copter.Geometry geometry;
   input Interfaces.SensorMeasurements measurements;

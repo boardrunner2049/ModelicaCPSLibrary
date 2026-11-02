@@ -142,9 +142,9 @@ class ImuTests(unittest.TestCase):
         work=OUT/"current"
         commands=[]
         for name,stop in [("ImuDigitalErrors",.2),("ImuElectromechanical",1),("ImuAcousticCoupling",.5)]:
-            commands.append(f'simulate(fire_modelica_models.Tests.{name},stopTime={stop},numberOfIntervals=1000,'
+            commands.append(f'simulate(ModelicaCPSLibrary.Tests.{name},stopTime={stop},numberOfIntervals=1000,'
                 f'tolerance=1e-10,outputFormat="csv",fileNamePrefix="{name}",simflags="-maxStepSize=0.00002");')
-        commands.append('simulate(fire_modelica_models.Tests.ImuAcousticCoupling,stopTime=.5,numberOfIntervals=1000,'
+        commands.append('simulate(ModelicaCPSLibrary.Tests.ImuAcousticCoupling,stopTime=.5,numberOfIntervals=1000,'
                 'tolerance=1e-10,outputFormat="csv",fileNamePrefix="Refined",simflags="-maxStepSize=0.00001");')
         log=self.omc(work,commands)
         self.assertEqual(log.count("The simulation finished successfully."),4)
@@ -218,13 +218,13 @@ class ImuTests(unittest.TestCase):
         commands = []
         for name, stop, intervals in (("ImuStatistical", 1, 1000), ("ImuDevice", .05, 500),
                                       ("ImuAcoustic", 1, 1000)):
-            commands.append(f'simulate(fire_modelica_models.Tests.{name},stopTime={stop},'
+            commands.append(f'simulate(ModelicaCPSLibrary.Tests.{name},stopTime={stop},'
                             f'numberOfIntervals={intervals},tolerance=1e-10,outputFormat="csv",'
                             f'fileNamePrefix="{name}",simflags="-maxStepSize=0.0001");')
         commands += [
-            'simulate(fire_modelica_models.Tests.ImuStatistical,stopTime=1,numberOfIntervals=2000,'
+            'simulate(ModelicaCPSLibrary.Tests.ImuStatistical,stopTime=1,numberOfIntervals=2000,'
             'tolerance=1e-8,outputFormat="csv",fileNamePrefix="Replay",simflags="-maxStepSize=0.0003");',
-            'simulate(fire_modelica_models.Tests.ImuAcoustic,stopTime=1,numberOfIntervals=2000,'
+            'simulate(ModelicaCPSLibrary.Tests.ImuAcoustic,stopTime=1,numberOfIntervals=2000,'
             'tolerance=1e-10,outputFormat="csv",fileNamePrefix="Refined",simflags="-maxStepSize=0.00005");',
         ]
         log = self.omc(work, commands)

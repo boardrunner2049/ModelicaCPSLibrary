@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities;
+within ModelicaCPSLibrary.Utilities;
 
 package Math
 end Math;

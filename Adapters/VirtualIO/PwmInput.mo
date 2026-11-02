@@ -1,4 +1,4 @@
-within fire_modelica_models.Adapters.VirtualIO;
+within ModelicaCPSLibrary.Adapters.VirtualIO;
 model PwmInput "Continuous PWM pulse-width value to normalized command; independent of plant semantics"
   parameter Integer nChannels(min=1)=4;
   parameter Real pwmMin[nChannels]=fill(1000,nChannels) "microseconds";

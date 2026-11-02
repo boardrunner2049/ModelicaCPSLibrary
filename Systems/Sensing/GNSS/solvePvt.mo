@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function solvePvt "Weighted range/range-rate solution; no receiver truth used as an initial guess"
   input Real satellite[:,3];
   input Real satelliteVelocity[size(satellite,1),3];

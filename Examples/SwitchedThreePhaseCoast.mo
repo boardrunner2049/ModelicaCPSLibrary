@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model SwitchedThreePhaseCoast "P4 uses the same motor and load, replacing only the ESC"
   extends ThreePhaseCoast(redeclare Physical.Electrical.Drives.ESC.SwitchingThreePhase
     esc(pwmFrequency=10000,deadTime=1e-6));

@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.MEMS;
+within ModelicaCPSLibrary.Physical.Sensors.MEMS;
 record AccelerometerParameters "Illustrative capacitive proof mass, NOT vendor calibration"
   parameter Real mass(unit="kg")=1e-8;
   parameter Real frequency(unit="Hz")=2000;

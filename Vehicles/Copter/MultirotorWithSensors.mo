@@ -1,4 +1,4 @@
-within fire_modelica_models.Vehicles.Copter;
+within ModelicaCPSLibrary.Vehicles.Copter;
 model MultirotorWithSensors "Default ideal sensors with independently replaceable IMU; no protocol/firmware driver"
   extends MultirotorPlant;
   input Real magneticField_w[3](each unit="T") = {0,20e-6,45e-6};

@@ -1,4 +1,4 @@
-within fire_modelica_models.Vehicles;
+within ModelicaCPSLibrary.Vehicles;
 
 package Copter
 end Copter;

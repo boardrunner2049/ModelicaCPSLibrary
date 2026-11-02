@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.MEMS;
+within ModelicaCPSLibrary.Physical.Sensors.MEMS;
 model GyroMechanics "Reciprocal Coriolis coupling, drive/sense proof-mass dynamics"
   parameter GyroParameters p;
   input Real angularRate(unit="rad/s");

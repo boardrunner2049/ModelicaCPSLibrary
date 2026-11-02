@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Chassis.LandingGear;
+within ModelicaCPSLibrary.Physical.Mechanical.Chassis.LandingGear;
 
 record Parameters "Four fixed contact points in chassis FRD and a stationary horizontal NED plane"
   parameter Boolean enabled = true "False removes all contact points at translation";

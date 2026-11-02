@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ThreePhaseCoast "P3/P4 signed currents, coast/restart, energy and finite dead time"
   Support.ThreePhaseDrive average;
   Support.ThreePhaseDrive switched(redeclare Physical.Electrical.Drives.ESC.SwitchingThreePhase

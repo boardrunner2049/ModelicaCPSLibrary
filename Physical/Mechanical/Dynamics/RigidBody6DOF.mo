@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Dynamics;
+within ModelicaCPSLibrary.Physical.Mechanical.Dynamics;
 model RigidBody6DOF "Single rigid body; all applied moments are about its CG"
   parameter Modelica.Units.SI.Mass mass = 1;
   parameter Modelica.Units.SI.Inertia inertia[3, 3] = identity(3)
@@ -68,7 +68,7 @@ initial equation
 equation
   for i in 1:3 loop
     for j in 1:3 loop
-      R_wb[i,j] = fire_modelica_models.Utilities.Math.quaternionRotationElement(q_wb,i,j);
+      R_wb[i,j] = ModelicaCPSLibrary.Utilities.Math.quaternionRotationElement(q_wb,i,j);
     end for;
   end for;
   specificForce_b = force_b / mass;
@@ -78,7 +78,7 @@ equation
   der(v_b) = specificForce_b + transpose(R_wb) * gravity_w - cross(omega_b, v_b);
   alpha_b = inverseInertia * (moment_b - cross(omega_b, inertia * omega_b));
   der(omega_b) = alpha_b;
-  der(q_wb) = 0.5 * fire_modelica_models.Utilities.Math.quaternionProduct(
+  der(q_wb) = 0.5 * ModelicaCPSLibrary.Utilities.Math.quaternionProduct(
     q_wb, {0, omega_b[1], omega_b[2], omega_b[3]})
     + quaternionNormGain * (1 - q_wb * q_wb) * q_wb;
   euler = {atan2(R_wb[3, 2], R_wb[3, 3]),

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuAcousticCoupling "Independent static coupling; compare physical and steady-state surrogate demodulation"
   parameter Physical.Sensors.MEMS.GyroParameters gp;
   parameter Real w0=2*Modelica.Constants.pi*gp.referenceFrequency;

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuStatistical "Sample epochs, queue validity, calibrated axes and deterministic independent streams"
   Systems.Sensing.IMU.StatisticalSensor delayed(p(samplePeriod=0.01,latencySamples=2),accelBias={0.1,0,0});
   Systems.Sensing.IMU.StatisticalSensor repeatA(p(samplePeriod=0.001,seed=2718,streamId=1,noiseStd=fill(0.2,6),biasStd=fill(0.1,6),biasTau=fill(0.02,6)));

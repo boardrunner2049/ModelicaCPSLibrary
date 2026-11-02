@@ -1,4 +1,4 @@
-within fire_modelica_models.Vehicles.Copter.Presets;
+within ModelicaCPSLibrary.Vehicles.Copter.Presets;
 record QuadX
   extends Geometry(nArms=4,nRotors=4,nActuators=4);
 end QuadX;

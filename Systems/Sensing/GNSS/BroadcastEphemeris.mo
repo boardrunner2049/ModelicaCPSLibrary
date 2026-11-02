@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 record BroadcastEphemeris "GPS broadcast Keplerian orbit/clock record in SI; illustrative defaults"
   parameter Real sqrtA=5153.7954775 "sqrt(m)";
   parameter Real eccentricity=0.01;

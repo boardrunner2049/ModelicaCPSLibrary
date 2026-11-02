@@ -1,4 +1,10 @@
-# FIRE 최소 multicopter 모델
+# ModelicaCPSLibrary
+
+`package.mo`를 로드하고 `ModelicaCPSLibrary.Examples.QuadHover`와 같이
+`ModelicaCPSLibrary` namespace를 사용합니다. FastDyn 내 라이브러리 경로는
+`third_party/courbet_deps/ModelicaCPSLibrary`입니다. 기존 생성 모델과 staged source는
+`fire-compose emit`을 다시 실행하면 새 namespace로 갱신됩니다.
+`deprecated/` archive는 원본 이름과 내용을 보존합니다.
 
 활성 패키지는 `MULTICOPTER_INTERFACES.md` v0.8과
 `261006_quadrotor-fidelity-port-contract.md`의 최초 실행 범위를 구현합니다.

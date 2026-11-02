@@ -43,10 +43,10 @@ def run(omc, out):
     for path in sorted((ROOT/"Tests").glob("*.mo")):
         if path.stem in {"package", "ExportOcto", "ChassisRejectedConfigurations"}:
             continue
-        cases.append((f"fire_modelica_models.Tests.{path.stem}", *experiment(path)))
+        cases.append((f"ModelicaCPSLibrary.Tests.{path.stem}", *experiment(path)))
     for name in ("QuadHover", "QuadImuOnly", "HexaHover", "OctoHover", "CoaxialHover"):
         stop = 1
-        cases.append((f"fire_modelica_models.Examples.{name}", stop, 1e-8, int(stop/0.002)))
+        cases.append((f"ModelicaCPSLibrary.Examples.{name}", stop, 1e-8, int(stop/0.002)))
     script = ['loadModel(Modelica,{"4.0.0"});', f'loadFile({quoted(ROOT/"package.mo")});',
               'getErrorString();']
     for name, stop, tol, intervals in cases:
@@ -90,7 +90,7 @@ def run(omc, out):
         mos = out/("reject_"+name+".mos")
         mos.write_text('loadModel(Modelica,{"4.0.0"});\n'
                        f'loadFile({quoted(ROOT/"package.mo")});\n'
-                       f'simulate(fire_modelica_models.Tests.ChassisRejectedConfigurations.{name},'
+                       f'simulate(ModelicaCPSLibrary.Tests.ChassisRejectedConfigurations.{name},'
                        f'stopTime=0.01,fileNamePrefix="reject_{name}");\ngetErrorString();\n')
         proc = subprocess.run([omc, str(mos)], cwd=out, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)

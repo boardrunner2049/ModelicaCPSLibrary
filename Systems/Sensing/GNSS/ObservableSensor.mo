@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 model ObservableSensor "G2: satellite observables, visibility, clock and weighted PVT solution"
   extends PartialSampledSensor;
   parameter Integer nSat(min=1)=4;

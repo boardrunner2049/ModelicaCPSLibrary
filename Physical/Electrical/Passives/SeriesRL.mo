@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Passives;
+within ModelicaCPSLibrary.Physical.Electrical.Passives;
 model SeriesRL "Bidirectional linear series resistance and inductance"
   Modelica.Electrical.Analog.Interfaces.PositivePin p;
   Modelica.Electrical.Analog.Interfaces.NegativePin n;

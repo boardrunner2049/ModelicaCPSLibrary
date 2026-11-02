@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 package Support "Propulsion benchmark assemblies"
   extends Modelica.Icons.Package;
 end Support;

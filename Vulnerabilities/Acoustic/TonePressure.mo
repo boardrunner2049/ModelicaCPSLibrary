@@ -1,4 +1,4 @@
-within fire_modelica_models.Vulnerabilities.Acoustic;
+within ModelicaCPSLibrary.Vulnerabilities.Acoustic;
 model TonePressure "Local instantaneous pressure from RMS amplitude; phase is at the sensor"
   parameter Real frequency(unit="Hz")=1000;
   parameter Real phase(unit="rad")=0;

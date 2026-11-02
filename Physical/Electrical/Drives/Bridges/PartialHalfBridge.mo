@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Bridges;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Bridges;
 partial model PartialHalfBridge "Common low-side switch and both body diodes"
   parameter Modelica.Units.SI.Resistance Ron;
   parameter Modelica.Units.SI.Resistance Rdiode;

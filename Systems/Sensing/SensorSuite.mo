@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing;
+within ModelicaCPSLibrary.Systems.Sensing;
 
 model SensorSuite "Optional four-sensor assembly with independently replaceable IMU and GNSS"
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
@@ -24,7 +24,7 @@ model SensorSuite "Optional four-sensor assembly with independently replaceable 
   input Real magneticField_w[3](each unit="T");
   input Real pressure(unit="Pa") "Ambient pressure supplied by the environment [Pa]";
   input Real temperature(unit="K") "Ambient temperature supplied by the environment [K]";
-  output fire_modelica_models.Interfaces.SensorMeasurements measurements;
+  output ModelicaCPSLibrary.Interfaces.SensorMeasurements measurements;
 
   replaceable model ImuModel = IMU.Sensor constrainedby IMU.PartialSensor;
   ImuModel imu( r_b=rImu_b, R_bs=R_bImu,

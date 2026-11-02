@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model ContactTiltedLanding "Uneven touchdown restores roll/pitch through separate contact moments"
   Vehicles.Copter.MultirotorPlant vehicle(

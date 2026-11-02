@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Control;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Control;
 block SixStep "Ideal-position forward six-step commutation with latched recirculation then Hi-Z"
   parameter Modelica.Units.SI.Current currentThreshold = 1e-3 "Switch release threshold, not a state reset";
   input Real command;

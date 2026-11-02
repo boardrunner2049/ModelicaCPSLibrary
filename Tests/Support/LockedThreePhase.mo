@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests.Support;
+within ModelicaCPSLibrary.Tests.Support;
 model LockedThreePhase "Fixed-angle CCM averaging benchmark; zero mechanical power"
   model LockedMotor
     extends Systems.Propulsion.Motors.ThreePhasePM(shaft(inertia(w(fixed=false),phi(fixed=false))));

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model VoltageMultirotor "P0/P1 vehicle equivalence with remapped channels and shared contact"
   parameter Vehicles.Copter.Geometry geometry=Vehicles.Copter.Presets.QuadX(
     actuatorIndex={3,2,4,1},spinSign={-1,1,-1,1});

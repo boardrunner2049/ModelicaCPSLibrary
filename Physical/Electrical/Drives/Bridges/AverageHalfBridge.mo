@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Bridges;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Bridges;
 model AverageHalfBridge "Mean high-side drive with physical low-side and diode paths"
   extends PartialHalfBridge;
   input Real modulation;

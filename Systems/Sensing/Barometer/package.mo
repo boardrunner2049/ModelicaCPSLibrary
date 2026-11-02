@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing;
+within ModelicaCPSLibrary.Systems.Sensing;
 
 package Barometer
 end Barometer;

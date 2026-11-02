@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.Bridges;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.Bridges;
 model SwitchingHalfBridge "Two finite-on-resistance switches with antiparallel body diodes"
   extends PartialHalfBridge;
   input Boolean highGate;

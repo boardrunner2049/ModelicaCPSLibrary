@@ -1,8 +1,8 @@
-within fire_modelica_models.Systems.Sensing.IMU;
+within ModelicaCPSLibrary.Systems.Sensing.IMU;
 model ElectromechanicalSensor "I3: six physical axes, shared sampled output; external forces belong to vulnerabilities"
   extends PartialSampledSensor(final deviceReadout=true);
-  parameter fire_modelica_models.Physical.Sensors.MEMS.GyroParameters gyroPhysics;
-  parameter fire_modelica_models.Physical.Sensors.MEMS.AccelerometerParameters accelPhysics;
+  parameter ModelicaCPSLibrary.Physical.Sensors.MEMS.GyroParameters gyroPhysics;
+  parameter ModelicaCPSLibrary.Physical.Sensors.MEMS.AccelerometerParameters accelPhysics;
   input Real gyroDriveForce[3](each unit="N")=zeros(3);
   input Real gyroSenseForce[3](each unit="N")=zeros(3);
   input Real accelForce[3](each unit="N")=zeros(3);

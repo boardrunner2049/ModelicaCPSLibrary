@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.Electronics;
+within ModelicaCPSLibrary.Physical.Sensors.Electronics;
 model CombDrive "Differential comb actuator: F = sum(V^2*dC/dx)/2"
   parameter Real C0(unit="F");
   parameter Real length(unit="m");

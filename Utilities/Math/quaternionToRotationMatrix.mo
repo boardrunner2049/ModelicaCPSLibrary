@@ -1,4 +1,4 @@
-within fire_modelica_models.Utilities.Math;
+within ModelicaCPSLibrary.Utilities.Math;
 
 function quaternionToRotationMatrix
   input Real q[4] "Quaternion {w, x, y, z}, body to world";

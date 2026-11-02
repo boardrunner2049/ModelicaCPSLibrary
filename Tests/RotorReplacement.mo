@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model RotorReplacement "Independent rotor replacement preserves the vehicle hub-wrench boundary"
   model ReducedThrustRotor
     extends Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade(kT=0.5e-5);

@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model SpiDisruption "Inactive CS rejection, partial-byte cancellation, recovery and logical line disruption"
   Adapters.VirtualIO.SpiTransfer rejected(clockFrequency=1e6);
   Adapters.VirtualIO.SpiTransfer cancelled(clockFrequency=1e6);

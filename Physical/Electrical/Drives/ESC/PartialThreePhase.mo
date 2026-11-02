@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Electrical.Drives.ESC;
+within ModelicaCPSLibrary.Physical.Electrical.Drives.ESC;
 partial model PartialThreePhase "Shared three-phase power ports, six-step policy and diagnostics"
   parameter Modelica.Units.SI.Resistance Ron;
   parameter Modelica.Units.SI.Resistance Rdiode;

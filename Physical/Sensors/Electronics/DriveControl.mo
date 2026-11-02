@@ -1,6 +1,6 @@
-within fire_modelica_models.Physical.Sensors.Electronics;
+within ModelicaCPSLibrary.Physical.Sensors.Electronics;
 model DriveControl "Measured I/Q drives bounded PI AGC and PLL, with anti-windup"
-  parameter fire_modelica_models.Physical.Sensors.MEMS.GyroParameters p;
+  parameter ModelicaCPSLibrary.Physical.Sensors.MEMS.GyroParameters p;
   input Real measuredDisplacement(unit="m");
   output Real phase(unit="rad", start=0, fixed=true);
   output Real frequency(unit="rad/s");

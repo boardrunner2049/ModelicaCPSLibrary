@@ -1,4 +1,4 @@
-within fire_modelica_models;
+within ModelicaCPSLibrary;
 package Logical "Discrete protocol and device behavior"
   extends Modelica.Icons.Package;
 end Logical;

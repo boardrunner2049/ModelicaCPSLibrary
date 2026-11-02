@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Sensors.MEMS;
+within ModelicaCPSLibrary.Physical.Sensors.MEMS;
 model AccelerometerMechanics "Specific force excites a damped proof mass"
   parameter AccelerometerParameters p;
   input Real specificForce(unit="m/s2");

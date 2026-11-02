@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical;
+within ModelicaCPSLibrary.Physical;
 package Electrical "Electrical components"
   extends Modelica.Icons.Package;
 end Electrical;

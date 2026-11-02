@@ -7,7 +7,7 @@
 English version takes precedence.
 
 This document describes the **implemented P0–P4 compositions** in
-`fire_modelica_models`: equations, units, initial conditions, configuration and
+`ModelicaCPSLibrary`: equations, units, initial conditions, configuration and
 validation scope. The world frame is NED, the body frame is FRD, and local +z is
 the propeller thrust direction. All physical parameters use SI units.
 

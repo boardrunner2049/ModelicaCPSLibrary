@@ -1,9 +1,9 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model SensorPhysics "Specific force, rigid lever arm, sensor rotation, and bias checks"
-  fire_modelica_models.Systems.Sensing.IMU.Sensor freefall;
-  fire_modelica_models.Systems.Sensing.IMU.Sensor supported;
-  fire_modelica_models.Systems.Sensing.IMU.Sensor lever(
+  ModelicaCPSLibrary.Systems.Sensing.IMU.Sensor freefall;
+  ModelicaCPSLibrary.Systems.Sensing.IMU.Sensor supported;
+  ModelicaCPSLibrary.Systems.Sensing.IMU.Sensor lever(
     r_b={1,0,0}, R_bs=[0,-1,0; 1,0,0; 0,0,1],
     accelBias={0.1,0.2,0.3}, gyroBias={0.1,0.2,0.3});
 equation

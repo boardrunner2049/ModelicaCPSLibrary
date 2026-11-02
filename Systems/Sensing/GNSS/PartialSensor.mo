@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 partial model PartialSensor "Antenna-point local NED PVT contract; mounting belongs to caller"
   parameter Real positionBias[3](each unit="m")=zeros(3);
   parameter Real velocityBias[3](each unit="m/s")=zeros(3);

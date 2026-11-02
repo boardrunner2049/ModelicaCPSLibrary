@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model ContactDisabled "Disabling landing gear preserves freefall through the ground plane"
   Vehicles.Copter.MultirotorWithSensors vehicle(

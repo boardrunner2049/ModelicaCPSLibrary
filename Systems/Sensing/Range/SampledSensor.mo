@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.Range;
+within ModelicaCPSLibrary.Systems.Sensing.Range;
 model SampledSensor "L1: sampled biased/noisy/quantized slant range and atomic status delivery"
   extends PartialSensor;
   parameter Real samplePeriod(unit="s")=0.02;

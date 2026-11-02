@@ -1,4 +1,4 @@
-within fire_modelica_models.Worlds.Environment;
+within ModelicaCPSLibrary.Worlds.Environment;
 
 model MagneticField
   parameter Real magneticField0[3] = {0.0, 21.0e-6, -43.0e-6}

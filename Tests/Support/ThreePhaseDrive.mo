@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests.Support;
+within ModelicaCPSLibrary.Tests.Support;
 model ThreePhaseDrive "Reusable bus + ESC + motor + R0 load bench"
   parameter Modelica.Units.SI.AngularVelocity omega_start = 0;
   parameter Real kQ = 1.5e-7;

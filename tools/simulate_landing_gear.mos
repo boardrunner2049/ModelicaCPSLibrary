@@ -1,11 +1,11 @@
-// Run from the fire_modelica_models library root:
+// Run from the ModelicaCPSLibrary library root:
 //   omc tools/simulate_landing_gear.mos
 loadModel(Modelica, {"4.0.0"});
 loadFile("package.mo");
 getErrorString();
 system("mkdir -p build/landing-gear");
 cd("build/landing-gear");
-simulate(fire_modelica_models.Examples.QuadGroundCycle,
+simulate(ModelicaCPSLibrary.Examples.QuadGroundCycle,
   stopTime=6, tolerance=1e-8, numberOfIntervals=3000,
   outputFormat="csv", fileNamePrefix="QuadGroundCycle");
 getErrorString();

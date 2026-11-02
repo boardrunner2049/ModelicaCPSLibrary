@@ -1,4 +1,4 @@
-within fire_modelica_models.Interfaces;
+within ModelicaCPSLibrary.Interfaces;
 
 record SensorMeasurements "Continuous ideal measurements, without attitude truth"
   Real acceleration[3](each unit="m/s2") "Specific force in IMU sensor frame";

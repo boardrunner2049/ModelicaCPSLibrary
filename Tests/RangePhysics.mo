@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model RangePhysics "Ray/plane slant distance, arbitrary normal scale and distinct invalid statuses"
   Systems.Sensing.Range.Sensor tilted(direction_w={0.6,0,0.8},planeNormal_w={-0.2,0,1});
   Systems.Sensing.Range.Sensor scaled(direction_w={0.6,0,0.8},planeNormal_w={-0.4,0,2});

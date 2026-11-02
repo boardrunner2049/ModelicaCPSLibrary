@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function broadcastState "Broadcast position and centered numerical ECEF velocity/clock drift"
   input BroadcastEphemeris eph;
   input Real epoch(unit="s");

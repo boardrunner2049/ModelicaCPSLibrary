@@ -75,15 +75,13 @@ impl ResolvedFireConfig {
     }
     pub fn imu_class(&self) -> &'static str {
         match self.imu_model() {
-            "digital" => "fire_modelica_models.Systems.Sensing.IMU.DigitalSensor",
-            "errors" => "fire_modelica_models.Systems.Sensing.IMU.ErrorSensor",
-            "electromechanical" => {
-                "fire_modelica_models.Systems.Sensing.IMU.ElectromechanicalSensor"
-            }
-            "statistical" => "fire_modelica_models.Systems.Sensing.IMU.StatisticalSensor",
-            "device" => "fire_modelica_models.Systems.Sensing.IMU.DeviceSensor",
-            "acoustic" => "fire_modelica_models.Systems.Sensing.IMU.AcousticSensor",
-            _ => "fire_modelica_models.Systems.Sensing.IMU.Sensor",
+            "digital" => "ModelicaCPSLibrary.Systems.Sensing.IMU.DigitalSensor",
+            "errors" => "ModelicaCPSLibrary.Systems.Sensing.IMU.ErrorSensor",
+            "electromechanical" => "ModelicaCPSLibrary.Systems.Sensing.IMU.ElectromechanicalSensor",
+            "statistical" => "ModelicaCPSLibrary.Systems.Sensing.IMU.StatisticalSensor",
+            "device" => "ModelicaCPSLibrary.Systems.Sensing.IMU.DeviceSensor",
+            "acoustic" => "ModelicaCPSLibrary.Systems.Sensing.IMU.AcousticSensor",
+            _ => "ModelicaCPSLibrary.Systems.Sensing.IMU.Sensor",
         }
     }
     pub fn imu_temperature(&self) -> bool {

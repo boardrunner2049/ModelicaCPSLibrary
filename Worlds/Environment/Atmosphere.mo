@@ -1,4 +1,4 @@
-within fire_modelica_models.Worlds.Environment;
+within ModelicaCPSLibrary.Worlds.Environment;
 
 model Atmosphere
   parameter Real temperature0 = 288.15 "Temperature [K]";

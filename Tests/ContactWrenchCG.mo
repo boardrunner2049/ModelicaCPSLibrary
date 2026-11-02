@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model ContactWrenchCG "Contact moment is about the combined CG, with ground height independent of origin"
   parameter Real weight=2*9.80665;

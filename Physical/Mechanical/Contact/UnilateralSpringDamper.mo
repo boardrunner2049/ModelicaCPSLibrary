@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical.Contact;
+within ModelicaCPSLibrary.Physical.Mechanical.Contact;
 
 model UnilateralSpringDamper "Penalty contact; normal force cannot pull the body toward the surface"
   parameter Real stiffness(min = 0, unit = "N/m") = 3000;

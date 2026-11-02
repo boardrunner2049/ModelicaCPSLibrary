@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing;
+within ModelicaCPSLibrary.Systems.Sensing;
 model SampledDelivery "Atomic value/status acquisition and integer-period delivery queue"
   parameter Integer n(min=1)=1;
   parameter Real samplePeriod(unit="s")=0.1;

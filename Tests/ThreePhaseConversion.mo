@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ThreePhaseConversion "ABC angle, peak ke, torque and signed-current conversion at prescribed speed"
   Physical.Electrical.Electromechanical.PermanentMagnet3Phase emf(
     polePairs=3,ke=0.02,trapezoidal=false,theta0=0.2);

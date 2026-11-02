@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 
 model ContactSettlingTakeoff "Four-point quad/hexa support, sensor force, takeoff and second landing"
   Examples.QuadGroundCycle quad;

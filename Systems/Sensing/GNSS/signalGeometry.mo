@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function signalGeometry "Linear satellite flight-time propagation and Earth rotation, with consistent derivatives"
   input Real receiver[3] "ECEF at reception";
   input Real satellite[3] "ECEF at reception";

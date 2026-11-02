@@ -1,4 +1,4 @@
-within fire_modelica_models.Physical.Mechanical;
+within ModelicaCPSLibrary.Physical.Mechanical;
 
 record MassProperties "A physical part's mass and inertia about its own centre of mass"
   Real mass(min = 0, unit = "kg") = 0;

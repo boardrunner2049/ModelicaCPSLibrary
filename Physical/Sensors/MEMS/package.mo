@@ -1,3 +1,3 @@
-within fire_modelica_models.Physical.Sensors;
+within ModelicaCPSLibrary.Physical.Sensors;
 package MEMS
 end MEMS;

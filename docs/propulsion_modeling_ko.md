@@ -6,7 +6,7 @@
 내용을 변경할 때는 영어 기준본을 먼저 수정하고 한국어 번역을 동기화합니다.
 두 문서의 내용이 다르면 영어 기준본을 따릅니다.
 
-이 문서는 `fire_modelica_models`의 **실제 P0–P4 조립 방식**, 수식, 단위,
+이 문서는 `ModelicaCPSLibrary`의 **실제 P0–P4 조립 방식**, 수식, 단위,
 초기조건, configuration 및 검증 범위를 정리한다. 좌표계는 NED world / FRD body이고,
 프로펠러의 local +z가 추력 방향이다. 모든 물리 파라미터는 SI 단위다.
 

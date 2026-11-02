@@ -1,6 +1,7 @@
 //! Deterministic artifacts and provenance, separate from compilation status.
 use crate::{
     config::ResolvedFireConfig, lower, Result, GENERATOR, HEADER, LEGACY_GENERATOR, LEGACY_HEADER,
+    PREVIOUS_GENERATOR, PREVIOUS_HEADER,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -121,7 +122,10 @@ pub fn emit(
     }
     if model.exists() {
         let previous_source = fs::read_to_string(&model).map_err(|e| e.to_string())?;
-        if !previous_source.starts_with(HEADER) && !previous_source.starts_with(LEGACY_HEADER) {
+        if ![HEADER, PREVIOUS_HEADER, LEGACY_HEADER]
+            .iter()
+            .any(|header| previous_source.starts_with(header))
+        {
             return Err(format!(
                 "Refusing to overwrite non-generated Modelica file: {}",
                 model.display()
@@ -132,7 +136,10 @@ pub fn emit(
     if manifest.exists() {
         let prior: Value = serde_json::from_slice(&fs::read(&manifest).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
-        if prior["generator_id"] != GENERATOR && prior["generator_id"] != LEGACY_GENERATOR {
+        if ![GENERATOR, PREVIOUS_GENERATOR, LEGACY_GENERATOR]
+            .iter()
+            .any(|generator| prior["generator_id"] == *generator)
+        {
             return Err("Refusing to overwrite non-generated manifest".into());
         }
         previous = Some(prior);
@@ -182,7 +189,7 @@ pub fn emit(
     }
     if profile == "vio" {
         manifest_value["input_adapter"] = json!({
-            "class":"fire_modelica_models.Adapters.VirtualIO.PwmInput",
+            "class":"ModelicaCPSLibrary.Adapters.VirtualIO.PwmInput",
             "input_contract":"pwm_pulse_command_v1",
             "output_contract":"normalized_pwm_command_v1",
             "input_unit":"us", "output_unit":"1", "acquisition":"continuous",
@@ -241,8 +248,8 @@ pub fn emit(
     manifest_value["propulsion_components"] = json!({
         "esc": config.esc_class(),
         "motor": config.motor_class(),
-        "rotor": "fire_modelica_models.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
-        "vehicle": "fire_modelica_models.Vehicles.Copter.MultirotorWithSensors",
+        "rotor": "ModelicaCPSLibrary.Physical.Mechanical.Aerodynamics.Blades.QuadraticBlade",
+        "vehicle": "ModelicaCPSLibrary.Vehicles.Copter.MultirotorWithSensors",
         "vehicle_input": "rotor-local hub force and moment"
     });
     if let Some(prior) = previous {
@@ -277,7 +284,7 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
 /// and undeclared compatibility directories are not Modelica source roots.
 pub fn stage_library(root: &Path, output: &Path) -> Result<PathBuf> {
     let sources = output.join("sources");
-    let staged = sources.join("fire_modelica_models");
+    let staged = sources.join("ModelicaCPSLibrary");
     if sources.is_symlink() || staged.is_symlink() {
         return Err("Refusing symlink staged source directories".into());
     }
@@ -314,7 +321,7 @@ pub fn stage_library(root: &Path, output: &Path) -> Result<PathBuf> {
     }
     fs::create_dir_all(&sources).map_err(|e| e.to_string())?;
     let work = tempfile::tempdir_in(&sources).map_err(|e| e.to_string())?;
-    let fresh = work.path().join("fire_modelica_models");
+    let fresh = work.path().join("ModelicaCPSLibrary");
     copy_package(root, &fresh)?;
     fs::write(fresh.join(".fire-compose"), GENERATOR).map_err(|e| e.to_string())?;
     // Replace only a directory owned by this generator, so removed classes do
@@ -329,15 +336,20 @@ pub fn stage_library(root: &Path, output: &Path) -> Result<PathBuf> {
         }
         return Err(error.to_string());
     }
-    // Retire the previous namespace only when its tree belongs to this generator.
-    let legacy = sources.join("FIRE_Modelica");
-    if !legacy.is_symlink()
-        && fs::read_to_string(legacy.join(".fire-compose"))
-            .ok()
-            .as_deref()
-            == Some(LEGACY_GENERATOR)
-    {
-        fs::rename(&legacy, work.path().join("previous-namespace")).map_err(|e| e.to_string())?;
+    // Retire previous namespaces only when their trees belong to this generator.
+    for (namespace, generator) in [
+        ("fire_modelica_models", PREVIOUS_GENERATOR),
+        ("FIRE_Modelica", LEGACY_GENERATOR),
+    ] {
+        let legacy = sources.join(namespace);
+        if !legacy.is_symlink()
+            && fs::read_to_string(legacy.join(".fire-compose"))
+                .ok()
+                .as_deref()
+                == Some(generator)
+        {
+            fs::rename(&legacy, work.path().join(namespace)).map_err(|e| e.to_string())?;
+        }
     }
     Ok(staged)
 }

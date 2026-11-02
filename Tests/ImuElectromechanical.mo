@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuElectromechanical "Three physical axes; rate is recovered from Coriolis displacement"
   Systems.Sensing.IMU.ElectromechanicalSensor imu(p(samplePeriod=0.002));
   Systems.Sensing.IMU.VibratoryGyro startup(p(startupFraction=0.1,driveFrequency=1003,referenceFrequency=1000));

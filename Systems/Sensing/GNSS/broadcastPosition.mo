@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.GNSS;
+within ModelicaCPSLibrary.Systems.Sensing.GNSS;
 function broadcastPosition "GPS broadcast ECEF orbit and L1 code clock, including relativity"
   input BroadcastEphemeris eph;
   input Real epoch(unit="s") "GNSS seconds of week, never UTC or wall clock";

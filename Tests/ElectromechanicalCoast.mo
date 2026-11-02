@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ElectromechanicalCoast "Current continuity, freewheel, open coast, blocked command and restart"
   Physical.Electrical.Drives.ESC.AverageUnidirectional esc;
   Systems.Propulsion.Motors.DynamicDCEquivalent motor(

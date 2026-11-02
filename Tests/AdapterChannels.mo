@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model AdapterChannels "Stateless eight-channel PWM clipping and sensor mount transformations"
   Adapters.VirtualIO.PwmInput commands(nChannels=8);
   Adapters.VirtualIO.SensorValues values(geometry=Vehicles.Copter.Presets.OctoX(

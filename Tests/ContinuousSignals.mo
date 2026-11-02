@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ContinuousSignals "Sensor values and PWM normalization change between former acquisition instants"
   Systems.Sensing.GNSS.Sensor gnss;
   Systems.Sensing.Barometer.Sensor barometer;

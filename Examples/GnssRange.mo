@@ -1,4 +1,4 @@
-within fire_modelica_models.Examples;
+within ModelicaCPSLibrary.Examples;
 model GnssRange "G0/G1/G2 and L0/L1 with an illustrative broadcast constellation and moving antenna"
   parameter Integer nSat=24;
   Systems.Sensing.GNSS.BroadcastConstellation constellation(nSat=nSat,

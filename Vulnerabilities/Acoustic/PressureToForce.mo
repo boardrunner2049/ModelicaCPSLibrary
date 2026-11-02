@@ -1,4 +1,4 @@
-within fire_modelica_models.Vulnerabilities.Acoustic;
+within ModelicaCPSLibrary.Vulnerabilities.Acoustic;
 model PressureToForce "Static package susceptibility: pressure to generalized MEMS forces"
   parameter Real effectiveArea(unit="m2")=1e-10 "Identified area, independent of drive amplitude";
   parameter Real incidenceAngle(unit="rad")=0 "Zero is sense direction, matching MFQuadrotor convention";

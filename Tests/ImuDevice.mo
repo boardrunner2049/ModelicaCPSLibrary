@@ -1,4 +1,4 @@
-within fire_modelica_models.Tests;
+within ModelicaCPSLibrary.Tests;
 model ImuDevice "Analog response, temperature, ADC clipping/rounding, IIR and independent output clock"
   Systems.Sensing.IMU.DeviceSensor analog(p(samplePeriod=0.004,adcDecimation=4,analogTau=fill(0.01,6)));
   Systems.Sensing.IMU.DeviceSensor digital(p(samplePeriod=0.004,adcDecimation=4,analogTau=fill(0.01,6),digitalTau=fill(0.002,6)));

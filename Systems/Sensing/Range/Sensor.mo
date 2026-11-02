@@ -1,4 +1,4 @@
-within fire_modelica_models.Systems.Sensing.Range;
+within ModelicaCPSLibrary.Systems.Sensing.Range;
 model Sensor "L0: ideal continuous ray/plane intersection with explicit return status"
   extends PartialSensor;
   output Real geometricRange(unit="m") "Diagnostic signed ray parameter; zero for parallel rays";
