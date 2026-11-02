@@ -455,3 +455,52 @@ input requirement.
 Physical transfer/convergence evidence above is native DASSL evidence. These tests
 do not certify hardware calibration, proprietary chip circuitry, force rebalance,
 Rumoca/FMI3, FastDyn firmware timestamp/batch handling or H-Flow integration.
+
+
+## GNSS G0–G2 and range L0/L1 (2026-10-28)
+
+The new profiles are native Modelica components, described in the
+[GNSS contract](../Systems/Sensing/GNSS/README.md) and
+[range contract](../Systems/Sensing/Range/README.md). G0 remains the suite default;
+`SensorSuite.GnssModel` supports redeclaration. The current TOML composer and
+FastDyn device adapters do not yet select/deliver these sampled profiles.
+
+Validation with OpenModelica 1.26.1 and Modelica 4.0.0:
+
+```sh
+FIRE_TEST_OMC=1 python3 -m unittest discover -s tools -p 'test_gnss_range.py'
+python3 tools/verify.py --output build/gnss-range-regression
+```
+
+All three Python checks passed, covering six native simulations (four physics
+models, a solver-step refinement and the broadcast-constellation example).
+The complete native regression passed **46 simulations and four expected invalid
+chassis configurations**, without compiler warnings or assertion violations.
+Reports are under `build/gnss-range-validation` and `build/gnss-range-regression`.
+
+- `GnssStatistical`: continuous G0, joint sampled PVT, suite antenna lever arm,
+  delayed validity loss/recovery, full covariance, stationary Gauss–Markov modes,
+  independent streams and exact seed replay. Across 2,001 samples, white variance
+  was 0.98549 (target 1), N/E covariance 0.49415 (target 0.5), position/velocity
+  covariance 0.19773 (target 0.2), and bias lag correlation 0.90705 (target 0.90484).
+  Reducing maximum solver step to 0.0007 s left sampled outputs exactly unchanged.
+- `GnssObservables`: moving satellites/antenna, receiver and satellite clocks,
+  common versus per-satellite code errors, receiver path corrections, reported
+  uncertainty, rank deficiency and delayed satellite loss/reacquisition. Maximum
+  error in the matched, noiseless synthetic PVT case was 6.34e-9 m. This measures
+  numerical consistency, not real-world navigation accuracy.
+- `GnssEphemeris`: analytic circular orbit/velocity and clock, week wrapping,
+  fit/health rejection, WGS84 reference rotation, independent finite differences
+  for range gradients/rates and an analytic Earth-rotation sign check.
+- `RangePhysics`: tilted-plane slant range, normal scaling, parallel/behind rays,
+  minimum/maximum range, temperature/bias/quantization, no-return/device-error
+  priority, co-timed quality/status and deterministic replay.
+- `Examples.GnssRange`: illustrative 24-satellite broadcast records feeding G2,
+  alongside G0/G1 and L0/L1; coherent PVT recovery and independent output clocks.
+
+These checks do not claim real ephemeris-dataset validation, RF tracking, hardware
+calibration, FMI export/runtime certification, Rumoca/FMI3 or firmware integration.
+G2 uses reception-epoch ephemeris with linear propagation across signal flight time;
+its range/rate equations are mutually consistent under that approximation. RINEX/SP3
+parsing, changing navigation records, optical scenes and H-Flow protocol work remain
+outside the implemented scope.

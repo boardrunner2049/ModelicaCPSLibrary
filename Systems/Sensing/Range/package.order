@@ -1,0 +1,9 @@
+Uninitialized
+Valid
+NoReturn
+TooClose
+TooFar
+DeviceError
+PartialSensor
+Sensor
+SampledSensor

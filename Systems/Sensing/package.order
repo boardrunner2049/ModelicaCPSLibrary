@@ -1,5 +1,8 @@
+normalDraw
+SampledDelivery
 IMU
 Magnetometer
 GNSS
 Barometer
+Range
 SensorSuite

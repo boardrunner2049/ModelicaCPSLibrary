@@ -1,1 +1,16 @@
+PartialSensor
 Sensor
+PartialSampledSensor
+StatisticalSensor
+Reference
+referenceFrame
+BroadcastEphemeris
+broadcastPosition
+broadcastState
+broadcastStates
+BroadcastConstellation
+signalGeometry
+constellationGeometry
+inverseNormal
+solvePvt
+ObservableSensor

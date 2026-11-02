@@ -1,0 +1,26 @@
+within fire_modelica_models.Systems.Sensing.GNSS;
+record BroadcastEphemeris "GPS broadcast Keplerian orbit/clock record in SI; illustrative defaults"
+  parameter Real sqrtA=5153.7954775 "sqrt(m)";
+  parameter Real eccentricity=0.01;
+  parameter Real inclination(unit="rad")=0.9599310886;
+  parameter Real omega0(unit="rad")=0 "Ascending node at weekly epoch";
+  parameter Real argumentOfPerigee(unit="rad")=0;
+  parameter Real meanAnomaly(unit="rad")=0;
+  parameter Real deltaN(unit="rad/s")=0;
+  parameter Real omegaDot(unit="rad/s")=-8e-9;
+  parameter Real inclinationDot(unit="rad/s")=0;
+  parameter Real cuc=0;
+  parameter Real cus=0;
+  parameter Real crc(unit="m")=0;
+  parameter Real crs(unit="m")=0;
+  parameter Real cic=0;
+  parameter Real cis=0;
+  parameter Real toe(unit="s")=0 "Seconds of GNSS week";
+  parameter Real toc(unit="s")=0;
+  parameter Real af0(unit="s")=0;
+  parameter Real af1=0;
+  parameter Real af2(unit="1/s")=0;
+  parameter Real tgd(unit="s")=0 "GPS L1 code group delay, subtracted from clock";
+  parameter Real fitInterval(unit="s")=14400 "Full fit window centered on toe";
+  parameter Boolean healthy=true;
+end BroadcastEphemeris;

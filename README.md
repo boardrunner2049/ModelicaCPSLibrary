@@ -23,7 +23,7 @@ P2 adds inductive motor current, torque and load feedback. P3/P4 add three-phase
 commutation and a shared DC link, with averaged or switched inverters. General terrain,
 drag, battery chemistry/SOC and protocol models remain outside the active path.
 
-## Sensor fidelity (2026-10-26, revised)
+## Sensor fidelity (2026-10-28, revised)
 
 IMU fidelity is independent of propulsion: **I0 ideal, I1 digital output, I2
 calibration/statistical errors, I3 electromechanical MEMS and electronics**.
@@ -33,9 +33,14 @@ See [IMU equations, configuration and limits](Systems/Sensing/IMU/README.md).
 | Family | Implemented scope | Remaining scope |
 |---|---|---|
 | IMU | I0–I3; I3 includes drive/sense, capacitive readout, AGC, PLL and open-loop sense demodulation | Hardware parameter identification; optional force rebalance |
-| GNSS | G0 ideal | G1–G3 and spoofing |
-| LiDAR rangefinder | Design for AFBR-S50LV85D | L0–L3 implementation |
+| GNSS | G0 continuous, G1 correlated PVT, G2 satellite observables and navigation solution | G3 RF tracking; device/host integration |
+| LiDAR rangefinder | L0 ray/plane, L1 errors, sampled delivery and status | L2/L3 optics and AFBR calibration |
 | Optical flow | Design for PAA3905E1 | F0–F3 implementation |
+
+[GNSS G0–G2](Systems/Sensing/GNSS/README.md) and [range L0/L1](Systems/Sensing/Range/README.md)
+are available by Modelica composition; see `Examples.GnssRange`. G2 accepts external
+ECEF states or parsed GPS broadcast ephemerides. `SensorSuite.GnssModel` is replaceable.
+The TOML GNSS selector remains ideal; sampled GNSS/range host adapters are separate work.
 
 I1–I3 share ADC/IIR/decimation and sample metadata. I2 adds nominal errors. I3
 replaces input physics with three gyros and three proof masses; its C/V electronics

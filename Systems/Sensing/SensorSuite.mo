@@ -1,6 +1,6 @@
 within fire_modelica_models.Systems.Sensing;
 
-model SensorSuite "Optional four-sensor assembly with independently replaceable IMU"
+model SensorSuite "Optional four-sensor assembly with independently replaceable IMU and GNSS"
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
   parameter Real R_bImu[3,3] = identity(3) "IMU frame to body";
   parameter Real R_bMag[3,3] = identity(3) "Magnetometer frame to body";
@@ -30,7 +30,8 @@ model SensorSuite "Optional four-sensor assembly with independently replaceable 
   ImuModel imu( r_b=rImu_b, R_bs=R_bImu,
     accelBias=accelBias, gyroBias=gyroBias);
   Magnetometer.Sensor magnetometer( R_bs=R_bMag, bias=magBias);
-  GNSS.Sensor gnss( positionBias=positionBias, velocityBias=velocityBias);
+  replaceable model GnssModel = GNSS.Sensor constrainedby GNSS.PartialSensor;
+  GnssModel gnss( positionBias=positionBias, velocityBias=velocityBias);
   Barometer.Sensor barometer( pressureBias=pressureBias,
     temperatureBias=temperatureBias, altitudeBias=altitudeBias);
 protected

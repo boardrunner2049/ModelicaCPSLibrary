@@ -1,4 +1,4 @@
-# Sensors: implemented IMU fidelity and remaining design proposals
+# Sensors: implemented IMU, GNSS and range fidelity
 
 ## Implemented continuous baseline
 
@@ -23,12 +23,15 @@ No mount correction is applied twice.
 
 ## Proposal status and composition rules
 
-The architecture below was proposed on 2026-10-26. **IMU I0–I3 now have
-implementations**, documented in [IMU usage, parameter conventions and limits](IMU/README.md)
-and section 7.14 of the parent FastDyn interface document v0.11.
+The architecture below was proposed on 2026-10-26. **IMU I0–I3, GNSS G0–G2 and
+range L0/L1 now have implementations**. IMU details are documented in
+[IMU usage, parameter conventions and limits](IMU/README.md) and section 7.14 of
+the parent FastDyn interface document v0.11.
 I0 remains the default. I1/I2/I3 select deterministic digital, calibration/statistical-error and
-electromechanical compositions; the other sensors remain ideal and continuous.
-G1–G3, flow/range families and their disturbance blocks remain proposals.
+electromechanical compositions. GNSS G1/G2 and range L0/L1 are selected by Modelica
+composition; see [GNSS implementation](GNSS/README.md), [range implementation](Range/README.md)
+and `Examples.GnssRange`. GNSS defaults to G0; mag/barometer remain ideal.
+G3, flow and range L2/L3 remain proposals.
 The equations below describe the broader design; the IMU README specifies the
 implemented signal-chain placement, clocks and reduced-model limitations.
 
@@ -242,9 +245,9 @@ identical noise or susceptibility.
 
 ## Proposed boundaries, scheduling and disturbances
 
-IMU epoch/delivery/sequence/validity fields are implemented for I1–I3; see the
-IMU README for exported names. Other families and integration-window fields
-below remain proposed, not existing Modelica ports.
+IMU I1–I3, GNSS G1/G2 and range L1 implement epoch/delivery/sequence/validity
+fields; their READMEs specify exact names and limits. The table below remains a
+broader boundary proposal, including unimplemented flow windows and host adapters.
 
 | Boundary | Proposed quantities | Meaning |
 |---|---|---|
@@ -307,13 +310,13 @@ levels use shared-memory/external functions or co-simulation only after defining
 the selected backend's contract and demonstrating compiler/FMI support.
 
 Current FIRE `SensorMeasurements` contains neither range nor flow metadata.
-`SensorSuite.ImuModel` is replaceable; other families retain concrete ideal instances.
+`SensorSuite.ImuModel` and `SensorSuite.GnssModel` are replaceable; mag/barometer retain concrete ideal instances.
 Sampled IMU metadata is separate from the existing measurement value record. The current FastDyn FMU LiDAR callback returns no samples, and
 the RPLidar scan format is not the H-Flow DroneCAN contract. The current IMU batch
 copies one reading into 17 slots; new profiles need actual sample history.
 GPS currently receives host simulation time and a truth-derived yaw through the
 export path: preserve acquisition timestamps and prevent unintended truth feedback.
-These host changes are prerequisites for end-to-end claims, not part of this design update.
+These host changes are prerequisites for end-to-end claims and remain outside the sensor library implementation.
 
 ## Implementation order and acceptance criteria
 
@@ -335,9 +338,9 @@ These host changes are prerequisites for end-to-end claims, not part of this des
 | Attacks | Paired nominal/attack runs with matched normal-noise seeds; navigation error, innovation/NIS, detection/failsafe/recovery |
 
 Parameter defaults must identify whether they are illustrative, datasheet-derived
-or measured. The full matrix is a design target; implemented IMU evidence is recorded in
+or measured. The full matrix is a design target; implemented sensor evidence is recorded in
 [validation](../../docs/validation.md). No firmware/hardware calibration or
-validation of the proposed GNSS, range or flow models is claimed.
+validation of GNSS/range hardware or proposed flow models is claimed.
 
 ## References
 

@@ -27,7 +27,7 @@ TOML과 manifest에 보존하며 composer가 모델 생성 전에 비어 있지 
 수정자를 제거해야 합니다. Composer를 거치지 않는 경우 부품 중복 계상은 호출자가 확인해야 하며,
 질량·회전행렬·관성의 물리적 유효성 검사는 기존 Modelica 함수에서 계속 수행합니다.
 
-## 센서 fidelity (2026-10-26, 개정)
+## 센서 fidelity (2026-10-28, 개정)
 
 **I0 이상값 → I1 디지털 출력 근사 → I2 교정·통계 오차 → I3 기계·전기 물리 모델**로
 구성합니다. 추진계와 독립적으로 `[models.imu]`의 `model`을
@@ -49,7 +49,17 @@ I3는 `modal_force`로 순간 음압을 받아 MEMS에 힘을 전달합니다.
 사용할 수 있습니다. 계수는 예시이며 ICM-42688-P 실측 보정값이 아닙니다.
 기존 `statistical`, `device`, `acoustic` 선택은 동작을 보존하며 manifest에서 legacy로 구분합니다.
 I0 기본식은 유지합니다. [검증 범위](docs/validation.md)는 native/FMI2와 hardware·Rumoca/FMI3·
-FastDyn firmware 통합을 구분합니다. H-Flow의 PAA3905E1·AFBR-S50LV85D 및 GNSS 확장은 설계안입니다.
+FastDyn firmware 통합을 구분합니다.
+
+[GNSS G0–G2](Systems/Sensing/GNSS/README.md)와 [range L0/L1](Systems/Sensing/Range/README.md)을
+Modelica 모델로 구현했습니다. G0은 연속 이상값, G1은 상관된 PVT 오차·측정/전달 시각·fix,
+G2는 위성 가시성·의사거리·거리율·시계·항법해·공분산을 계산합니다.
+위성 기하는 위성과 수신기 사이의 배치이며 ephemeris는 시간별 위성 위치를 구하는 자료입니다.
+G2에 외부 ECEF 상태를 주거나 `BroadcastConstellation`으로 파싱된 GPS broadcast 궤도를 계산할 수 있습니다.
+RINEX 파서·실시간 다운로드는 포함하지 않습니다.
+L0은 광선/평면의 사선 거리, L1은 오차·양자화·샘플링·지연과 무효 상태를 구현합니다.
+`Examples.GnssRange`와 `SensorSuite.GnssModel` redeclare를 사용합니다.
+TOML composer GNSS 선택은 기존 ideal만 지원하며, H-Flow 조립·flow·광학 L2/L3·host protocol 연결은 후속입니다.
 
 ## P0 유지와 P1 선택
 
