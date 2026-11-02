@@ -1,5 +1,7 @@
 # ModelicaCPSLibrary
 
+**ModelicaCPSLibrary** is a composable, multi-fidelity Modelica library for physics-based simulation of cyber-physical systems, designed to support firmware-in-the-loop testing, fuzzing, and safety falsification.
+
 [Korean version](README_ko.md)
 
 Load `package.mo` and use the `ModelicaCPSLibrary` namespace, for example
