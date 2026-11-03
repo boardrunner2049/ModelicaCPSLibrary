@@ -1,0 +1,159 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# 1 MHz mode 0 MSB first: half period 0.5 us, a byte = 16 edges = 8 us after
+# submission; sampling on rising edges (t0 + 0.5 + i us), shifting on falling
+# edges. Inputs set at a communication point t act at t (the request event,
+# hence the clock, is anchored at t) but appear in the trace row at t + 50 ns.
+# Bytes: tx 0xA5 = 10100101 (req 2, t0 = 5), 0x81 (req 3, t0 = 15, aborted),
+# 0x00 (req 4, t0 = 23); harness slave answers 0x3C = 60 and 0xC5 = 197.
+# A native `bin/rumoca sim` of the same timeline (scratch model
+# NativeByteMaster) matches every column at every sample away from the
+# input-change instants.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.cs_n} - (1 - {m.csActive})"
+at = "all"
+near = 0
+tol = 0
+why = "cs_n is the inverse of csActive at every sample"
+
+# --- request 1: CS inactive --------------------------------------------------
+[[check]]
+expr = "{m.completedId@2.05e-6}*100 + {m.status@2.05e-6}*10 + {m.busy@2.05e-6}"
+near = 120
+tol = 0
+why = "request with CS inactive retires immediately as completedId 1, status 2, never busy"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+to = 5.45e-6
+range = [0, 0]
+why = "no clock for the rejected request, nor when CS is merely asserted with nothing to send"
+
+[[check]]
+expr = "{m.status@4.95e-6}*10 + {m.completedId@4.95e-6}"
+near = 21
+tol = 0
+why = "asserting CS without a request changes nothing"
+
+# --- request 2: full byte ----------------------------------------------------
+[[check]]
+variable = "m.busy"
+at = "all"
+from = 5.05e-6
+to = 12.95e-6
+range = [1, 1]
+why = "busy from submission at 5 us for 8 us"
+
+[[check]]
+expr = "{m.sclk@5.45e-6} + 2*{m.sclk@5.5e-6} + 4*{m.sclk@6e-6} + 8*{m.sclk@12.5e-6} + 16*{m.sclk@13e-6}"
+near = 10
+tol = 0
+why = "first rising edge 0.5 us after submission, falling at 1 us, 16th edge (falling) at 13 us"
+
+[[check]]
+variable = "m.sclk"
+at = "mean"
+from = 5.0e-6
+to = 12.95e-6
+near = 0.5
+tol = 1e-9
+why = "8 periods at 1 MHz, 50% duty"
+
+[[check]]
+expr = "128*{m.mosi@5.45e-6} + 64*{m.mosi@6.45e-6} + 32*{m.mosi@7.45e-6} + 16*{m.mosi@8.45e-6} + 8*{m.mosi@9.45e-6} + 4*{m.mosi@10.45e-6} + 2*{m.mosi@11.45e-6} + {m.mosi@12.45e-6}"
+near = 165
+tol = 0
+why = "MOSI just before each rising edge spells 0xA5 MSB first (first bit valid before the first edge)"
+
+[[check]]
+expr = "{m.completedId@13e-6}*1000 + {m.rxData@13e-6}*10 + {m.status@13e-6}"
+near = 2601
+tol = 0
+why = "request 2 retires at 13 us with status 1 and rxData 0x3C sampled from MISO"
+
+[[check]]
+variable = "m.rxData"
+at = "all"
+to = 12.95e-6
+range = [0, 0]
+why = "rxData only changes on successful completion"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 13.0e-6
+to = 15.45e-6
+range = [0, 0]
+why = "clock idle low between bytes"
+
+# --- request 3: aborted by CS drop at 18.25 us -------------------------------
+[[check]]
+expr = "{m.busy@18.25e-6}*10 + {m.edgeCount@18.25e-6}"
+near = 16
+tol = 0
+why = "request 3 in flight with 6 edges done when CS drops"
+
+[[check]]
+expr = "{m.completedId@18.3e-6}*1000 + {m.status@18.3e-6}*100 + {m.busy@18.3e-6}*10 + {m.sclk@18.3e-6}"
+near = 3300
+tol = 0
+why = "CS drop aborts at once (before the 18.5 us edge): completedId 3, status 3, not busy, SCLK idle"
+
+[[check]]
+variable = "m.rxData"
+at = "all"
+from = 13e-6
+to = 30.95e-6
+range = [60, 60]
+why = "the aborted byte does not overwrite the last received byte"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 18.3e-6
+to = 23.45e-6
+range = [0, 0]
+why = "no clock after the abort, nor on CS re-assertion"
+
+# --- request 4: recovery -----------------------------------------------------
+[[check]]
+variable = "m.busy"
+at = "all"
+from = 23.05e-6
+to = 30.95e-6
+range = [1, 1]
+why = "fresh 8 us transfer after the abort"
+
+[[check]]
+variable = "m.mosi"
+at = "all"
+from = 23.05e-6
+to = 30.95e-6
+range = [0, 0]
+why = "tx 0x00: MOSI low throughout (no residue of the aborted 0x81)"
+
+[[check]]
+expr = "{m.completedId@31e-6}*1000 + {m.rxData@31e-6}*10 + {m.status@31e-6}"
+near = 5971
+tol = 0
+why = "request 4 retires at 31 us with status 1 and rxData 0xC5 = 197"
+
+[[check]]
+expr = "{m.status}*10 + {m.busy}"
+near = 10
+tol = 0
+why = "CS release at 33 us after completion leaves status 1 (no abort)"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 31e-6
+range = [0, 0]
+why = "clock idle after the last byte"

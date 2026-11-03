@@ -1,0 +1,1496 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Generated per pair; 1 MHz clock (half period 0.5 us), byte k submitted at
+# t0 = 2 + 12(k-1) us and retiring at t0 + 8 us. Sampling edges: CPHA = 0 ->
+# edges 1,3,..,15 (t0 + 0.5 + i us), CPHA = 1 -> edges 2,4,..,16 (t0 + 1 + i).
+# Line bits are read 0.1 us before each sampling edge (setup time), weighted
+# 128..1 for MSB first and 1..128 for LSB first; 53 = 00110101 is not a
+# palindrome, so a wrong bit order or mode shows. These restate the model's
+# asserts (11, 23, 35, 47, 59, 66 us) at the exact retirement instants and add
+# line-level timing. The whole trace also matches a native `bin/rumoca sim`
+# of the test exactly at every 50 ns sample (234 columns).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.master[[]?].cs_n"
+at = "all"
+from = 1e-6
+to = 64.95e-6
+range = [0, 0]
+why = "CS held asserted continuously across all five bytes"
+
+# --- pair 1 (CPOL=0, CPHA=0, MSB first) ---
+
+[[check]]
+variable = "m.master[1].sclk"
+at = "all"
+to = 2.45e-06
+range = [0, 0]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[1].sclk"
+at = "all"
+from = 5.8e-05
+range = [0, 0]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "128*{m.master[1].mosi@2.4e-6} + 64*{m.master[1].mosi@3.4e-6} + 32*{m.master[1].mosi@4.4e-6} + 16*{m.master[1].mosi@5.4e-6} + 8*{m.master[1].mosi@6.4e-6} + 4*{m.master[1].mosi@7.4e-6} + 2*{m.master[1].mosi@8.4e-6} + 1*{m.master[1].mosi@9.4e-6}"
+near = 150
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "128*{m.slave[1].miso@2.4e-6} + 64*{m.slave[1].miso@3.4e-6} + 32*{m.slave[1].miso@4.4e-6} + 16*{m.slave[1].miso@5.4e-6} + 8*{m.slave[1].miso@6.4e-6} + 4*{m.slave[1].miso@7.4e-6} + 2*{m.slave[1].miso@8.4e-6} + 1*{m.slave[1].miso@9.4e-6}"
+near = 105
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[1].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[1].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[1].completedId@10e-6}*10000 + {m.master[1].rxData@10e-6}*10 + {m.master[1].status@10e-6} + 100000*{m.master[1].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[1].rxData@10e-6}*10 + {m.slave[1].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[1].receivedCount"
+at = "9.45e-6"
+near = 0
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 1 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[1].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[1].completedId@22e-6}*10000 + {m.master[1].rxData@22e-6}*10 + {m.master[1].status@22e-6} + 100000*{m.master[1].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[1].rxData@22e-6}*10 + {m.slave[1].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[1].receivedCount"
+at = "21.45e-6"
+near = 1
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 2 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "128*{m.master[1].mosi@26.4e-6} + 64*{m.master[1].mosi@27.4e-6} + 32*{m.master[1].mosi@28.4e-6} + 16*{m.master[1].mosi@29.4e-6} + 8*{m.master[1].mosi@30.4e-6} + 4*{m.master[1].mosi@31.4e-6} + 2*{m.master[1].mosi@32.4e-6} + 1*{m.master[1].mosi@33.4e-6}"
+near = 53
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[1].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[1].completedId@34e-6}*10000 + {m.master[1].rxData@34e-6}*10 + {m.master[1].status@34e-6} + 100000*{m.master[1].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[1].rxData@34e-6}*10 + {m.slave[1].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[1].receivedCount"
+at = "33.45e-6"
+near = 2
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 3 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[1].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[1].completedId@46e-6}*10000 + {m.master[1].rxData@46e-6}*10 + {m.master[1].status@46e-6} + 100000*{m.master[1].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[1].rxData@46e-6}*10 + {m.slave[1].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[1].receivedCount"
+at = "45.45e-6"
+near = 3
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 4 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[1].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[1].completedId@58e-6}*10000 + {m.master[1].rxData@58e-6}*10 + {m.master[1].status@58e-6} + 100000*{m.master[1].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[1].rxData@58e-6}*10 + {m.slave[1].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[1].receivedCount"
+at = "57.45e-6"
+near = 4
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): byte 5 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "{m.slave[1].misoEnabled@66e-6}*10 + {m.slave[1].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 1 (CPOL=0, CPHA=0, MSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 2 (CPOL=0, CPHA=1, MSB first) ---
+
+[[check]]
+variable = "m.master[2].sclk"
+at = "all"
+to = 2.45e-06
+range = [0, 0]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[2].sclk"
+at = "all"
+from = 5.8e-05
+range = [0, 0]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "128*{m.master[2].mosi@2.9e-6} + 64*{m.master[2].mosi@3.9e-6} + 32*{m.master[2].mosi@4.9e-6} + 16*{m.master[2].mosi@5.9e-6} + 8*{m.master[2].mosi@6.9e-6} + 4*{m.master[2].mosi@7.9e-6} + 2*{m.master[2].mosi@8.9e-6} + 1*{m.master[2].mosi@9.9e-6}"
+near = 150
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "128*{m.slave[2].miso@2.9e-6} + 64*{m.slave[2].miso@3.9e-6} + 32*{m.slave[2].miso@4.9e-6} + 16*{m.slave[2].miso@5.9e-6} + 8*{m.slave[2].miso@6.9e-6} + 4*{m.slave[2].miso@7.9e-6} + 2*{m.slave[2].miso@8.9e-6} + 1*{m.slave[2].miso@9.9e-6}"
+near = 105
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[2].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[2].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[2].completedId@10e-6}*10000 + {m.master[2].rxData@10e-6}*10 + {m.master[2].status@10e-6} + 100000*{m.master[2].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[2].rxData@10e-6}*10 + {m.slave[2].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[2].receivedCount"
+at = "9.95e-6"
+near = 0
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 1 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[2].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[2].completedId@22e-6}*10000 + {m.master[2].rxData@22e-6}*10 + {m.master[2].status@22e-6} + 100000*{m.master[2].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[2].rxData@22e-6}*10 + {m.slave[2].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[2].receivedCount"
+at = "21.95e-6"
+near = 1
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 2 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "128*{m.master[2].mosi@26.9e-6} + 64*{m.master[2].mosi@27.9e-6} + 32*{m.master[2].mosi@28.9e-6} + 16*{m.master[2].mosi@29.9e-6} + 8*{m.master[2].mosi@30.9e-6} + 4*{m.master[2].mosi@31.9e-6} + 2*{m.master[2].mosi@32.9e-6} + 1*{m.master[2].mosi@33.9e-6}"
+near = 53
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[2].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[2].completedId@34e-6}*10000 + {m.master[2].rxData@34e-6}*10 + {m.master[2].status@34e-6} + 100000*{m.master[2].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[2].rxData@34e-6}*10 + {m.slave[2].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[2].receivedCount"
+at = "33.95e-6"
+near = 2
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 3 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[2].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[2].completedId@46e-6}*10000 + {m.master[2].rxData@46e-6}*10 + {m.master[2].status@46e-6} + 100000*{m.master[2].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[2].rxData@46e-6}*10 + {m.slave[2].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[2].receivedCount"
+at = "45.95e-6"
+near = 3
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 4 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[2].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[2].completedId@58e-6}*10000 + {m.master[2].rxData@58e-6}*10 + {m.master[2].status@58e-6} + 100000*{m.master[2].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[2].rxData@58e-6}*10 + {m.slave[2].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[2].receivedCount"
+at = "57.95e-6"
+near = 4
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): byte 5 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "{m.slave[2].misoEnabled@66e-6}*10 + {m.slave[2].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 2 (CPOL=0, CPHA=1, MSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 3 (CPOL=1, CPHA=0, MSB first) ---
+
+[[check]]
+variable = "m.master[3].sclk"
+at = "all"
+to = 2.45e-06
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[3].sclk"
+at = "all"
+from = 5.8e-05
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "128*{m.master[3].mosi@2.4e-6} + 64*{m.master[3].mosi@3.4e-6} + 32*{m.master[3].mosi@4.4e-6} + 16*{m.master[3].mosi@5.4e-6} + 8*{m.master[3].mosi@6.4e-6} + 4*{m.master[3].mosi@7.4e-6} + 2*{m.master[3].mosi@8.4e-6} + 1*{m.master[3].mosi@9.4e-6}"
+near = 150
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "128*{m.slave[3].miso@2.4e-6} + 64*{m.slave[3].miso@3.4e-6} + 32*{m.slave[3].miso@4.4e-6} + 16*{m.slave[3].miso@5.4e-6} + 8*{m.slave[3].miso@6.4e-6} + 4*{m.slave[3].miso@7.4e-6} + 2*{m.slave[3].miso@8.4e-6} + 1*{m.slave[3].miso@9.4e-6}"
+near = 105
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[3].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[3].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[3].completedId@10e-6}*10000 + {m.master[3].rxData@10e-6}*10 + {m.master[3].status@10e-6} + 100000*{m.master[3].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[3].rxData@10e-6}*10 + {m.slave[3].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[3].receivedCount"
+at = "9.45e-6"
+near = 0
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 1 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[3].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[3].completedId@22e-6}*10000 + {m.master[3].rxData@22e-6}*10 + {m.master[3].status@22e-6} + 100000*{m.master[3].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[3].rxData@22e-6}*10 + {m.slave[3].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[3].receivedCount"
+at = "21.45e-6"
+near = 1
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 2 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "128*{m.master[3].mosi@26.4e-6} + 64*{m.master[3].mosi@27.4e-6} + 32*{m.master[3].mosi@28.4e-6} + 16*{m.master[3].mosi@29.4e-6} + 8*{m.master[3].mosi@30.4e-6} + 4*{m.master[3].mosi@31.4e-6} + 2*{m.master[3].mosi@32.4e-6} + 1*{m.master[3].mosi@33.4e-6}"
+near = 53
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[3].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[3].completedId@34e-6}*10000 + {m.master[3].rxData@34e-6}*10 + {m.master[3].status@34e-6} + 100000*{m.master[3].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[3].rxData@34e-6}*10 + {m.slave[3].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[3].receivedCount"
+at = "33.45e-6"
+near = 2
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 3 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[3].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[3].completedId@46e-6}*10000 + {m.master[3].rxData@46e-6}*10 + {m.master[3].status@46e-6} + 100000*{m.master[3].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[3].rxData@46e-6}*10 + {m.slave[3].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[3].receivedCount"
+at = "45.45e-6"
+near = 3
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 4 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[3].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[3].completedId@58e-6}*10000 + {m.master[3].rxData@58e-6}*10 + {m.master[3].status@58e-6} + 100000*{m.master[3].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[3].rxData@58e-6}*10 + {m.slave[3].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[3].receivedCount"
+at = "57.45e-6"
+near = 4
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): byte 5 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "{m.slave[3].misoEnabled@66e-6}*10 + {m.slave[3].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 3 (CPOL=1, CPHA=0, MSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 4 (CPOL=1, CPHA=1, MSB first) ---
+
+[[check]]
+variable = "m.master[4].sclk"
+at = "all"
+to = 2.45e-06
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[4].sclk"
+at = "all"
+from = 5.8e-05
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "128*{m.master[4].mosi@2.9e-6} + 64*{m.master[4].mosi@3.9e-6} + 32*{m.master[4].mosi@4.9e-6} + 16*{m.master[4].mosi@5.9e-6} + 8*{m.master[4].mosi@6.9e-6} + 4*{m.master[4].mosi@7.9e-6} + 2*{m.master[4].mosi@8.9e-6} + 1*{m.master[4].mosi@9.9e-6}"
+near = 150
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "128*{m.slave[4].miso@2.9e-6} + 64*{m.slave[4].miso@3.9e-6} + 32*{m.slave[4].miso@4.9e-6} + 16*{m.slave[4].miso@5.9e-6} + 8*{m.slave[4].miso@6.9e-6} + 4*{m.slave[4].miso@7.9e-6} + 2*{m.slave[4].miso@8.9e-6} + 1*{m.slave[4].miso@9.9e-6}"
+near = 105
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[4].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[4].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[4].completedId@10e-6}*10000 + {m.master[4].rxData@10e-6}*10 + {m.master[4].status@10e-6} + 100000*{m.master[4].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[4].rxData@10e-6}*10 + {m.slave[4].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[4].receivedCount"
+at = "9.95e-6"
+near = 0
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 1 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[4].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[4].completedId@22e-6}*10000 + {m.master[4].rxData@22e-6}*10 + {m.master[4].status@22e-6} + 100000*{m.master[4].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[4].rxData@22e-6}*10 + {m.slave[4].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[4].receivedCount"
+at = "21.95e-6"
+near = 1
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 2 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "128*{m.master[4].mosi@26.9e-6} + 64*{m.master[4].mosi@27.9e-6} + 32*{m.master[4].mosi@28.9e-6} + 16*{m.master[4].mosi@29.9e-6} + 8*{m.master[4].mosi@30.9e-6} + 4*{m.master[4].mosi@31.9e-6} + 2*{m.master[4].mosi@32.9e-6} + 1*{m.master[4].mosi@33.9e-6}"
+near = 53
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[4].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[4].completedId@34e-6}*10000 + {m.master[4].rxData@34e-6}*10 + {m.master[4].status@34e-6} + 100000*{m.master[4].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[4].rxData@34e-6}*10 + {m.slave[4].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[4].receivedCount"
+at = "33.95e-6"
+near = 2
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 3 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[4].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[4].completedId@46e-6}*10000 + {m.master[4].rxData@46e-6}*10 + {m.master[4].status@46e-6} + 100000*{m.master[4].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[4].rxData@46e-6}*10 + {m.slave[4].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[4].receivedCount"
+at = "45.95e-6"
+near = 3
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 4 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[4].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[4].completedId@58e-6}*10000 + {m.master[4].rxData@58e-6}*10 + {m.master[4].status@58e-6} + 100000*{m.master[4].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[4].rxData@58e-6}*10 + {m.slave[4].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[4].receivedCount"
+at = "57.95e-6"
+near = 4
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): byte 5 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "{m.slave[4].misoEnabled@66e-6}*10 + {m.slave[4].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 4 (CPOL=1, CPHA=1, MSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 5 (CPOL=0, CPHA=0, LSB first) ---
+
+[[check]]
+variable = "m.master[5].sclk"
+at = "all"
+to = 2.45e-06
+range = [0, 0]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[5].sclk"
+at = "all"
+from = 5.8e-05
+range = [0, 0]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "1*{m.master[5].mosi@2.4e-6} + 2*{m.master[5].mosi@3.4e-6} + 4*{m.master[5].mosi@4.4e-6} + 8*{m.master[5].mosi@5.4e-6} + 16*{m.master[5].mosi@6.4e-6} + 32*{m.master[5].mosi@7.4e-6} + 64*{m.master[5].mosi@8.4e-6} + 128*{m.master[5].mosi@9.4e-6}"
+near = 150
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "1*{m.slave[5].miso@2.4e-6} + 2*{m.slave[5].miso@3.4e-6} + 4*{m.slave[5].miso@4.4e-6} + 8*{m.slave[5].miso@5.4e-6} + 16*{m.slave[5].miso@6.4e-6} + 32*{m.slave[5].miso@7.4e-6} + 64*{m.slave[5].miso@8.4e-6} + 128*{m.slave[5].miso@9.4e-6}"
+near = 105
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[5].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[5].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[5].completedId@10e-6}*10000 + {m.master[5].rxData@10e-6}*10 + {m.master[5].status@10e-6} + 100000*{m.master[5].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[5].rxData@10e-6}*10 + {m.slave[5].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[5].receivedCount"
+at = "9.45e-6"
+near = 0
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 1 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[5].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[5].completedId@22e-6}*10000 + {m.master[5].rxData@22e-6}*10 + {m.master[5].status@22e-6} + 100000*{m.master[5].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[5].rxData@22e-6}*10 + {m.slave[5].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[5].receivedCount"
+at = "21.45e-6"
+near = 1
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 2 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "1*{m.master[5].mosi@26.4e-6} + 2*{m.master[5].mosi@27.4e-6} + 4*{m.master[5].mosi@28.4e-6} + 8*{m.master[5].mosi@29.4e-6} + 16*{m.master[5].mosi@30.4e-6} + 32*{m.master[5].mosi@31.4e-6} + 64*{m.master[5].mosi@32.4e-6} + 128*{m.master[5].mosi@33.4e-6}"
+near = 53
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[5].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[5].completedId@34e-6}*10000 + {m.master[5].rxData@34e-6}*10 + {m.master[5].status@34e-6} + 100000*{m.master[5].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[5].rxData@34e-6}*10 + {m.slave[5].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[5].receivedCount"
+at = "33.45e-6"
+near = 2
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 3 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[5].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[5].completedId@46e-6}*10000 + {m.master[5].rxData@46e-6}*10 + {m.master[5].status@46e-6} + 100000*{m.master[5].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[5].rxData@46e-6}*10 + {m.slave[5].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[5].receivedCount"
+at = "45.45e-6"
+near = 3
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 4 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[5].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[5].completedId@58e-6}*10000 + {m.master[5].rxData@58e-6}*10 + {m.master[5].status@58e-6} + 100000*{m.master[5].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[5].rxData@58e-6}*10 + {m.slave[5].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[5].receivedCount"
+at = "57.45e-6"
+near = 4
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): byte 5 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "{m.slave[5].misoEnabled@66e-6}*10 + {m.slave[5].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 5 (CPOL=0, CPHA=0, LSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 6 (CPOL=0, CPHA=1, LSB first) ---
+
+[[check]]
+variable = "m.master[6].sclk"
+at = "all"
+to = 2.45e-06
+range = [0, 0]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[6].sclk"
+at = "all"
+from = 5.8e-05
+range = [0, 0]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "1*{m.master[6].mosi@2.9e-6} + 2*{m.master[6].mosi@3.9e-6} + 4*{m.master[6].mosi@4.9e-6} + 8*{m.master[6].mosi@5.9e-6} + 16*{m.master[6].mosi@6.9e-6} + 32*{m.master[6].mosi@7.9e-6} + 64*{m.master[6].mosi@8.9e-6} + 128*{m.master[6].mosi@9.9e-6}"
+near = 150
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "1*{m.slave[6].miso@2.9e-6} + 2*{m.slave[6].miso@3.9e-6} + 4*{m.slave[6].miso@4.9e-6} + 8*{m.slave[6].miso@5.9e-6} + 16*{m.slave[6].miso@6.9e-6} + 32*{m.slave[6].miso@7.9e-6} + 64*{m.slave[6].miso@8.9e-6} + 128*{m.slave[6].miso@9.9e-6}"
+near = 105
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[6].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[6].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[6].completedId@10e-6}*10000 + {m.master[6].rxData@10e-6}*10 + {m.master[6].status@10e-6} + 100000*{m.master[6].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[6].rxData@10e-6}*10 + {m.slave[6].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[6].receivedCount"
+at = "9.95e-6"
+near = 0
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 1 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[6].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[6].completedId@22e-6}*10000 + {m.master[6].rxData@22e-6}*10 + {m.master[6].status@22e-6} + 100000*{m.master[6].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[6].rxData@22e-6}*10 + {m.slave[6].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[6].receivedCount"
+at = "21.95e-6"
+near = 1
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 2 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "1*{m.master[6].mosi@26.9e-6} + 2*{m.master[6].mosi@27.9e-6} + 4*{m.master[6].mosi@28.9e-6} + 8*{m.master[6].mosi@29.9e-6} + 16*{m.master[6].mosi@30.9e-6} + 32*{m.master[6].mosi@31.9e-6} + 64*{m.master[6].mosi@32.9e-6} + 128*{m.master[6].mosi@33.9e-6}"
+near = 53
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[6].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[6].completedId@34e-6}*10000 + {m.master[6].rxData@34e-6}*10 + {m.master[6].status@34e-6} + 100000*{m.master[6].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[6].rxData@34e-6}*10 + {m.slave[6].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[6].receivedCount"
+at = "33.95e-6"
+near = 2
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 3 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[6].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[6].completedId@46e-6}*10000 + {m.master[6].rxData@46e-6}*10 + {m.master[6].status@46e-6} + 100000*{m.master[6].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[6].rxData@46e-6}*10 + {m.slave[6].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[6].receivedCount"
+at = "45.95e-6"
+near = 3
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 4 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[6].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[6].completedId@58e-6}*10000 + {m.master[6].rxData@58e-6}*10 + {m.master[6].status@58e-6} + 100000*{m.master[6].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[6].rxData@58e-6}*10 + {m.slave[6].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[6].receivedCount"
+at = "57.95e-6"
+near = 4
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): byte 5 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "{m.slave[6].misoEnabled@66e-6}*10 + {m.slave[6].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 6 (CPOL=0, CPHA=1, LSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 7 (CPOL=1, CPHA=0, LSB first) ---
+
+[[check]]
+variable = "m.master[7].sclk"
+at = "all"
+to = 2.45e-06
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[7].sclk"
+at = "all"
+from = 5.8e-05
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "1*{m.master[7].mosi@2.4e-6} + 2*{m.master[7].mosi@3.4e-6} + 4*{m.master[7].mosi@4.4e-6} + 8*{m.master[7].mosi@5.4e-6} + 16*{m.master[7].mosi@6.4e-6} + 32*{m.master[7].mosi@7.4e-6} + 64*{m.master[7].mosi@8.4e-6} + 128*{m.master[7].mosi@9.4e-6}"
+near = 150
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "1*{m.slave[7].miso@2.4e-6} + 2*{m.slave[7].miso@3.4e-6} + 4*{m.slave[7].miso@4.4e-6} + 8*{m.slave[7].miso@5.4e-6} + 16*{m.slave[7].miso@6.4e-6} + 32*{m.slave[7].miso@7.4e-6} + 64*{m.slave[7].miso@8.4e-6} + 128*{m.slave[7].miso@9.4e-6}"
+near = 105
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[7].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[7].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[7].completedId@10e-6}*10000 + {m.master[7].rxData@10e-6}*10 + {m.master[7].status@10e-6} + 100000*{m.master[7].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[7].rxData@10e-6}*10 + {m.slave[7].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[7].receivedCount"
+at = "9.45e-6"
+near = 0
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 1 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[7].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[7].completedId@22e-6}*10000 + {m.master[7].rxData@22e-6}*10 + {m.master[7].status@22e-6} + 100000*{m.master[7].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[7].rxData@22e-6}*10 + {m.slave[7].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[7].receivedCount"
+at = "21.45e-6"
+near = 1
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 2 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "1*{m.master[7].mosi@26.4e-6} + 2*{m.master[7].mosi@27.4e-6} + 4*{m.master[7].mosi@28.4e-6} + 8*{m.master[7].mosi@29.4e-6} + 16*{m.master[7].mosi@30.4e-6} + 32*{m.master[7].mosi@31.4e-6} + 64*{m.master[7].mosi@32.4e-6} + 128*{m.master[7].mosi@33.4e-6}"
+near = 53
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[7].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[7].completedId@34e-6}*10000 + {m.master[7].rxData@34e-6}*10 + {m.master[7].status@34e-6} + 100000*{m.master[7].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[7].rxData@34e-6}*10 + {m.slave[7].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[7].receivedCount"
+at = "33.45e-6"
+near = 2
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 3 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[7].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[7].completedId@46e-6}*10000 + {m.master[7].rxData@46e-6}*10 + {m.master[7].status@46e-6} + 100000*{m.master[7].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[7].rxData@46e-6}*10 + {m.slave[7].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[7].receivedCount"
+at = "45.45e-6"
+near = 3
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 4 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+variable = "m.master[7].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[7].completedId@58e-6}*10000 + {m.master[7].rxData@58e-6}*10 + {m.master[7].status@58e-6} + 100000*{m.master[7].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[7].rxData@58e-6}*10 + {m.slave[7].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[7].receivedCount"
+at = "57.45e-6"
+near = 4
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): byte 5 not delivered before its last sampling edge (15th edge)"
+
+[[check]]
+expr = "{m.slave[7].misoEnabled@66e-6}*10 + {m.slave[7].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 7 (CPOL=1, CPHA=0, LSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"
+
+# --- pair 8 (CPOL=1, CPHA=1, LSB first) ---
+
+[[check]]
+variable = "m.master[8].sclk"
+at = "all"
+to = 2.45e-06
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): SCLK idles at CPOL before the first byte"
+
+[[check]]
+variable = "m.master[8].sclk"
+at = "all"
+from = 5.8e-05
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): SCLK back at idle polarity after the last byte and CS release"
+
+[[check]]
+expr = "1*{m.master[8].mosi@2.9e-6} + 2*{m.master[8].mosi@3.9e-6} + 4*{m.master[8].mosi@4.9e-6} + 8*{m.master[8].mosi@5.9e-6} + 16*{m.master[8].mosi@6.9e-6} + 32*{m.master[8].mosi@7.9e-6} + 64*{m.master[8].mosi@8.9e-6} + 128*{m.master[8].mosi@9.9e-6}"
+near = 150
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): MOSI just before the 8 sampling edges spells byte 1 = 150 in the configured bit order"
+
+[[check]]
+expr = "1*{m.slave[8].miso@2.9e-6} + 2*{m.slave[8].miso@3.9e-6} + 4*{m.slave[8].miso@4.9e-6} + 8*{m.slave[8].miso@5.9e-6} + 16*{m.slave[8].miso@6.9e-6} + 32*{m.slave[8].miso@7.9e-6} + 64*{m.slave[8].miso@8.9e-6} + 128*{m.slave[8].miso@9.9e-6}"
+near = 105
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave MISO before the sampling edges spells 105 in the configured bit order"
+
+[[check]]
+variable = "m.master[8].sclk"
+at = "mean"
+from = 2e-06
+to = 9.95e-06
+near = 0.5
+tol = 1e-09
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): 8 SCLK periods at 1 MHz, 50% duty, in the 8 us byte"
+
+[[check]]
+variable = "m.master[8].busy"
+at = "all"
+from = 2e-06
+to = 9.95e-06
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 1 busy for exactly 16 half periods from 2 us"
+
+[[check]]
+expr = "{m.master[8].completedId@10e-6}*10000 + {m.master[8].rxData@10e-6}*10 + {m.master[8].status@10e-6} + 100000*{m.master[8].busy@10e-6}"
+near = 11051
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): at 10 us request 1 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[8].rxData@10e-6}*10 + {m.slave[8].receivedCount@10e-6}"
+near = 1501
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave holds byte 1 = 150, receivedCount 1"
+
+[[check]]
+variable = "m.slave[8].receivedCount"
+at = "9.95e-6"
+near = 0
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 1 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[8].busy"
+at = "all"
+from = 1.4e-05
+to = 2.1949999999999998e-05
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 2 busy for exactly 16 half periods from 14 us"
+
+[[check]]
+expr = "{m.master[8].completedId@22e-6}*10000 + {m.master[8].rxData@22e-6}*10 + {m.master[8].status@22e-6} + 100000*{m.master[8].busy@22e-6}"
+near = 21051
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): at 22 us request 2 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[8].rxData@22e-6}*10 + {m.slave[8].receivedCount@22e-6}"
+near = 1502
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave holds byte 2 = 150, receivedCount 2 (repeated byte still counted)"
+
+[[check]]
+variable = "m.slave[8].receivedCount"
+at = "21.95e-6"
+near = 1
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 2 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "1*{m.master[8].mosi@26.9e-6} + 2*{m.master[8].mosi@27.9e-6} + 4*{m.master[8].mosi@28.9e-6} + 8*{m.master[8].mosi@29.9e-6} + 16*{m.master[8].mosi@30.9e-6} + 32*{m.master[8].mosi@31.9e-6} + 64*{m.master[8].mosi@32.9e-6} + 128*{m.master[8].mosi@33.9e-6}"
+near = 53
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): MOSI just before the 8 sampling edges spells byte 3 = 53 in the configured bit order"
+
+[[check]]
+variable = "m.master[8].busy"
+at = "all"
+from = 2.6e-05
+to = 3.395e-05
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 3 busy for exactly 16 half periods from 26 us"
+
+[[check]]
+expr = "{m.master[8].completedId@34e-6}*10000 + {m.master[8].rxData@34e-6}*10 + {m.master[8].status@34e-6} + 100000*{m.master[8].busy@34e-6}"
+near = 31051
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): at 34 us request 3 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[8].rxData@34e-6}*10 + {m.slave[8].receivedCount@34e-6}"
+near = 533
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave holds byte 3 = 53, receivedCount 3"
+
+[[check]]
+variable = "m.slave[8].receivedCount"
+at = "33.95e-6"
+near = 2
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 3 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[8].busy"
+at = "all"
+from = 3.7999999999999995e-05
+to = 4.595e-05
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 4 busy for exactly 16 half periods from 38 us"
+
+[[check]]
+expr = "{m.master[8].completedId@46e-6}*10000 + {m.master[8].rxData@46e-6}*10 + {m.master[8].status@46e-6} + 100000*{m.master[8].busy@46e-6}"
+near = 41051
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): at 46 us request 4 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[8].rxData@46e-6}*10 + {m.slave[8].receivedCount@46e-6}"
+near = 4
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave holds byte 4 = 0, receivedCount 4"
+
+[[check]]
+variable = "m.slave[8].receivedCount"
+at = "45.95e-6"
+near = 3
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 4 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+variable = "m.master[8].busy"
+at = "all"
+from = 4.9999999999999996e-05
+to = 5.795e-05
+range = [1, 1]
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 5 busy for exactly 16 half periods from 50 us"
+
+[[check]]
+expr = "{m.master[8].completedId@58e-6}*10000 + {m.master[8].rxData@58e-6}*10 + {m.master[8].status@58e-6} + 100000*{m.master[8].busy@58e-6}"
+near = 51051
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): at 58 us request 5 retired, not busy, status 1, master received 105"
+
+[[check]]
+expr = "{m.slave[8].rxData@58e-6}*10 + {m.slave[8].receivedCount@58e-6}"
+near = 2555
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): slave holds byte 5 = 255, receivedCount 5"
+
+[[check]]
+variable = "m.slave[8].receivedCount"
+at = "57.95e-6"
+near = 4
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): byte 5 not delivered before its last sampling edge (16th edge)"
+
+[[check]]
+expr = "{m.slave[8].misoEnabled@66e-6}*10 + {m.slave[8].receivedCount@66e-6}"
+near = 5
+tol = 0
+why = "pair 8 (CPOL=1, CPHA=1, LSB first): after CS release MISO is Hi-Z and exactly 5 bytes were received"

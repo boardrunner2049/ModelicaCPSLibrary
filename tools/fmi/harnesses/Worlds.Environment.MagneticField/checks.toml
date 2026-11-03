@@ -1,0 +1,31 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Default magneticField0 = {0, 21e-6, -43e-6} T (NED) = W * legacy ENU {21e-6, 0, 43e-6}
+# with W = [0 1 0; 1 0 0; 0 0 -1] (docs/architecture.md).
+# See harness.c: this default points East/Up in NED (library data issue, reported).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.magneticField[1]"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "NED North = legacy ENU y component (0), constant"
+
+[[check]]
+variable = "m.magneticField[2]"
+at = "all"
+near = 21.0e-6
+tol = 1e-15
+why = "NED East = legacy ENU x component (21 uT), constant"
+
+[[check]]
+variable = "m.magneticField[3]"
+at = "all"
+near = -43.0e-6
+tol = 1e-15
+why = "NED Down = -(legacy ENU Up 43 uT), constant"

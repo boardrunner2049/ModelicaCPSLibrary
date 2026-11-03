@@ -1,0 +1,215 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Rig (Wrapper.mo): R = 0.2 ohm, L = 1 mH, k = 0.02 V.s, J = 2e-4 kg.m2,
+# b = 1e-5 N.m.s, drag kQ w^2 with kQ = 1.5e-7. Inputs held from t appear in
+# the row at t + 0.5 ms. "native" = bin/rumoca sim of the same rig with the
+# same piecewise-constant inputs as time functions (dt 0.5 ms); FMU and
+# native agree to 2e-4 rad/s (5e-7 relative), and their coast/freewheel
+# transitions fall in the same communication steps.
+# Coast-down with zero current: J w' = -kQ w^2 - b w, whose solution is
+#   w(t) = b w0 e^{-a t} / (b + kQ w0 (1 - e^{-a t})),  a = b/J = 0.05 1/s.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- algebraic ESC laws, every row ---
+[[check]]
+expr = "{m.esc.modulation} - min(1.0, max(0.0, {m.escCommand}))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "modulation = clamp(command, 0, 1) (1.4 -> 1, -0.3 -> 0)"
+
+[[check]]
+expr = "(1 - {m.esc.coast}) * ({m.esc.terminalVoltage} - {m.esc.modulation} * {m.dcVoltage})"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "conducting (or freewheeling): terminal voltage = modulation x dcVoltage"
+
+[[check]]
+expr = "{m.esc.coast} * ({m.esc.terminalVoltage} - {m.backEMF})"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "coast: terminal voltage follows the supplied back-EMF (open circuit, not 0 V)"
+
+[[check]]
+expr = "{m.esc.coast} * (abs({m.current}) + abs({m.esc.dcCurrent}))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "coast carries no motor or supply current (motor projected its current to zero)"
+
+[[check]]
+expr = "{m.esc.electricalPower} - {m.esc.terminalVoltage} * {m.current}"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "lossless averaged converter: DC-side power = motor-side power in every mode"
+
+[[check]]
+expr = "{m.esc.electricalPower} - {m.dcVoltage} * {m.esc.dcCurrent}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "electricalPower = dcVoltage x dcCurrent"
+
+[[check]]
+expr = "{m.esc.coast} + {m.esc.freewheel}"
+at = "all"
+range = [0, 1]
+why = "coast and freewheel are exclusive"
+
+[[check]]
+variable = "m.current"
+at = "all"
+range = [-1e-9, 80.0]
+why = "one-quadrant, nonregenerative drive: no reverse current (bounded by the 16 V stall current 80 A)"
+
+[[check]]
+variable = "m.esc.dcCurrent"
+at = "all"
+range = [-1e-9, 80.0]
+why = "the bus never absorbs current"
+
+[[check]]
+expr = "{m.storedEnergy} + {m.lossEnergy} - {m.inputEnergy}"
+at = "all"
+near = 0.0
+tol = 1e-5
+why = "energy balance: L i^2/2 + J w^2/2 + integral(losses) = integral(bus power), from rest"
+
+# --- phases ---
+[[check]]
+expr = "{m.esc.coast} * ({m.omega} == 0) * ({m.current} == 0)"
+at = "all"
+to = 0.05
+near = 1.0
+tol = 0.0
+why = "zero command at rest: coast, nothing moves"
+
+[[check]]
+variable = "m.current"
+at = "0.06"
+near = 33.5145647
+tol = 1e-3
+why = "inductance-limited spin-up current at 8 V (native 33.51456 A)"
+
+[[check]]
+variable = "m.omega"
+at = "0.2"
+near = 308.774837
+tol = 1e-3
+why = "spin-up matches native (308.7748 rad/s)"
+
+[[check]]
+variable = "m.omega"
+at = "0.5"
+near = 384.136126
+tol = 1e-3
+why = "approaching the loaded 8 V equilibrium w = 386.84 rad/s (native 384.1361)"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 0.0505
+to = 0.5
+near = 0.0
+tol = 0.0
+why = "forward conduction at 50 % command never opens"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 0.503
+to = 0.787
+near = 1.0
+tol = 0.0
+why = "bus sag to 14 V: requested 7 V < back-EMF 7.68 V; the current hits zero (native 0.5019 s) and the drive blocks instead of regenerating"
+
+[[check]]
+expr = "{m.omega@0.75} - 1e-5 * {m.omega@0.55} * exp(-0.01) / (1e-5 + 1.5e-7 * {m.omega@0.55} * (1 - exp(-0.01)))"
+near = 0.0
+tol = 1e-4
+why = "free coast-down closed form (quadratic + viscous drag) over 0.55-0.75 s"
+
+[[check]]
+expr = "({m.omega@0.7875} > 350) + ({m.omega@0.7885} < 350) + (1 - {m.esc.coast@0.7885})"
+near = 3.0
+tol = 0.0
+why = "conduction resumes exactly when k w falls below 7 V (w = 350 rad/s; native 0.78752 s)"
+
+[[check]]
+variable = "m.omega"
+at = "1.0"
+near = 340.620591
+tol = 1e-3
+why = "re-established 7 V conduction toward the 7 V equilibrium 339.65 rad/s (native 340.6206)"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 1.0005
+to = 1.2
+near = 1.0
+tol = 0.0
+why = "cutoff at 1.0 s: the 0.93 A current freewheels to zero within one step (native 0.135 ms), then coast"
+
+[[check]]
+expr = "{m.omega@1.2} - 1e-5 * {m.omega@1.05} * exp(-0.0075) / (1e-5 + 1.5e-7 * {m.omega@1.05} * (1 - exp(-0.0075)))"
+near = 0.0
+tol = 1e-4
+why = "coast-down closed form over 1.05-1.2 s"
+
+[[check]]
+variable = "m.esc.terminalVoltage"
+at = "all"
+from = 1.2005
+to = 1.4
+near = 16.0
+tol = 1e-12
+why = "over-range command 1.4 clamps to full bus voltage"
+
+[[check]]
+variable = "m.current"
+at = "1.25"
+near = 32.1331875
+tol = 1e-3
+why = "full-voltage restart current (native 32.13319 A)"
+
+[[check]]
+variable = "m.omega"
+at = "1.4"
+near = 708.907824
+tol = 1e-3
+why = "full-voltage spin-up toward 753.6 rad/s (native 708.9078)"
+
+[[check]]
+expr = "{m.esc.freewheel@1.4005} * ({m.current@1.4005} > 0) * ({m.esc.terminalVoltage@1.4005} == 0) * ({m.esc.dcCurrent@1.4005} == 0)"
+near = 1.0
+tol = 0.0
+why = "dead bus with full command: zero requested voltage freewheels the residual current with no supply current"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 1.401
+near = 1.0
+tol = 0.0
+why = "freewheel ends at zero current (native 0.62 ms) and the drive stays open; command -0.3 on a live bus keeps it open"
+
+[[check]]
+expr = "{m.omega@1.6} - 1e-5 * {m.omega@1.45} * exp(-0.0075) / (1e-5 + 1.5e-7 * {m.omega@1.45} * (1 - exp(-0.0075)))"
+near = 0.0
+tol = 1e-4
+why = "coast-down closed form over 1.45-1.6 s"
+
+[[check]]
+variable = "m.inputEnergy"
+at = "end"
+near = 106.239696
+tol = 1e-3
+why = "total bus energy matches native (106.2397 J); no energy returned during coast"

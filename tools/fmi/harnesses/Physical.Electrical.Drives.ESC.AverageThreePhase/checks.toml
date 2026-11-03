@@ -1,0 +1,567 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# ESC: Ron = Rdiode = 5 mOhm, Vdiode = 0.5 V, Goff = 1e-5 S; ideal 16 V bus.
+# Load: floating star, per phase R = 0.2 Ohm, L = 0.1 mH, EMF e_j.
+# Six-step tables: sector s -> (high, low) phase = 1:(3,2) 2:(1,2) 3:(1,3)
+# 4:(2,3) 5:(2,1) 6:(3,1); sector = 1 + floor(mod(theta + pi/6, 2 pi)/(pi/3)).
+# Closed forms (each segment lasts >= 10 time constants 2L/0.41 = 0.49 ms):
+#   d = 0.5: I = (d*16 - (1-d)*0.5)/(d*Ron + (1-d)*Rd + 2R + Ron) = 7.75/0.41
+#            = 18.9024 A out of the high phase and back through the low phase;
+#   d = 1:   I = 16/0.41 = 39.0244 A;
+#   cutoff from 39.02 A: the held low switch and the old high phase's low
+#            diode recirculate, 2L di/dt = -(Vd + 0.41 i), so
+#            i(t) = (I0 + Vd/0.41) exp(-t/0.488 ms) - Vd/0.41, zero after 1.7056 ms;
+#   Hi-Z with e = {0, 12, -9}: diodes rectify e2 - e3 = 21 V > 16 + 2*0.5:
+#            I = 4/0.41 = 9.7561 A returned to the bus.
+# All values were confirmed with a native 'rumoca sim' of the same wrapper and
+# scenario (inputs as time functions, --rtol 1e-9) resampled on the 10 us grid.
+#   initial i0 = 5 A at zero command (Hi-Z): diodes return it to the bus,
+#            2L di/dt = -17 - 0.41 i, extinct after 55.5 us;
+#   asymmetric EMF {1.5, -1.0, 0.5}: sector 5 -> 25.0 A, sector 2 -> 12.8049 A.
+# Leakage through Goff adds up to ~1e-4 A and ~0.01 W; the tolerances allow it.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.coast"
+at = "0.002"
+near = 1
+tol = 0
+why = "zero command at start: Hi-Z coast (no gate selected)"
+
+[[check]]
+variable = "m.coast"
+at = "0"
+near = 1
+tol = 0
+why = "documented SixStep behaviour: zero-command operation starts in Hi-Z even with a nonzero initial winding current (i0 = 5 A), no latched recirculation"
+
+[[check]]
+variable = "m.recirculating"
+at = "0"
+near = 0
+tol = 0
+why = "the initial() branch clears the recirculation latch regardless of the 5 A winding current"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0"
+near = -5.0
+tol = 2e-3
+why = "with every switch off the 5 A winding current can only flow through the body diodes: low diode dc_n -> phase 1, phase 2 -> high diode -> dc_p, so it returns to the bus (native -4.9994: leakage). A latched low switch would keep it off the bus"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.00001"
+near = 4.0574
+tol = 2e-3
+why = "the diodes drive the current down against the bus: 2L di/dt = -(16 + 2*Vd) - (2R + 2Rd) i, i = -41.463 + 46.463*exp(-t/0.4878 ms) = 4.0574 A at 10 us (native 4.05724). Low-side recirculation (only 2*Vd opposing) would leave ~4.95 A"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.00001"
+near = 8.0
+tol = 1e-3
+why = "phases clamped at -Vd - Rd*i and 16 + Vd + Rd*i by the conducting diodes; the symmetric R-L-(e=0) branches put the star at their midpoint 8 V"
+
+[[check]]
+variable = "m.phaseCurrent*"
+at = "0.0001"
+near = 0.0
+tol = 1e-4
+why = "the initial current is extinguished after tau*ln(46.463/41.463) = 55.5 us and the diodes then block (native: 0 from 60 us)"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.0019"
+near = 5.3333
+tol = 0.001
+why = "Hi-Z with no current: each phase is a Goff divider, one Goff (high diode) to dc_p and two (low switch, low diode) to dc_n, so star = 16/3 V. A closed low switch would pin it near 0"
+
+[[check]]
+variable = "m.phaseCurrent*"
+at = "0.002"
+near = 0.0
+tol = 0.0001
+why = "no conduction path in Hi-Z without EMF"
+
+[[check]]
+variable = "m.sector"
+at = "0.007"
+near = 1
+tol = 0
+why = "angle 0.1 rad lies in sector 1"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.007"
+near = 18.9024
+tol = 0.003
+why = "sector 1: phase 3 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.007"
+near = -18.9024
+tol = 0.003
+why = "sector 1: phase 2 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.007"
+near = 0.0
+tol = 0.001
+why = "sector 1: phase 1 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.012"
+near = 2
+tol = 0
+why = "angle 0.1 + pi/3 rad lies in sector 2"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.012"
+near = 18.9024
+tol = 0.003
+why = "sector 2: phase 1 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.012"
+near = -18.9024
+tol = 0.003
+why = "sector 2: phase 2 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.012"
+near = 0.0
+tol = 0.001
+why = "sector 2: phase 3 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.017"
+near = 3
+tol = 0
+why = "angle 0.1 + 2pi/3 rad lies in sector 3"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.017"
+near = 18.9024
+tol = 0.003
+why = "sector 3: phase 1 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.017"
+near = -18.9024
+tol = 0.003
+why = "sector 3: phase 3 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.017"
+near = 0.0
+tol = 0.001
+why = "sector 3: phase 2 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.022"
+near = 4
+tol = 0
+why = "angle 0.1 + pi rad lies in sector 4"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.022"
+near = 18.9024
+tol = 0.003
+why = "sector 4: phase 2 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.022"
+near = -18.9024
+tol = 0.003
+why = "sector 4: phase 3 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.022"
+near = 0.0
+tol = 0.001
+why = "sector 4: phase 1 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.027"
+near = 5
+tol = 0
+why = "angle 0.1 + 4pi/3 rad lies in sector 5"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.027"
+near = 18.9024
+tol = 0.003
+why = "sector 5: phase 2 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.027"
+near = -18.9024
+tol = 0.003
+why = "sector 5: phase 1 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.027"
+near = 0.0
+tol = 0.001
+why = "sector 5: phase 3 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.032"
+near = 6
+tol = 0
+why = "angle 0.1 + 5pi/3 rad lies in sector 6"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.032"
+near = 18.9024
+tol = 0.003
+why = "sector 6: phase 3 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.032"
+near = -18.9024
+tol = 0.003
+why = "sector 6: phase 1 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.032"
+near = 0.0
+tol = 0.001
+why = "sector 6: phase 2 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.sector"
+at = "0.037"
+near = 5
+tol = 0
+why = "angle -2.0, wrapped by mod rad lies in sector 5"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.037"
+near = 18.9024
+tol = 0.003
+why = "sector 5: phase 2 is the PWM high side and sources the d = 0.5 steady current 7.75/0.41 A"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.037"
+near = -18.9024
+tol = 0.003
+why = "sector 5: phase 1 is the low side and sinks the same current"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.037"
+near = 0.0
+tol = 0.001
+why = "sector 5: phase 3 is unselected and floats once its freewheel current has decayed"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.007"
+near = 9.4512
+tol = 0.002
+why = "averaged high side draws Idc = d*I = 0.5*18.9024 A from the bus"
+
+[[check]]
+variable = "m.motorPower"
+at = "0.007"
+near = 142.921
+tol = 0.02
+why = "power delivered to the load equals its copper loss 2*R*I^2 (no EMF)"
+
+[[check]]
+variable = "m.lossPower"
+at = "0.007"
+near = 8.2986
+tol = 0.015
+why = "ESC loss = (d*Ron + (1-d)*Rd + Ron)*I^2 + (1-d)*Vd*I = 3.573 + 4.726 W (+ ~6 mW Goff leakage); bus power 151.22 W = load + ESC loss"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.007"
+near = 3.875
+tol = 0.002
+why = "star midway between the high-phase mean voltage 7.6555 V and the low-phase Ron*I = 0.0945 V"
+
+[[check]]
+variable = "m.esc.control.modulation"
+at = "0.042"
+near = 1.0
+tol = 0
+why = "command 1.2 is clamped to modulation 1"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.042"
+near = 39.0244
+tol = 0.003
+why = "full duty in sector 5: 16/(Ron + 2R + Ron) = 39.0244 A out of phase 2"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.042"
+near = -39.0244
+tol = 0.003
+why = "returned through phase 1 low side"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.042"
+near = 39.0244
+tol = 0.003
+why = "at d = 1 the whole phase current comes from the bus"
+
+[[check]]
+variable = "m.lossPower"
+at = "0.042"
+near = 15.229
+tol = 0.015
+why = "ESC loss 2*Ron*I^2 at d = 1: no diode conduction"
+
+[[check]]
+variable = "m.recirculating"
+at = "0.0425"
+near = 1
+tol = 0
+why = "negative command cuts off PWM while current flows: the last low switch is latched for recirculation"
+
+[[check]]
+variable = "m.esc.control.stopLow"
+at = "0.0425"
+near = 1
+tol = 0
+why = "the latched sink leg is the sector-5 low phase, phase 1"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.0425"
+near = 13.2199
+tol = 0.01
+why = "recirculating decay through low diode 2 and low switch 1: (39.024 + 1.2195)*exp(-0.5/0.4878) - 1.2195"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.043"
+near = 3.9613
+tol = 0.01
+why = "same decay at 1 ms after cutoff"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0425"
+near = 0.0
+tol = 0.001
+why = "recirculation through the low devices does not touch the bus"
+
+[[check]]
+variable = "m.recirculating"
+at = "0.0437"
+near = 1
+tol = 0
+why = "current still above the 1 mA threshold 5.6 us before the predicted extinction at 43.7056 ms"
+
+[[check]]
+variable = "m.coast"
+at = "0.04371"
+near = 1
+tol = 0
+why = "currents drained (closed-form extinction 1.7056 ms after cutoff): latch released, all gates off"
+
+[[check]]
+variable = "m.recirculating"
+at = "0.04371"
+near = 0
+tol = 0
+why = "recirculation ends when drained"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.047"
+near = 5.3333
+tol = 0.001
+why = "back in Hi-Z with no current: the Goff divider sets the star at 16/3 V"
+
+[[check]]
+variable = "m.coast"
+at = "0.052"
+near = 1
+tol = 0
+why = "zero command keeps the ESC in Hi-Z while the diodes rectify"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.052"
+near = -9.7561
+tol = 0.002
+why = "EMF on phase 2 (+12 V) drives current back into the ESC through high diode 2: (21 - 16 - 2*0.5)/(2R + 2Rd)"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.052"
+near = 9.7561
+tol = 0.002
+why = "and out through low diode 3 (e3 = -9 V)"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.052"
+near = 0.0
+tol = 0.001
+why = "phase 1 (no EMF) sits at the star potential 6.5 V, inside the rails, so its diodes stay off"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.052"
+near = -9.7551
+tol = 0.002
+why = "the rectified current flows into the bus (negative)"
+
+[[check]]
+variable = "m.electricalPower"
+at = "0.052"
+near = -156.08
+tol = 0.03
+why = "bus absorbs 16 V * 9.756 A"
+
+[[check]]
+variable = "m.lossPower"
+at = "0.052"
+near = 10.717
+tol = 0.02
+why = "two conducting diodes: 2*(Vd*I + Rd*I^2) = 10.708 W (+ leakage)"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.052"
+near = 6.5
+tol = 0.002
+why = "star = v3 - R*i3 - e3 = (-0.5 - Rd*I) - 0.2*I + 9 = 6.5 V"
+
+[[check]]
+variable = "m.lossPower"
+at = "all"
+range = [-1e-06, 34.75]
+why = "the ESC never generates energy (bench assert esc.lossPower > -1e-6); its peak is at the cutoff from 39.02 A, when the held low switch and a body diode carry it: (Ron + Rd)*I^2 + Vd*I = 15.23 + 19.51 = 34.74 W (sampled 33.71 W 10 us later)"
+
+[[check]]
+variable = "m.esc.legs[[]*].high.current"
+at = "all"
+range = [0.0, 39.03]
+why = "the averaged high side conducts only forward current, at most the full-duty steady state"
+
+# --- asymmetric EMF e = {1.5, -1.0, 0.5} V, d = 0.5: the same phase pair in both orders ---
+# I = (7.75 - (e_high - e_low))/0.41; star = v_high - R*I - e_high = 3.625 V in both;
+# floating phase 3 sits at star + e3 = 4.125 V, inside the rails (its diodes stay off).
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "0.057"
+near = 25.0
+tol = 3e-3
+why = "sector 5 (high 2, low 1): e2 - e1 = -2.5 V aids the drive, I = (7.75 + 2.5)/0.41 = 25.0 A out of phase 2 (native 24.99904)"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "0.057"
+near = -25.0
+tol = 3e-3
+why = "sector 5: the current returns through phase 1's low switch"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "0.057"
+near = 0.0
+tol = 1e-3
+why = "sector 5: phase 3 floats (only leakage)"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.057"
+near = 12.5
+tol = 3e-3
+why = "Idc = d*I = 0.5*25.0"
+
+[[check]]
+variable = "m.lossPower"
+at = "0.057"
+near = 12.5055
+tol = 0.01
+why = "ESC loss (d*Ron + (1-d)*Rd + Ron)*I^2 + (1-d)*Vd*I = 6.25 + 6.25 W (+ ~6 mW leakage; native 12.5055)"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.057"
+near = 3.625
+tol = 2e-3
+why = "star = v2 - R*I - e2 = (7.75 - 0.005*25 = 7.625) - 5.0 + 1.0 = 3.625 V"
+
+[[check]]
+variable = "m.phaseCurrent[1]"
+at = "end"
+near = 12.8049
+tol = 3e-3
+why = "sector 2 (high 1, low 2), same phase pair reversed: e1 - e2 = +2.5 V now opposes the drive, I = (7.75 - 2.5)/0.41 = 12.8049 A (native 12.80407). A swapped high/low table entry or a transposed EMF would exchange the 25.0 and 12.8 A values"
+
+[[check]]
+variable = "m.phaseCurrent[2]"
+at = "end"
+near = -12.8049
+tol = 3e-3
+why = "sector 2: the current returns through phase 2's low switch"
+
+[[check]]
+variable = "m.phaseCurrent[3]"
+at = "end"
+near = 0.0
+tol = 1e-3
+why = "sector 2: phase 3 floats"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "end"
+near = 6.4024
+tol = 3e-3
+why = "Idc = d*I = 0.5*12.8049"
+
+[[check]]
+variable = "m.lossPower"
+at = "end"
+near = 4.8467
+tol = 0.01
+why = "ESC loss 0.01*12.805^2 + 0.25*12.805 = 1.6397 + 3.2012 W (+ leakage; native 4.84667)"
+
+[[check]]
+variable = "m.starVoltage"
+at = "end"
+near = 3.625
+tol = 2e-3
+why = "star = v1 - R*I - e1 = 7.686 - 2.561 - 1.5 = 3.625 V"

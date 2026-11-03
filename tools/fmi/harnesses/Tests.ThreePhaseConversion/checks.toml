@@ -1,0 +1,122 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# polePairs p = 3, ke = 0.02 V/(rad/s) (phase peak), theta0 = 0.2 rad,
+# prescribed speed w = 10 rad/s, phase current peak I = 2 A, in phase with EMF.
+# Electrical angle theta_e = p*w*t + theta0; e_j = ke*w*sin(theta_e - (j-1)*2pi/3).
+# Note: check_trace.py matches variables with fnmatch, so a literal "[" is written "[[]".
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.emf.omega"
+at = "all"
+near = 10.0
+tol = 1e-9
+why = "ideal speed source (exact=true) holds the shaft at w_ref = 10 rad/s"
+
+[[check]]
+variable = "m.emf.electricalAngle"
+at = "0.05"
+near = 1.7
+tol = 1e-9
+why = "theta_e = p*w*t + theta0 = 3*10*0.05 + 0.2"
+
+[[check]]
+variable = "m.emf.electricalAngle"
+at = "end"
+near = 3.2
+tol = 1e-9
+why = "theta_e = 3*10*0.1 + 0.2: electrical angle is polePairs times mechanical angle"
+
+[[check]]
+variable = "m.emf.backEMF[[]1]"
+at = "0.05"
+near = 0.198333
+tol = 1e-5
+why = "e_a = 0.2*sin(1.7)"
+
+[[check]]
+variable = "m.emf.backEMF[[]2]"
+at = "0.05"
+near = -0.076850
+tol = 1e-5
+why = "e_b = 0.2*sin(1.7 - 2pi/3): phase b lags a by 120 electrical degrees"
+
+[[check]]
+variable = "m.emf.backEMF[[]3]"
+at = "0.05"
+near = -0.121483
+tol = 1e-5
+why = "e_c = 0.2*sin(1.7 - 4pi/3): phase c lags a by 240 electrical degrees"
+
+[[check]]
+variable = "m.emf.backEMF[[]1]"
+at = "end"
+near = -0.011675
+tol = 1e-5
+why = "e_a = 0.2*sin(3.2), past the half-turn sign change"
+
+[[check]]
+variable = "m.emf.backEMF[[]2]"
+at = "end"
+near = 0.178747
+tol = 1e-5
+why = "e_b = 0.2*sin(3.2 - 2pi/3)"
+
+[[check]]
+variable = "m.emf.backEMF[[]3]"
+at = "end"
+near = -0.167072
+tol = 1e-5
+why = "e_c = 0.2*sin(3.2 - 4pi/3)"
+
+[[check]]
+variable = "m.emf.backEMF[[]1]"
+at = "max"
+near = 0.2
+tol = 1e-4
+why = "theta_e crosses pi/2 during the run: phase-peak EMF = ke*w = 0.2 V (ke is phase peak, not line-line)"
+
+[[check]]
+variable = "m.emf.backEMF[[]2]"
+at = "min"
+near = -0.2
+tol = 1e-4
+why = "theta_e - 2pi/3 crosses -pi/2: negative peak -ke*w"
+
+[[check]]
+variable = "m.emf.backEMF[[]*]"
+at = "all"
+range = [-0.20001, 0.20001]
+why = "no phase EMF exceeds the peak ke*w"
+
+[[check]]
+variable = "m.emf.torque"
+at = "all"
+near = 0.06
+tol = 1e-9
+why = "balanced sinusoidal currents in phase with EMF: tau = 3/2*ke*Ipeak = 1.5*0.02*2, ripple-free"
+
+[[check]]
+variable = "m.electricalPower"
+at = "all"
+near = 0.6
+tol = 1e-8
+why = "lossless conversion: sum(e_j*i_j) = tau*w = 0.06*10 W"
+
+[[check]]
+variable = "m.emf.neutral.i"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "balanced three-phase currents sum to zero: star point carries no current"
+
+[[check]]
+variable = "m.currents[[]1].i"
+at = "max"
+near = 2.0
+tol = 1e-3
+why = "prescribed phase current peak 2 A is reached as theta_e crosses pi/2"

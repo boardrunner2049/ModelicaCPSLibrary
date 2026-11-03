@@ -1,0 +1,197 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# J = [2 .3 -.2; .3 3 .4; -.2 .4 4], applied moment M = J*alpha + w x (J w) for
+# the manufactured rate w(t) = {0.1+0.2t, 0.2-0.15t, -0.1+0.1t}, so the body
+# must follow w(t) with constant alpha = {0.2, -0.15, 0.1}. Attitude reference:
+# independent RK4 (h = 1e-4) of q' = q (x) (0, w(t))/2 from identity:
+#   t = 0.5: q = {0.998296393089, 0.037504002759, 0.040444983617, -0.019025367894}
+#   t = 1.0: q = {0.992743853980, 0.099942590507, 0.061076794231, -0.027216616137}
+#   3-2-1 Euler at 1 s: {0.197986451, 0.127048939, -0.042182302} rad.
+# The FMU matches that to ~4e-13 (checked at 1e-10). (Native `rumoca sim`
+# without --rtol runs at its default tolerance -- it does not apply
+# experiment(Tolerance) -- and is 8e-8 off on q_wb[2].)
+# world.toml adds p_start = {1,-2,3}, body-frame v_start = {0.4,-0.3,0.2} and
+# mass 3 kg. With zero force and gravity the world velocity stays
+# R_wb(0) v_start = v_start, so p_w(t) = p_start + v_start t although the body
+# frame rotates under it (v_b changes by the transport term -w x v_b).
+# Native `rumoca sim --rtol 1e-10 --atol 1e-12` of the same perturbation
+# agrees with the FMU to 2.5e-10 on every common column.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.body.omega_b[1]"
+at = "0.5"
+near = 0.2
+tol = 1e-9
+why = "Euler's equation with full J inverts the manufactured moment: w1 = 0.1 + 0.2t"
+
+[[check]]
+variable = "m.body.omega_b[2]"
+at = "0.5"
+near = 0.125
+tol = 1e-9
+why = "w2 = 0.2 - 0.15t: the off-diagonal coupling is inverted correctly"
+
+[[check]]
+variable = "m.body.omega_b[1]"
+at = "end"
+near = 0.3
+tol = 1e-9
+why = "w1(1 s) = 0.3 rad/s"
+
+[[check]]
+variable = "m.body.omega_b[2]"
+at = "end"
+near = 0.05
+tol = 1e-9
+why = "w2(1 s) = 0.05 rad/s"
+
+[[check]]
+variable = "m.body.omega_b[3]"
+at = "end"
+near = 0.0
+tol = 1e-9
+why = "w3(1 s) = -0.1 + 0.1 = 0 (yaw rate crosses zero)"
+
+[[check]]
+variable = "m.body.alpha_b[1]"
+at = "all"
+near = 0.2
+tol = 1e-9
+why = "constant angular acceleration of the manufactured trajectory"
+
+[[check]]
+variable = "m.body.alpha_b[2]"
+at = "all"
+near = -0.15
+tol = 1e-9
+why = "constant angular acceleration of the manufactured trajectory"
+
+[[check]]
+variable = "m.body.alpha_b[3]"
+at = "all"
+near = 0.1
+tol = 1e-9
+why = "constant angular acceleration of the manufactured trajectory"
+
+[[check]]
+variable = "m.body.q_wb[1]"
+at = "0.5"
+near = 0.998296393089
+tol = 1e-10
+why = "attitude kinematics q' = q (x) w/2 against independent RK4"
+
+[[check]]
+variable = "m.body.q_wb[2]"
+at = "end"
+near = 0.099942590507
+tol = 1e-10
+why = "attitude kinematics q' = q (x) w/2 against independent RK4"
+
+[[check]]
+variable = "m.body.q_wb[3]"
+at = "end"
+near = 0.061076794231
+tol = 1e-10
+why = "attitude kinematics q' = q (x) w/2 against independent RK4"
+
+[[check]]
+variable = "m.body.q_wb[4]"
+at = "end"
+near = -0.027216616137
+tol = 1e-10
+why = "attitude kinematics q' = q (x) w/2 against independent RK4"
+
+[[check]]
+variable = "m.body.euler[1]"
+at = "end"
+near = 0.197986451
+tol = 1e-8
+why = "display roll from R_wb matches the reference attitude"
+
+[[check]]
+variable = "m.body.euler[2]"
+at = "end"
+near = 0.127048939
+tol = 1e-8
+why = "display pitch from R_wb matches the reference attitude"
+
+[[check]]
+variable = "m.body.euler[3]"
+at = "end"
+near = -0.042182302
+tol = 1e-8
+why = "display yaw from R_wb matches the reference attitude"
+
+[[check]]
+expr = "norm({m.body.q_wb[1]}, {m.body.q_wb[2]}, {m.body.q_wb[3]}, {m.body.q_wb[4]})"
+at = "all"
+near = 1.0
+tol = 1e-10
+why = "the attitude quaternion stays at unit norm"
+
+[[check]]
+variable = "m.body.q_wb[1]"
+at = "end"
+near = 0.992743853980
+tol = 1e-10
+why = "attitude kinematics q' = q (x) w/2 against independent RK4"
+
+# --- translation of the rotating body (p_start, v_start overridden) ---
+[[check]]
+variable = "m.body.v_w[1]"
+at = "all"
+near = 0.4
+tol = 1e-10
+why = "no force: world velocity stays v_start (body-frame start, identity attitude)"
+
+[[check]]
+variable = "m.body.v_w[2]"
+at = "all"
+near = -0.3
+tol = 1e-10
+why = "no force: world velocity is constant while the body rotates"
+
+[[check]]
+variable = "m.body.v_w[3]"
+at = "all"
+near = 0.2
+tol = 1e-10
+why = "no force: world velocity is constant while the body rotates"
+
+[[check]]
+expr = "{m.body.v_b[2]@1.0} - {m.body.v_b[2]@0.0}"
+range = [0.01, 1.0]
+why = "the body-frame velocity does rotate (v_b[2] grows from -0.3 by ~0.04): the transport term is exercised"
+
+[[check]]
+variable = "m.body.p_w[1]"
+at = "end"
+near = 1.4
+tol = 1e-9
+why = "uniform motion: p_start[1] + 0.4 t at 1 s"
+
+[[check]]
+variable = "m.body.p_w[2]"
+at = "end"
+near = -2.3
+tol = 1e-9
+why = "uniform motion: p_start[2] - 0.3 t at 1 s"
+
+[[check]]
+variable = "m.body.p_w[3]"
+at = "end"
+near = 3.2
+tol = 1e-9
+why = "uniform motion: p_start[3] + 0.2 t at 1 s"
+
+[[check]]
+variable = "m.body.specificForce_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "zero applied force: zero specific force whatever the mass"

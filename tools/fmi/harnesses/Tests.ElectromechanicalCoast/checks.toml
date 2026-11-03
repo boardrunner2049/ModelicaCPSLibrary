@@ -1,0 +1,215 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Bench: R = 0.2 ohm, L = 1 mH, k = 0.02, J_total = 2e-4, kQ = 1.5e-7, 16 V bus.
+# "native" values: bin/rumoca sim of the same model with --dt 0.0005
+# (FMU vs native max deviation: current 3.6e-8 A, speed 8.6e-8 rad/s,
+# energies 9e-8 J).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- initial equilibrium and cutoff ---
+[[check]]
+expr = "{m.esc.terminalVoltage@0.05} - 0.515 * 16"
+near = 0.0
+tol = 1e-9
+why = "conduction: terminal voltage = modulation x dcVoltage = 8.24 V"
+
+[[check]]
+expr = "{m.esc.dcCurrent@0.05} - 0.515 * {m.motor.current@0.05}"
+near = 0.0
+tol = 1e-9
+why = "averaged DC-side current = modulation x motor current (lossless converter)"
+
+[[check]]
+variable = "m.motor.omega"
+at = "all"
+to = 0.0995
+near = 400.0
+tol = 1e-6
+why = "i_start = 1.2 A, omega_start = 400 rad/s is an equilibrium: 8.24 = 0.2*1.2 + 0.02*400 and k i = kQ w^2 = 0.024 N.m"
+
+[[check]]
+expr = "{m.motor.current@0.1} - 1.2"
+near = 0.0
+tol = 1e-6
+why = "cutoff does not reset the inductive current (continuity at the command step)"
+
+[[check]]
+expr = "{m.esc.freewheel@0.1} + (1 - {m.esc.coast@0.1}) + (abs({m.esc.dcCurrent@0.1}) < 1e-12) + ({m.esc.terminalVoltage@0.1} == 0)"
+near = 4.0
+tol = 0.0
+why = "zero command with positive current: freewheel at zero terminal voltage, no supply current"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 0.1005
+to = 0.5995
+near = 1.0
+tol = 0.0
+why = "current reaches zero within 0.5 ms (1.2 A against -8 V over 1 mH: 0.15 ms) and the drive opens; the 0.1 command (1.6 V < back-EMF ~7 V) stays blocked"
+
+[[check]]
+variable = "m.motor.current"
+at = "all"
+from = 0.1005
+to = 0.5995
+near = 0.0
+tol = 1e-9
+why = "open-circuit coast: winding current projected to exactly zero by currentZero"
+
+[[check]]
+expr = "{m.esc.terminalVoltage} - 0.02 * {m.motor.omega}"
+at = "all"
+from = 0.1005
+to = 0.5995
+near = 0.0
+tol = 1e-9
+why = "coast terminal voltage is the back-EMF k*omega, not zero"
+
+[[check]]
+variable = "m.reaction.moment_r[3]"
+at = "all"
+from = 0.1005
+to = 0.5995
+near = 0.0
+tol = 1e-9
+why = "free rotor: drag decelerates the rotor only; no net carrier reaction (not counted twice)"
+
+# --- coast-down closed form: J w' = -kQ w^2 => w = w0/(1 + kQ w0 (t-t0)/J) ---
+[[check]]
+variable = "m.motor.omega"
+at = "0.3"
+near = 377.366343
+tol = 1e-4
+why = "quadratic-drag coast from coastSpeed 398.81236 at 0.11 s"
+
+[[check]]
+variable = "m.motor.omega"
+at = "0.5"
+near = 357.149891
+tol = 1e-4
+why = "quadratic-drag coast closed form at 0.5 s"
+
+[[check]]
+variable = "m.motor.omega"
+at = "0.6"
+near = 347.832759
+tol = 1e-4
+why = "the blocked 0.1 command does not slow or drive the coast (closed form continues)"
+
+[[check]]
+expr = "{m.motor.omega@1.1} - {m.motor.omega@0.91} / (1 + 1.5e-7 * {m.motor.omega@0.91} * 0.19 / 0.0002)"
+near = 0.0
+tol = 1e-4
+why = "second coast after the 0.9 s cutoff follows the same closed form"
+
+# --- restart ---
+[[check]]
+variable = "m.motor.current"
+at = "min"
+from = 0.6005
+to = 0.9
+range = [1e-3, 100.0]
+why = "the drive restarts after coast: positive conduction throughout 0.6-0.9 s"
+
+[[check]]
+variable = "m.motor.omega"
+at = "0.8"
+near = 583.374561
+tol = 1e-4
+why = "restart acceleration matches the native rumoca sim (583.3746 rad/s)"
+
+[[check]]
+variable = "m.motor.current"
+at = "0.65"
+near = 19.7137785
+tol = 1e-5
+why = "restart current matches the native rumoca sim (19.71378 A)"
+
+[[check]]
+expr = "{m.esc.coast} + {m.esc.freewheel}"
+at = "all"
+range = [0, 1]
+why = "coast and freewheel are mutually exclusive modes"
+
+[[check]]
+variable = "m.esc.coast"
+at = "all"
+from = 0.9005
+near = 1.0
+tol = 0.0
+why = "second cutoff: freewheel ends within 0.5 ms and the drive coasts to the end"
+
+# --- one-quadrant, energy and reactions ---
+[[check]]
+variable = "m.motor.current"
+at = "all"
+range = [-1e-6, 100.0]
+why = "nonregenerative drive: reverse current forbidden"
+
+[[check]]
+variable = "m.esc.dcCurrent"
+at = "all"
+range = [-1e-6, 100.0]
+why = "the supply never absorbs current"
+
+[[check]]
+expr = "{m.motor.storedEnergy} + {m.dissipatedEnergy} - {m.inputEnergy}"
+at = "all"
+near = 16.00072
+tol = 2e-5
+why = "energy balance: stored + dissipated - supplied stays at the initial stored energy L i0^2/2 + J w0^2/2 = 16.00072 J"
+
+[[check]]
+variable = "m.inputEnergy"
+at = "end"
+near = 41.9568979
+tol = 1e-5
+why = "total supplied energy matches the native rumoca sim"
+
+[[check]]
+expr = "{m.reaction.moment_r[3]} - {m.motor.electromagneticTorque}"
+at = "all"
+near = 0.0
+tol = 1e-7
+why = "hub reaction = electromagnetic torque (spinSign -1 blade drag cancels the J alpha term)"
+
+# --- unpowered spinning motor ---
+[[check]]
+expr = "abs({m.spinning.current}) + abs({m.unpowered.dcCurrent})"
+at = "all"
+near = 0.0
+tol = 1e-8
+why = "zero supply with a rotating motor: open-circuit coast, no current"
+
+[[check]]
+variable = "m.unpowered.coast"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "the unpowered drive is in coast for the whole run"
+
+[[check]]
+variable = "m.spinning.omega"
+at = "0.5"
+near = 155.760157
+tol = 1e-5
+why = "viscous coast 200 exp(-t b/J) = 200 exp(-t/2)"
+
+[[check]]
+variable = "m.spinning.omega"
+at = "end"
+near = 115.389962
+tol = 1e-5
+why = "viscous coast 200 exp(-1.1/2)"
+
+[[check]]
+expr = "{m.frictionReaction.moment_r[3]} - 0.0001 * {m.spinning.omega}"
+at = "all"
+near = 0.0
+tol = 1e-8
+why = "bearing friction b*omega acts on the carrier once"

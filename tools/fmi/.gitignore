@@ -1,0 +1,7 @@
+local.env
+bin/
+.cache/
+results/
+sweep*/
+harnesses/*/out/
+__pycache__/

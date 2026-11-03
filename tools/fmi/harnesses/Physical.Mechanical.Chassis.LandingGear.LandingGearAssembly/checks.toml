@@ -1,0 +1,300 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Asymmetric legs (world.toml): 1 (0.20,0.15,0.10), 2 (-0.12,0.18,0.12),
+# 3 (-0.15,-0.16,0.10), 4 (0.18,-0.10,0.11) m FRD from the CG; k = 3000 N/m,
+# c = 150 N.s/m, 25 N.s/m tangential, mu = 0.6, level ground at Down = 0
+# (2.30-2.70 s: a sloped, moving deck through a nonzero terrain point).
+# Expected values: ref.py (this directory), an independent numpy evaluation
+# of the leg laws
+# (tip = p + R r, v_tip = R (v + w x r), N = max(0, k pen - c v_n),
+# |F_t| = min(25 |v_t|, mu N), F_b = R' F_w, M_b = sum r x F_b) at the inputs
+# of each phase (harness.c). The sample at t reflects the inputs applied at
+# t - 1 ms (zero-order hold).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.rLeg_b[4]} + 0.12"
+at = "0"
+near = 0.0
+tol = 1e-15
+why = "the asymmetric layout override reached the FMU (leg 2 x, element 4 row-major)"
+
+# --- free flight and staggered touchdown -------------------------------------
+[[check]]
+variable = "m.gap[[]*]"
+at = "0.1"
+range = [0.18, 0.2]
+why = "CG 0.3 m up, tips 0.10-0.12 m below the CG: gaps 0.18-0.20 m"
+
+[[check]]
+expr = "{m.gap[1]} - {m.gap[2]}"
+at = "0.1"
+near = 0.02
+tol = 1e-12
+why = "leg 2 reaches 20 mm lower than leg 1 (0.12 vs 0.10 m)"
+
+[[check]]
+variable = "m.normalForce[[]*]"
+at = "0.5"
+near = 0.0
+tol = 1e-12
+why = "descending but every tip still above the ground"
+
+[[check]]
+variable = "m.normalForce[2]"
+at = "0.575"
+near = 96.0
+tol = 1e-6
+why = "leg 2 touched first (0.56 s): 7 mm in at 0.5 m/s, 21 + 75 N"
+
+[[check]]
+expr = "abs({m.normalForce[1]}) + abs({m.normalForce[3]}) + abs({m.normalForce[4]})"
+at = "0.575"
+near = 0.0
+tol = 1e-12
+why = "legs 1, 3 (0.60 s) and 4 (0.58 s) have not touched yet"
+
+[[check]]
+expr = "{m.contact[2]} - {m.contact[4]}"
+at = "0.575"
+near = 1.0
+tol = 0
+why = "contact flags: leg 2 in, leg 4 still 3 mm clear"
+
+[[check]]
+expr = "norm({m.moment_b[1]} + 17.28, {m.moment_b[2]} + 11.52, {m.moment_b[3]})"
+at = "0.575"
+near = 0.0
+tol = 1e-6
+why = "single leg 2: r2 x (0,0,-96) = (0.18*-96, -(-0.12)(-96), 0) = (-17.28, -11.52, 0)"
+
+[[check]]
+expr = "norm({m.normalForce[1]} - 88.5, {m.normalForce[2]} - 148.5, {m.normalForce[3]} - 88.5, {m.normalForce[4]} - 118.5)"
+at = "0.61"
+near = 0.0
+tol = 1e-6
+why = "last descent sample (inputs of 0.609 s): k*pen + c*0.5 with pen 4.5/24.5/4.5/14.5 mm"
+
+# --- level hold --------------------------------------------------------------
+[[check]]
+expr = "norm({m.normalForce[1]} - 15, {m.normalForce[2]} - 75, {m.normalForce[3]} - 15, {m.normalForce[4]} - 45)"
+at = "0.8"
+near = 0.0
+tol = 1e-6
+why = "static penetrations 5/25/5/15 mm: k*pen per leg"
+
+[[check]]
+expr = "norm({m.force_b[1]}, {m.force_b[2]}, {m.force_b[3]} + 150)"
+at = "0.8"
+near = 0.0
+tol = 1e-6
+why = "the legs push the vehicle Up (-z FRD) with 150 N, no tangential load at rest"
+
+[[check]]
+expr = "norm({m.moment_b[1]} + 8.85, {m.moment_b[2]} + 0.15, {m.moment_b[3]})"
+at = "0.8"
+near = 0.0
+tol = 1e-6
+why = "sum r_i x (0,0,-N_i): roll -sum(y N) = -8.85, pitch sum(x N) = -0.15; vertical loads give no yaw"
+
+# --- static tilt (roll 0.06, pitch -0.04) -------------------------------------
+[[check]]
+expr = "norm({m.normalForce[1]} - 65.176445055, {m.normalForce[2]} - 92.023253145, {m.normalForce[4]} - 47.762116331)"
+at = "1.1"
+near = 0.0
+tol = 1e-6
+why = "tilted tips: penetrations 21.7/30.7/15.9 mm (reference evaluation)"
+
+[[check]]
+expr = "{m.normalForce[3]} + {m.contact[3]}"
+at = "1.1"
+near = 0.0
+tol = 0
+why = "rolled right-down and pitched nose-down, the rear-left leg 3 lifts 10.8 mm clear"
+
+[[check]]
+expr = "norm({m.force_b[1]} + 8.196286497, {m.force_b[2]} + 12.28050062, {m.force_b[3]} + 204.429341357)"
+at = "1.1"
+near = 0.0
+tol = 1e-6
+why = "world-vertical contact force R_wb' (0,0,-205.0) resolved in tilted body axes"
+
+[[check]]
+expr = "norm({m.moment_b[1]} + 20.141477515, {m.moment_b[2]} - 9.649841122, {m.moment_b[3]} - 0.227855943)"
+at = "1.1"
+near = 0.0
+tol = 1e-6
+why = "summed r x F_b; the negative roll moment opposes the right-down roll, the positive pitch moment the nose-down pitch"
+
+# --- yawed slide ----------------------------------------------------------------
+[[check]]
+expr = "norm({m.force_b[1]} + 24.260923598, {m.force_b[2]} - 40.434872663, {m.force_b[3]} + 150)"
+at = "1.5"
+near = 0.0
+tol = 1e-6
+why = "friction 9 + 14.58 + 9 + 14.58 N opposite the body velocity (0.3,-0.5): legs 1, 3 capped at mu*15 N, legs 2, 4 viscous 25*0.583 N"
+
+[[check]]
+expr = "norm({m.moment_b[1]} + 13.268487266, {m.moment_b[2]} + 2.80109236, {m.moment_b[3]} - 1.689567199)"
+at = "1.5"
+near = 0.0
+tol = 1e-6
+why = "summed r x F_b including the unequal friction forces (reference evaluation)"
+
+[[check]]
+variable = "m.legs[1].frictionLaw.forceMagnitude"
+at = "1.5"
+near = 9.0
+tol = 1e-9
+why = "Coulomb cap mu*N = 0.6*15 N binds below the 14.6 N viscous force"
+
+[[check]]
+variable = "m.legs[2].frictionLaw.forceMagnitude"
+at = "1.5"
+near = 14.577379737
+tol = 1e-6
+why = "viscous 25*|v_t| = 25*0.5831 N is below the cap 0.6*75 = 45 N"
+
+[[check]]
+expr = "{m.legs[1].tangentialPower} + {m.legs[2].tangentialPower} + {m.legs[3].tangentialPower} + {m.legs[4].tangentialPower}"
+at = "1.5"
+near = -27.495713410
+tol = 1e-6
+why = "dissipated power -sum |F_t| |v_t| = -(9+14.58+9+14.58)*0.5831 W"
+
+# --- body rates -----------------------------------------------------------------
+[[check]]
+expr = "norm({m.normalForce[1]} - 50.25, {m.normalForce[2]} - 74.1, {m.normalForce[4]} - 59.1)"
+at = "1.85"
+near = 0.0
+tol = 1e-6
+why = "k*pen - c*v_n with tip normal velocities from w x r (legs 1, 4 pressed, leg 2 nearly unchanged)"
+
+[[check]]
+expr = "{m.normalForce[3]} + 1 - {m.contact[3]}"
+at = "1.85"
+near = 0.0
+tol = 0
+why = "leg 3 is still 5 mm in (contact) but rising at 0.13 m/s: 15 - 150*0.13 < 0, the damper cannot pull"
+
+[[check]]
+expr = "norm({m.force_b[1]} - 8.325, {m.force_b[2]} - 2.175, {m.force_b[3]} + 183.45)"
+at = "1.85"
+near = 0.0
+tol = 1e-6
+why = "summed normal plus viscous friction loads (reference evaluation)"
+
+[[check]]
+expr = "norm({m.moment_b[1]} + 15.23125, {m.moment_b[2]} - 12.718, {m.moment_b[3]} + 1.33225)"
+at = "1.85"
+near = 0.0
+tol = 1e-6
+why = "summed r x F_b; each component opposes the imposed rate (0.5, -0.8, 0.3) as gear damping should"
+
+# --- sloped, heaving deck at a general attitude (ref.py phase 2.5) -----------------
+[[check]]
+expr = "norm({m.gap[1]} - (0.0007881323952630137), {m.gap[2]} - (-0.002767794515703274), {m.gap[3]} - (-0.03179729046626545), {m.gap[4]} - (-0.045054338649276965))"
+at = "2.5"
+near = 0.0
+tol = 1e-12
+why = "gap_i = n.(tip_i - terrainPoint) with the inclined normal and terrainPoint (1.5,-0.8,0.4): leg 1 clear by 0.79 mm, legs 2-4 in by 2.8/31.8/45.1 mm. Each leg gets its own terrain fan-out, so a dropped or mis-wired terrainPoint/normal for any leg moves its gap by >= 0.1 m"
+
+[[check]]
+expr = "norm({m.contact[1]}, {m.contact[2]} - 1, {m.contact[3]} - 1, {m.contact[4]} - 1)"
+at = "2.5"
+near = 0.0
+tol = 0
+why = "contact flags follow the per-leg gaps: leg 1 clear, legs 2-4 in contact"
+
+[[check]]
+expr = "norm({m.normalForce[1]} - (0.0), {m.normalForce[2]} - (16.559100744193408), {m.normalForce[3]} - (93.76114670588622), {m.normalForce[4]} - (123.73244363219436))"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "N_i = k*pen_i - c*n.(v_tip_i - terrainVelocity): the deck heave (-0.2,0.15,0.05) enters every leg's normal velocity"
+
+[[check]]
+expr = "{m.legs[2].frictionLaw.forceMagnitude} - 0.6*{m.normalForce[2]}"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "leg 2 (lightly loaded, N = 16.5591 N) slides at |v_t| = 1.0804 m/s: viscous demand 27.009 N exceeds the Coulomb cap, so |F_t| = mu*N"
+
+[[check]]
+expr = "norm({m.legs[3].frictionLaw.forceMagnitude} - (24.062162546913406), {m.legs[4].frictionLaw.forceMagnitude} - (23.03763697474478))"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "legs 3 and 4 stay viscous: 25*|v_t| = 24.0622 / 23.0376 N below their caps 56.26 / 74.24 N, with |v_t| the in-plane part of the velocity relative to the moving deck"
+
+[[check]]
+expr = "{m.legs[1].tangentialPower} + {m.legs[2].tangentialPower} + {m.legs[3].tangentialPower} + {m.legs[4].tangentialPower}"
+at = "2.5"
+near = -55.12281687712762
+tol = 1e-9
+why = "dissipated power -sum |F_t| |v_t| in the deck frame"
+
+[[check]]
+expr = "norm({m.force_b[1]} - (-59.05507695054592), {m.force_b[2]} - (8.055048844536376), {m.force_b[3]} - (-233.3793578929571))"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "summed body force R_wb' sum(N_i n + F_t,i) (reference evaluation)"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - (23.430287547260995), {m.moment_b[2]} - (-0.3121498489224699), {m.moment_b[3]} - (-2.9726306765531207))"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "summed r_i x F_b,i about the CG (reference evaluation)"
+
+[[check]]
+expr = "{m.legs[2].force_w[1]}*(-0.10661278062209463) + {m.legs[2].force_w[2]}*(0.08945874489878386) + {m.legs[2].force_w[3]}*(-0.9902680687415704) - {m.normalForce[2]}"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "leg 2: friction lies in the inclined plane, so the world force along n is exactly the normal force"
+
+[[check]]
+expr = "{m.legs[4].force_w[1]}*(-0.10661278062209463) + {m.legs[4].force_w[2]}*(0.08945874489878386) + {m.legs[4].force_w[3]}*(-0.9902680687415704) - {m.normalForce[4]}"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "leg 4: friction lies in the inclined plane, so the world force along n is exactly the normal force"
+
+# --- lift-off and invariants ------------------------------------------------------
+[[check]]
+expr = "norm({m.gap[1]} - 0.294, {m.gap[2]} - 0.274, {m.gap[3]} - 0.294, {m.gap[4]} - 0.284)"
+at = "2.3"
+near = 0.0
+tol = 1e-9
+why = "CG climbed 0.299 m at 1 m/s from Down -0.095 m (inputs of 2.299 s); gap = 0.394 - r_z"
+
+[[check]]
+variable = "m.normalForce[[]*]"
+at = "2.3"
+near = 0.0
+tol = 1e-12
+why = "climbed clear of the ground"
+
+[[check]]
+variable = "m.normalForce[[]*]"
+at = "all"
+range = [0.0, 148.5000001]
+why = "normal forces are never negative; the largest is leg 2 at the end of the descent"
+
+[[check]]
+variable = "m.legs[[]*].tangentialPower"
+at = "all"
+range = [-1e300, 0.0]
+why = "friction never injects energy"
+
+[[check]]
+expr = "{m.force_b[3]}"
+at = "all"
+range = [-444.0000001, 0.0]
+why = "level, tilted or on the 8 deg deck, the ground never pulls the vehicle down; the total peaks at 444 N at the end of the descent"

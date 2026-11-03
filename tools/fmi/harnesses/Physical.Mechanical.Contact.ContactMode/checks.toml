@@ -1,0 +1,103 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# contact = gap <= 0 (touching counts as contact). Inputs held from t show in
+# the row at t + 1 ms. Gap profile in harness.c.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.contact} - ({m.gap} <= 0)"
+at = "all"
+range = [0.0, 0.0]
+why = "the flag is exactly the closed relation gap <= 0 at every sample"
+
+[[check]]
+variable = "m.contact"
+at = "0"
+near = 1.0
+tol = 0
+why = "initially touching point (gap start 0) is in contact at initialization"
+
+[[check]]
+variable = "m.contact"
+at = "0.2"
+near = 0.0
+tol = 0
+why = "5 mm .. 2.5 mm above the surface: no contact"
+
+[[check]]
+variable = "m.contact"
+at = "0.3"
+near = 0.0
+tol = 0
+why = "last sample with gap > 0 (25 um) before the 0.30 s crossing"
+
+[[check]]
+variable = "m.contact"
+at = "0.302"
+near = 1.0
+tol = 0
+why = "first samples past the ramp's zero crossing: penetrating"
+
+[[check]]
+variable = "m.contact"
+at = "0.45"
+near = 1.0
+tol = 0
+why = "held 5 mm penetration"
+
+[[check]]
+variable = "m.gap"
+at = "0.55"
+near = 0.0
+tol = 0
+why = "exactly touching phase reached the FMU"
+
+[[check]]
+variable = "m.contact"
+from = 0.501
+to = 0.6
+at = "min"
+near = 1.0
+tol = 0
+why = "gap exactly 0 (touching, not penetrating) counts as contact throughout"
+
+[[check]]
+variable = "m.contact"
+at = "0.699"
+near = 1.0
+tol = 0
+why = "still 20 um in, just before the outward crossing at 0.70 s"
+
+[[check]]
+variable = "m.contact"
+at = "0.702"
+near = 0.0
+tol = 0
+why = "10 um outside after the outward crossing: separated"
+
+[[check]]
+variable = "m.contact"
+from = 0.851
+to = 0.86
+at = "min"
+near = 1.0
+tol = 0
+why = "a 1 um, 10 ms penetration pulse is detected on every sample"
+
+[[check]]
+variable = "m.contact"
+at = "0.85"
+near = 0.0
+tol = 0
+why = "before the pulse: separated"
+
+[[check]]
+variable = "m.contact"
+at = "end"
+near = 0.0
+tol = 0
+why = "after the pulse the flag returns to false"

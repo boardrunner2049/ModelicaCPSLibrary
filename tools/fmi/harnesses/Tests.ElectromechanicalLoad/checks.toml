@@ -1,0 +1,170 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Note: variables are fnmatch globs, so a literal "[" is written "[[]".
+# Bench: terminal voltage 0.5*16 = 8 V, R = 0.2 ohm, k = 0.02 N.m/A.
+#   motor 1: L=1mH J=1e-4 kQ=1.5e-7   motor 2: kQ=3e-7
+#   motor 3: J=4e-4                   motor 4: L=2mH
+# Reference values: independent scipy Radau integration of
+#   L di/dt = 8 - R i - k w, J dw/dt = k i - kQ w^2 (rtol 1e-11);
+# equilibrium (R kQ/k) w^2 + k w - 8 = 0 gives w1 = 388.670 rad/s, w2 = 378.510 rad/s.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- drive ---
+[[check]]
+variable = "m.esc[[]*].terminalVoltage"
+at = "all"
+near = 8.0
+tol = 1e-9
+why = "50 % modulation of a 16 V bus during positive-current conduction"
+
+[[check]]
+variable = "m.esc[[]*].coast"
+at = "all"
+range = [0, 0]
+why = "a continuously commanded drive with forward current never enters coast (a regression guard only: the bench never removes the command, so the coast/freewheel path itself is not exercised here)"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "all"
+range = [-1e-6, 40.0]
+why = "one-quadrant drive: current never negative; peak bounded by 8 V/R = 40 A stall current"
+
+# --- inductance sets the initial current slope ---
+[[check]]
+variable = "m.motors[[]1].current"
+at = "0.002"
+near = 13.1522
+tol = 0.01
+why = "L = 1 mH: reference ODE i(2 ms) = 13.152 A (initial slope 8 V/L = 8000 A/s)"
+
+[[check]]
+variable = "m.motors[[]4].current"
+at = "0.002"
+near = 7.2411
+tol = 0.01
+why = "doubling L to 2 mH roughly halves the early current: reference i(2 ms) = 7.241 A"
+
+# --- inertia sets the acceleration ---
+[[check]]
+variable = "m.motors[[]1].omega"
+at = "0.05"
+near = 250.077
+tol = 0.05
+why = "J = 1e-4: reference ODE w(50 ms) = 250.08 rad/s (mechanical tau ~ J R/k^2 = 50 ms)"
+
+[[check]]
+variable = "m.motors[[]3].omega"
+at = "0.1"
+near = 153.800
+tol = 0.05
+why = "J = 4e-4 accelerates four times slower: reference w(0.1 s) = 153.80 rad/s vs motor 1 at 346.4"
+
+[[check]]
+variable = "m.motors[[]1].omega"
+at = "0.1"
+near = 346.366
+tol = 0.05
+why = "reference ODE w(0.1 s) for the baseline motor"
+
+[[check]]
+variable = "m.motors[[]3].omega"
+at = "0.5"
+near = 361.517
+tol = 0.05
+why = "high-inertia motor still approaching equilibrium at 0.5 s (reference 361.52 rad/s)"
+
+[[check]]
+variable = "m.motors[[]3].current"
+at = "max"
+near = 37.21
+tol = 0.1
+why = "slower spin-up lets back-EMF lag: higher current peak than motor 1 (reference 37.21 A vs 33.39 A)"
+
+[[check]]
+variable = "m.motors[[]1].current"
+at = "max"
+near = 33.39
+tol = 0.1
+why = "baseline current peak from the reference ODE (33.39 A near 13 ms)"
+
+# --- loaded equilibrium ---
+[[check]]
+variable = "m.motors[[]1].omega"
+at = "end"
+near = 388.6702
+tol = 0.01
+why = "equilibrium root of (R kQ/k) w^2 + k w - 8 = 0 with kQ = 1.5e-7"
+
+[[check]]
+variable = "m.motors[[]4].omega"
+at = "end"
+near = 388.6702
+tol = 0.01
+why = "inductance does not change the steady state"
+
+[[check]]
+variable = "m.motors[[]3].omega"
+at = "end"
+near = 388.6702
+tol = 0.01
+why = "inertia does not change the steady state (reference 388.67014 at 3.1 s)"
+
+[[check]]
+variable = "m.motors[[]2].omega"
+at = "end"
+near = 378.5096
+tol = 0.01
+why = "doubled load coefficient lowers the equilibrium speed (root with kQ = 3e-7)"
+
+[[check]]
+variable = "m.motors[[]1].current"
+at = "end"
+near = 1.132984
+tol = 1e-4
+why = "steady torque balance k*i = kQ*w^2 = 1.5e-7*388.67^2 -> i = 1.1330 A"
+
+[[check]]
+variable = "m.motors[[]2].current"
+at = "end"
+near = 2.149042
+tol = 1e-4
+why = "heavier load draws more current at lower speed: kQ*w^2/k = 2.1490 A"
+
+[[check]]
+variable = "m.motors[[]1].acceleration"
+at = "end"
+near = 0.0
+tol = 1e-3
+why = "equilibrium: no net shaft torque"
+
+[[check]]
+variable = "m.motors[[]1].loadPower"
+at = "end"
+near = 8.80714
+tol = 1e-3
+why = "load power kQ*w^3 at equilibrium"
+
+[[check]]
+variable = "m.motors[[]1].copperLoss"
+at = "end"
+near = 0.256731
+tol = 1e-4
+why = "copper loss R*i^2 at equilibrium"
+
+[[check]]
+variable = "m.esc[[]1].electricalPower"
+at = "end"
+near = 9.06387
+tol = 1e-3
+why = "bus power 16 V * (0.5 i) equals copper loss + load power (8.8071 + 0.2567): lossless averaged drive"
+
+[[check]]
+variable = "m.esc[[]2].electricalPower"
+at = "end"
+near = 17.19234
+tol = 1e-3
+why = "power balance for the heavily loaded motor: R i^2 + kQ w^3 = 0.9237 + 16.2687 W"

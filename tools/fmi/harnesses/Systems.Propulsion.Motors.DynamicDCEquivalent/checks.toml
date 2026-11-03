@@ -1,0 +1,41 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Reference: `rumoca sim` (rtol 1e-9) of the same rig with the scenario written
+# as equations (voltage = if time >= 0.01 then 12 else 0; currentZero =
+# time >= 0.1 and time < 0.11; loadTorque = if time >= 0.2 then 0.005 else 0):
+#   t = 0.0995: current 2.1163 A, omega 553.433 rad/s
+#   t = 0.1005: current 0.215586 A (reinitialized to 0 at t = 0.1)
+#   t = 0.4:    current 0.279248 A, omega 593.018 rad/s
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.current"
+at = "0.0995"
+near = 2.1163
+tol = 0.02
+why = "current decaying during spin-up, before the reported zero"
+
+[[check]]
+variable = "m.current"
+at = "0.1005"
+near = 0.215586
+tol = 0.02
+why = "currentZero reinitialized the winding current to 0 at t = 0.1 s"
+
+[[check]]
+variable = "m.omega"
+at = "end"
+near = 593.018
+tol = 0.5
+why = "loaded steady speed (V - R*tau/k)/k"
+
+[[check]]
+variable = "m.current"
+at = "end"
+near = 0.279248
+tol = 0.005
+why = "steady current carries the load and friction torque"

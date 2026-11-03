@@ -1,0 +1,32 @@
+# Hand-written in the tools/new_harness.py format: Rumoca currently refuses
+# the FMI export of this wrapper (the MSL Basic.Resistor inside SeriesRL
+# carries an assertion the FMI C profile rejects, see the harness report), so
+# it could not be generated from out/model.fmu. Once the export works,
+# regenerate with tools/new_harness.py --refresh (keeps [World] stop/step).
+[World]
+start = 0
+stop = 300000000
+step = 100000
+time_unit = "ns"
+
+[Models.m]
+path = "out/model.fmu"
+
+[World.Inputs]
+voltage = "m.voltage"
+
+[World.Outputs]
+current = "m.current"
+terminalvoltage = "m.terminalVoltage"
+energyerror = "m.energyError"
+
+[Trace]
+every_step = true
+models = ["m"]
+output = "out/trace.csv"
+
+[Logging]
+output = "out/runtime.log"
+
+[Frontend]
+enabled = false

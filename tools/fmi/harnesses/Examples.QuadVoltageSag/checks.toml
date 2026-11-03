@@ -1,0 +1,205 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# m = 1.5 kg, g = 9.80665, kT = 1e-5, kQ = 1.5e-7, Kv = 62.5, tau = 0.03 s.
+# Command c = sqrt(m g/(4 kT))/1000 = 0.6064234288; hover speed w_h = 606.4234288.
+# Bus 16 V for t < 1, 12 V from t = 1 (row t = 1.000 already shows 12 V).
+# Speed after the drop: w(t) = w_h (3/4 + 1/4 exp(-(t-1)/tau)) (closed form).
+# "ref" = independent integration (scipy, rtol 1e-12) of z'' = g - 4 kT w(t)^2/m.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- supply, ESC and motor ---------------------------------------------------
+
+[[check]]
+variable = "m.dcVoltage"
+at = "all"
+to = 0.998
+near = 16.0
+tol = 0.0
+why = "bus 16 V before the drop"
+
+[[check]]
+variable = "m.dcVoltage"
+at = "all"
+from = 1.0
+near = 12.0
+tol = 0.0
+why = "documented supply drop to 12 V at t = 1 s"
+
+[[check]]
+variable = "m.escs[[]*].modulation"
+at = "all"
+near = 0.6064234288020212
+tol = 1e-12
+why = "fixed ESC command, unaffected by the supply (P1: voltage-mode command)"
+
+[[check]]
+variable = "m.escs[[]*].equivalentVoltage"
+at = "0.5"
+near = 9.702774860832339
+tol = 1e-10
+why = "equivalent voltage c * 16 V"
+
+[[check]]
+variable = "m.escs[[]*].equivalentVoltage"
+at = "1.5"
+near = 7.277081145624254
+tol = 1e-10
+why = "equivalent voltage c * 12 V after the drop"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "all"
+to = 1.0
+near = 606.4234288020211
+tol = 1e-8
+why = "Kv c 16 V = hover speed: started in equilibrium, no transient"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "1.03"
+near = 510.59024962675517
+tol = 1e-6
+why = "one tau after the drop: w_h (3/4 + exp(-1)/4)"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "1.1"
+near = 460.22595794269114
+tol = 1e-6
+why = "w_h (3/4 + exp(-10/3)/4)"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "end"
+near = 454.81757160151585
+tol = 1e-6
+why = "documented: lower supply reduces speed at a fixed command, to Kv c 12 V = 3/4 hover"
+
+[[check]]
+expr = "{m.motors[1].omega@2.0} / {m.motors[1].omega@0.9}"
+at = "end"
+near = 0.75
+tol = 1e-9
+why = "voltage-to-speed surrogate: steady speed ratio = voltage ratio 12/16"
+
+# --- forces -----------------------------------------------------------------
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "0.5"
+near = -14.709975
+tol = 1e-8
+why = "at 16 V total thrust balances the weight m g"
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "end"
+near = -8.274360937500019
+tol = 1e-7
+why = "documented: thrust drops to (12/16)^2 m g = 9/16 of the weight"
+
+[[check]]
+variable = "m.rotors[[]*].loadTorque"
+at = "end"
+near = 0.03102885351562507
+tol = 1e-10
+why = "blade drag kQ w^2 at the reduced speed"
+
+[[check]]
+variable = "m.vehicle.moment_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-10
+why = "equal rotors: arm moments and alternating yaw reactions cancel through the transient"
+
+[[check]]
+variable = "m.vehicle.body.euler[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "stays level"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no rotation"
+
+# --- vertical motion --------------------------------------------------------
+
+[[check]]
+variable = "m.altitude"
+at = "all"
+to = 1.0
+near = 1.0
+tol = 1e-9
+why = "hover holds 1 m while the bus is 16 V"
+
+[[check]]
+variable = "m.altitude"
+at = "1.1"
+near = 0.9871704047245492
+tol = 1e-8
+why = "sink during the speed transient, ref"
+
+[[check]]
+variable = "m.altitude"
+at = "1.5"
+near = 0.5200104513631107
+tol = 1e-8
+why = "sink, ref"
+
+[[check]]
+variable = "m.altitude"
+at = "end"
+near = -1.029133791015612
+tol = 1e-8
+why = "sink, ref (no landing gear: passes the ground plane)"
+
+[[check]]
+variable = "m.vehicle.truth.v_w[3]"
+at = "end"
+near = 4.170890828124999
+tol = 1e-7
+why = "sink rate at 2 s, ref"
+
+[[check]]
+expr = "{m.vehicle.truth.v_w[3]@2.0} - {m.vehicle.truth.v_w[3]@1.5}"
+at = "end"
+near = 2.1452046875
+tol = 1e-7
+why = "steady phase: sink rate grows by (7/16) g * 0.5 s"
+
+[[check]]
+variable = "m.vehicle.truth.a_w[3]"
+at = "end"
+near = 4.290409374999987
+tol = 1e-8
+why = "steady downward acceleration g (1 - 9/16)"
+
+[[check]]
+variable = "m.vehicle.measurements.acceleration[3]"
+at = "end"
+near = 5.516240625000012
+tol = 1e-8
+why = "IMU specific force = thrust/m = 9/16 g (sensor z = -body z)"
+
+[[check]]
+variable = "m.vehicle.measurements.acceleration[3]"
+at = "0.5"
+near = 9.80665
+tol = 1e-9
+why = "hovering IMU reads g"
+
+[[check]]
+variable = "m.vehicle.truth.p_w[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal drift"

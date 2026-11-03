@@ -1,0 +1,40 @@
+# Hand-written in the tools/new_harness.py format: Rumoca currently refuses
+# the FMI export of this wrapper (first "unsupported-feature:residual_equations"
+# for the floating star; behind it the MSL Basic.Resistor assertion inside
+# SeriesRL, see the harness report), so
+# it could not be generated from out/model.fmu. Once the export works,
+# regenerate with tools/new_harness.py --refresh (keeps [World] stop/step).
+[World]
+start = 0
+stop = 150000000
+step = 100000
+time_unit = "ns"
+
+[Models.m]
+path = "out/model.fmu"
+
+[World.Inputs]
+va = "m.va"
+vb = "m.vb"
+vc = "m.vc"
+loadtorque = "m.loadTorque"
+
+[World.Outputs]
+ia = "m.ia"
+ib = "m.ib"
+ic = "m.ic"
+torque = "m.torque"
+locktorque = "m.lockTorque"
+starvoltage = "m.starVoltage"
+energyerror = "m.energyError"
+
+[Trace]
+every_step = true
+models = ["m"]
+output = "out/trace.csv"
+
+[Logging]
+output = "out/runtime.log"
+
+[Frontend]
+enabled = false

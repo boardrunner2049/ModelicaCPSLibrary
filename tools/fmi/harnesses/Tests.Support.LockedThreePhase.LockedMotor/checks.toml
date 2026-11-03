@@ -1,0 +1,231 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Locked rotor: omega = 0, back-EMF = 0, electricalAngle = theta0 = 0.3 rad,
+# trapezoid shape f = {2*0.3/(pi/3), -1, +1} = {0.572958, -1, 1}.
+# Floating star: v_star = mean(v), i_j = (v_j - mean(v))/R in steady state,
+# tau = L/R = 5 ms; each segment i(t) = iss + (i0 - iss)*exp(-(t - t0)/tau).
+#   (2, -1, 1) V   -> iss = (6.66667, -8.33333, 1.66667) A, Te = 0.138197 N m
+#   (7, 4, 6) V    -> same iss (common mode +5 V), v_star = 5.66667 V
+#   (-2, 1, -1) V  -> iss negated, zero crossing at 90 ms + tau*ln2 = 93.466 ms
+# Lock reaction (torque balance on the locked shaft): lockTorque = Te - loadTorque.
+# Values computed in closed form and cross-checked against native `rumoca sim`
+# of the same wrapper (agreement to 1e-5 A; energy balance error 1.6e-8 J).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.motor.phaseCurrent*"
+at = "0.0099"
+near = 0.0
+tol = 1e-12
+why = "no voltage: no current in any phase"
+
+[[check]]
+variable = "m.ia"
+at = "0.012"
+near = 2.19787
+tol = 1e-3
+why = "phase a rise 2 ms after the step: (20/3)*(1 - exp(-0.4))"
+
+[[check]]
+variable = "m.ib"
+at = "0.012"
+near = -2.74733
+tol = 1e-3
+why = "phase b rise: (-25/3)*(1 - exp(-0.4)); driven by vb - mean(v) = -5/3 V"
+
+[[check]]
+variable = "m.ic"
+at = "0.012"
+near = 0.54947
+tol = 1e-3
+why = "phase c rise: (5/3)*(1 - exp(-0.4)); a different amplitude per phase exposes swapped wiring"
+
+[[check]]
+variable = "m.torque"
+at = "0.012"
+near = 0.045561
+tol = 2e-5
+why = "locked-rotor torque ke*sum(f_j*i_j) with the frozen shape {0.573, -1, 1}"
+
+[[check]]
+variable = "m.ia"
+at = "0.0499"
+near = 6.66439
+tol = 1e-3
+why = "phase a after 8 tau: (va - mean(v))/R = (4/3)/0.2 less exp(-8) residual"
+
+[[check]]
+variable = "m.ib"
+at = "0.0499"
+near = -8.33048
+tol = 1e-3
+why = "phase b after 8 tau: (-5/3)/0.2"
+
+[[check]]
+variable = "m.ic"
+at = "0.0499"
+near = 1.66610
+tol = 1e-3
+why = "phase c after 8 tau: (1/3)/0.2"
+
+[[check]]
+variable = "m.torque"
+at = "0.0499"
+near = 0.138150
+tol = 2e-5
+why = "electromagnetic torque ke*(0.573*ia - ib + ic) at a locked rotor"
+
+[[check]]
+variable = "m.ia"
+at = "0.0599"
+near = 6.66636
+tol = 1e-4
+why = "the +5 V common-mode step at 50 ms leaves the current on the same exponential (floating star rejects common mode)"
+
+[[check]]
+variable = "m.ib"
+at = "0.0599"
+near = -8.33295
+tol = 1e-4
+why = "common-mode rejection in phase b too"
+
+[[check]]
+variable = "m.starVoltage"
+at = "0.0599"
+near = 5.666667
+tol = 1e-6
+why = "the floating star point rises with the common mode to mean(7, 4, 6) V"
+
+[[check]]
+expr = "{m.starVoltage} - ({m.va} + {m.vb} + {m.vc})/3"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "with zero back-EMF and sum(i) = 0, the star point sits at the mean phase voltage at every instant"
+
+[[check]]
+expr = "{m.ia} + {m.ib} + {m.ic}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "floating-star KCL: the phase currents sum to zero"
+
+[[check]]
+variable = "m.torque"
+at = "0.0899"
+near = 0.138197
+tol = 2e-5
+why = "the 0.05 N m load torque does not change the electromagnetic torque of a locked rotor"
+
+[[check]]
+variable = "m.lockTorque"
+at = "0.0699"
+near = 0.138196
+tol = 2e-5
+why = "without load the lock takes the whole electromagnetic torque"
+
+[[check]]
+variable = "m.lockTorque"
+at = "0.0899"
+near = 0.088197
+tol = 2e-5
+why = "with 0.05 N m load torque opposing rotation, the lock takes Te - loadTorque"
+
+[[check]]
+expr = "{m.lockTorque} - ({m.torque} - {m.loadTorque})"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "torque balance on the stationary shaft at every step: lock reaction = Te - loadTorque"
+
+[[check]]
+variable = "m.motor.omega"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "the locked shaft never turns, whatever the torque"
+
+[[check]]
+variable = "m.motor.acceleration"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "and never accelerates"
+
+[[check]]
+variable = "m.motor.backEMF*"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "no motion, no back-EMF in any phase"
+
+[[check]]
+variable = "m.motor.electricalAngle"
+at = "all"
+range = [0.299999999999, 0.300000000001]
+why = "the electrical angle stays at theta0 = 0.3 rad (polePairs*phi with phi = 0)"
+
+[[check]]
+variable = "m.motor.copperLoss"
+at = "0.0899"
+near = 23.3333
+tol = 0.005
+why = "copper loss R*sum(i_j^2) = 0.2*(6.667^2 + 8.333^2 + 1.667^2)"
+
+[[check]]
+variable = "m.motor.storedEnergy"
+at = "0.0899"
+near = 0.0583333
+tol = 1e-5
+why = "stored energy is magnetic only (no kinetic energy at a lock): L/2*sum(i_j^2)"
+
+[[check]]
+variable = "m.ia"
+at = "0.0934"
+range = [0.0, 0.15]
+why = "after the reversal at 90 ms phase a decays through zero at 93.466 ms (slope -1333 A/s): still just positive (0.088 A)"
+
+[[check]]
+variable = "m.ia"
+at = "0.0935"
+range = [-0.1, 0.0]
+why = "and just negative (-0.046 A) after the crossing"
+
+[[check]]
+variable = "m.ib"
+at = "0.1"
+near = 6.07775
+tol = 1e-3
+why = "phase b on its reversed exponential 10 ms after the reversal"
+
+[[check]]
+variable = "m.torque"
+at = "0.1"
+near = -0.100791
+tol = 2e-5
+why = "the torque reverses sign with the currents"
+
+[[check]]
+variable = "m.ic"
+at = "end"
+near = -1.66665
+tol = 1e-3
+why = "reversed steady state in phase c: -(1/3)/0.2"
+
+[[check]]
+variable = "m.torque"
+at = "end"
+near = -0.138195
+tol = 2e-5
+why = "reversed steady-state torque is the mirror image of the forward one"
+
+[[check]]
+variable = "m.lockTorque"
+at = "end"
+near = -0.188195
+tol = 2e-5
+why = "with negative Te and the 0.05 N m load, the lock reaction is Te - loadTorque = -0.188 N m"
+
+[[check]]
+variable = "m.energyError"
+at = "all"
+range = [-1e-5, 1e-5]
+why = "integrated terminal energy (~2.92 J) = integrated copper loss + magnetic energy; no mechanical work at a lock"

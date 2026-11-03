@@ -1,0 +1,101 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# modulation = clamp(escCommand, 0, 1); equivalentVoltage = modulation*dcVoltage.
+# Inputs held from t appear in the row at t + 1 ms.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.modulation} - min(1.0, max(0.0, {m.escCommand}))"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "modulation is the command clamped to [0, 1] in every row"
+
+[[check]]
+expr = "{m.equivalentVoltage} - {m.modulation} * {m.dcVoltage}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "DC-equivalent voltage is modulation times supply in every row"
+
+[[check]]
+variable = "m.modulation"
+at = "0.2"
+near = 0.0
+tol = 0.0
+why = "negative ramp segment (command -0.005 at 0.199 s) clamps to 0"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "0.301"
+near = 8.0
+tol = 1e-12
+why = "linear range: command 0.5 held from 0.300 s on a 16 V bus gives 8 V"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "0.45"
+near = 16.0
+tol = 1e-12
+why = "command 1.25 saturates: full bus voltage, never above it"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "0.55"
+near = 4.0
+tol = 1e-12
+why = "0.25 x 16 V"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "0.65"
+near = 2.0
+tol = 1e-12
+why = "supply sag to 8 V scales the output: 0.25 x 8 V"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "all"
+from = 0.701
+to = 0.8
+near = 0.0
+tol = 0.0
+why = "command -1 clamps to zero modulation: no negative (bipolar) voltage"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "0.851"
+near = 2.4
+tol = 1e-12
+why = "0.6 x 4 V at the midpoint of the supply ramp"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "all"
+from = 0.901
+near = 0.0
+tol = 0.0
+why = "dead bus: zero output for any command"
+
+[[check]]
+variable = "m.modulation"
+at = "end"
+near = 0.6
+tol = 1e-15
+why = "modulation is independent of supply voltage"
+
+[[check]]
+expr = "{m.dcVoltage} - {m.equivalentVoltage}"
+at = "all"
+range = [0.0, 16.0]
+why = "the averaged drive never exceeds its supply and never goes negative (0 <= V_eq <= V_dc)"
+
+[[check]]
+variable = "m.equivalentVoltage"
+at = "all"
+range = [0.0, 16.0]
+why = "unipolar output bounded by the 16 V maximum supply"

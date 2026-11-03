@@ -1,0 +1,306 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# m = 1.5 kg, g = 9.80665, kT = 1e-5, kQ = 1.5e-7; motor R = 0.2, L = 1e-3,
+# k = 0.02, J + JLoad = 2e-4; bus 16 V. Hover: w_h = 606.4234288 rad/s,
+# i_h = kQ w_h^2/k = 2.7581203 A, command (k w_h + R i_h)/16 = 0.7925058.
+# Command 0 on [0.3, 0.6): freewheel, current zero crossing at t_z = 0.3002224 s
+# with w_z = 606.3925340 rad/s, then coast w = w_z/(1 + kQ w_z (t - t_z)/J).
+# Command 0.95 from 0.6 s (15.2 V). "ref" = independent integration (scipy
+# LSODA, rtol 1e-12) of the per-motor RL/shaft equations, the projection at
+# the zero crossing and z'' = g - 4 kT w^2/m. Rows are on a 0.5 ms grid.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- electromechanical hover -------------------------------------------------
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "all"
+to = 0.3
+near = 606.4234288020211
+tol = 1e-8
+why = "hover speed sqrt(m g/(4 kT)) held before cutoff"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "all"
+to = 0.2995
+near = 2.7581203125
+tol = 1e-9
+why = "hover current kQ w_h^2/k: torque k i balances blade drag"
+
+[[check]]
+variable = "m.escs[[]*].terminalVoltage"
+at = "all"
+to = 0.2995
+near = 12.680092638540422
+tol = 1e-10
+why = "terminal voltage = hover command * 16 V = k w_h + R i_h"
+
+[[check]]
+variable = "m.escs[[]*].dcCurrent"
+at = "0.2"
+near = 2.1858263169212537
+tol = 1e-9
+why = "averaged converter: bus current = modulation * motor current"
+
+[[check]]
+expr = "{m.escs[1].electricalPower} - {m.motors[1].copperLoss} - {m.motors[1].loadPower}"
+at = "all"
+to = 0.2995
+near = 0.0
+tol = 1e-9
+why = "hover power balance: bus power = copper loss R i^2 + aerodynamic power kQ w^3"
+
+[[check]]
+variable = "m.altitude"
+at = "all"
+to = 0.3
+near = 1.0
+tol = 1e-9
+why = "hover: altitude holds 1 m"
+
+# --- cutoff: freewheel, zero crossing, coast -----------------------------------
+
+[[check]]
+variable = "m.escs[[]*].freewheel"
+at = "0.3"
+near = 1
+tol = 0
+why = "zero command with positive circulating current: freewheel"
+
+[[check]]
+variable = "m.escs[[]*].terminalVoltage"
+at = "0.3"
+near = 0.0
+tol = 0.0
+why = "freewheel path holds 0 V"
+
+[[check]]
+variable = "m.escs[[]*].coast"
+at = "0.3"
+near = 0
+tol = 0
+why = "no coast while current is still positive (no current reset on cutoff)"
+
+[[check]]
+variable = "m.escs[[]*].coast"
+at = "all"
+from = 0.3005
+to = 0.5995
+near = 1
+tol = 0
+why = "current reached zero at t_z = 0.30022 s (ref); coast holds until the restart"
+
+[[check]]
+variable = "m.escs[[]*].freewheel"
+at = "all"
+from = 0.3005
+near = 0
+tol = 0
+why = "freewheel ends at the zero crossing and stays off after restart"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "all"
+from = 0.3005
+to = 0.5995
+near = 0.0
+tol = 1e-12
+why = "currentZero reinit projects the winding current to 0 and it stays 0 (blocked conduction)"
+
+[[check]]
+expr = "{m.escs[1].terminalVoltage} - {m.motors[1].backEMF}"
+at = "all"
+from = 0.3005
+to = 0.5995
+near = 0.0
+tol = 1e-12
+why = "coasting terminal follows the open-circuit back-EMF k w"
+
+[[check]]
+variable = "m.escs[[]*].electricalPower"
+at = "all"
+from = 0.3
+to = 0.5995
+near = 0.0
+tol = 0.0
+why = "no bus power while freewheeling/coasting"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "0.35"
+near = 592.968569342786
+tol = 1e-6
+why = "coast under blade drag: w_z/(1 + kQ w_z (t - t_z)/J)"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "0.45"
+near = 567.720536757706
+tol = 1e-6
+why = "coast closed form"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "0.5995"
+near = 533.7446650646283
+tol = 1e-6
+why = "coast closed form just before restart"
+
+[[check]]
+variable = "m.motors[[]*].storedEnergy"
+at = "0.5995"
+near = 28.488336748490344
+tol = 1e-6
+why = "coasting stored energy = J w^2/2 (no inductor energy)"
+
+[[check]]
+variable = "m.altitude"
+at = "0.5"
+near = 0.9888806133056648
+tol = 1e-8
+why = "sink while coasting, ref"
+
+[[check]]
+variable = "m.vehicle.truth.v_w[3]"
+at = "0.5995"
+near = 0.3518754820464176
+tol = 1e-8
+why = "sink rate at restart, ref"
+
+# --- restart at 0.95 ------------------------------------------------------------
+
+[[check]]
+variable = "m.escs[[]*].terminalVoltage"
+at = "all"
+from = 0.6
+near = 15.2
+tol = 1e-12
+why = "restart: requested 0.95 * 16 V exceeds the back-EMF, conduction resumes"
+
+[[check]]
+variable = "m.escs[[]*].coast"
+at = "all"
+from = 0.6
+near = 0
+tol = 0
+why = "no coast after restart"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "0.6005"
+near = 2.1544576482869022
+tol = 1e-7
+why = "current rise 0.5 ms into the restart, ref"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "max"
+near = 20.397992191566345
+tol = 1e-6
+why = "restart current peak (sampled at 0.6165 s), ref"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "0.7"
+near = 10.575447442142485
+tol = 1e-7
+why = "current decays as back-EMF builds, ref"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "0.7"
+near = 658.1344508859985
+tol = 1e-6
+why = "speed above hover after restart, ref"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "end"
+near = 719.1248210087573
+tol = 1e-6
+why = "speed at 1 s, ref"
+
+[[check]]
+variable = "m.motors[[]*].current"
+at = "end"
+near = 4.099237690760494
+tol = 1e-7
+why = "current at 1 s, ref"
+
+[[check]]
+variable = "m.altitude"
+at = "min"
+near = 0.8991393511867702
+tol = 1e-8
+why = "documented recovery: the vehicle bottoms out at 0.899 m (0.8275 s), ref"
+
+[[check]]
+variable = "m.altitude"
+at = "end"
+near = 0.9550023419415076
+tol = 1e-8
+why = "climbing again at 1 s, ref"
+
+[[check]]
+variable = "m.vehicle.truth.v_w[3]"
+at = "end"
+near = -0.6599001016047567
+tol = 1e-8
+why = "climb rate at 1 s, ref"
+
+[[check]]
+expr = "{m.escs[1].electricalPower} - {m.escs[1].dcVoltage}*{m.escs[1].dcCurrent}"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "bus power = dcVoltage * dcCurrent throughout"
+
+# --- vertical-only motion, hub reactions cancel -----------------------------------
+
+[[check]]
+variable = "m.vehicle.moment_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "equal drive trains: arm moments, alternating drag reactions and spin-acceleration reactions cancel"
+
+[[check]]
+expr = "{m.reactions[1].moment_r[3]} + {m.rotors[1].loadTorque} + 0.0002*{m.motors[1].acceleration}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "HubReaction z = -spinSign (kQ w^2 + (J+JLoad) w') for spinSign +1"
+
+[[check]]
+expr = "{m.reactions[2].moment_r[3]} - {m.rotors[2].loadTorque} - 0.0002*{m.motors[2].acceleration}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "HubReaction z for spinSign -1"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no body rotation"
+
+[[check]]
+variable = "m.vehicle.body.euler[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "stays level"
+
+[[check]]
+variable = "m.vehicle.truth.p_w[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal drift"

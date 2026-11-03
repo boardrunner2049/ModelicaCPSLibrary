@@ -1,0 +1,222 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Leg: Vdc = 16 V (dc_p - dc_n), Ron = 0.01, Rdiode = 0.02 Ohm, Vdiode = 0.5 V.
+# The negative rail dc_n is held at -1 V (dc_p at +15 V); the load (R = 0.5 Ohm
+# + L = 1 mH) and the bleed Rb = 10 Ohm return to ground.
+# While the leg conducts it is a source Vm = d*Vdc - (1-d)*Vdiode, referenced
+# to dc_n, behind Rm = d*Ron + (1-d)*Rdiode. Seen from ground that is
+# V = Vm - 1 V, so the inductor sees the Thevenin source
+#   Vth = V*Rb/(Rb+Rm), Rth = Rm*Rb/(Rb+Rm),  tau = L/(R+Rth) ~ 1.94 ms,
+# with steady state iL = Vth/(R+Rth), v = R*iL (to ground), leg current
+# ib = iL + v/Rb, bus power d*Vdc*ib, pin shares dc_p d*ib, dc_n (1-d)*ib, and
+# leg loss (1-d)*Vdiode*ib + Rm*ib^2.
+# A model that dropped dc_n.v from its references would see a 1 V larger
+# drive and miss every plateau below by >= 1.9 A.
+# Plateaus are sampled >= 10 tau after each duty change (residual < 1e-3 A,
+# hence tol 0.002 there). Values cross-checked against native `rumoca sim`
+# of this wrapper (passes 29/30: only the 94.7 ms release value differs,
+# because native drives the ramp continuously instead of through the hold)
+# and against an independent RK4 integration of the same circuit with the harness's zero-order hold (FMU agrees to 2e-5 A
+# at worst, at the 71.4 ms blocking corner; 1e-9 elsewhere).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.legCurrent"
+at = "all"
+range = [0.0, 31.0]
+why = "the averaged high side only sources current (blocks reverse) and never exceeds the d = 1 steady state 30.85 A"
+
+[[check]]
+variable = "m.kclResidual"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "KCL over the three pins: dc_p takes d*i, dc_n (1-d)*i, phase returns i"
+
+[[check]]
+expr = "{m.negRail.i} - {m.legCurrent}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "the whole leg current returns through the negative rail source (dc_p share via the bus plus dc_n share), and the disabled leg adds nothing"
+
+[[check]]
+variable = "m.dcNegVoltage"
+at = "all"
+range = [-1.0000001, -0.9999999]
+why = "dc_n really sits 1 V below ground, so the dc_n-referenced terms are exercised"
+
+[[check]]
+variable = "m.bridgeLoss"
+at = "all"
+range = [-1e-9, 32.0]
+why = "the leg is passive: power absorbed through its pins (now including the non-zero dc_n.v*dc_n.i term) is never negative; peak ~31 W at the d = 1 -> 0.2 step"
+
+[[check]]
+variable = "m.legCurrent"
+at = "0.0099"
+near = 0.0
+tol = 1e-12
+why = "d = 0 from rest: Vm = -Vdiode relative to dc_n is 1.5 V below the 0 V phase, the leg blocks"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.012"
+near = 8.41511
+tol = 1e-4
+why = "d = 0.5 step at 10 ms: 13.08774*(1 - exp(-2 ms/1.9418 ms)) (Vm = 7.75 V, i.e. 6.75 V above ground)"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.0299"
+near = 13.08774
+tol = 0.002
+why = "d = 0.5 steady state: Vth/(R+Rth) with Vm - 1 V = 6.75 V, Rm = 15 mOhm"
+
+[[check]]
+variable = "m.legCurrent"
+at = "0.0299"
+near = 13.74212
+tol = 0.002
+why = "d = 0.5 leg current = load current + bleed current v/Rb"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0299"
+near = 7.54387
+tol = 0.001
+why = "d = 0.5 phase voltage relative to dc_n: R*iL + 1 V"
+
+[[check]]
+variable = "m.bridge.phase.v"
+at = "0.0299"
+near = 6.54387
+tol = 0.001
+why = "d = 0.5 absolute phase potential R*iL: one volt less than the dc_n-referenced value"
+
+[[check]]
+variable = "m.busPower"
+at = "0.0299"
+near = 109.937
+tol = 0.02
+why = "d = 0.5 bus draws d*Vdc*ib: the dc_p pin carries d*i"
+
+[[check]]
+variable = "m.bridgeLoss"
+at = "0.0299"
+near = 6.26822
+tol = 0.002
+why = "d = 0.5 power balance through all three pin potentials: (1-d)*Vdiode*ib + Rm*ib^2"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.0499"
+near = 29.38296
+tol = 0.002
+why = "d = 1 steady state: 16 V behind Ron, 15 V above ground"
+
+[[check]]
+variable = "m.bridgeLoss"
+at = "0.0499"
+near = 9.51852
+tol = 0.002
+why = "d = 1: no freewheel share, loss is Ron*ib^2 only"
+
+[[check]]
+variable = "m.bridge.dc_n.i"
+at = "0.0499"
+near = 0.0
+tol = 1e-9
+why = "d = 1: the freewheel (dc_n) share (1-d)*i vanishes"
+
+[[check]]
+variable = "m.idleForwardBias"
+at = "0.0499"
+near = 0.30852
+tol = 1e-4
+why = "the disabled leg sees the same forward bias as the conducting one (Ron*ib = 0.3085 V), enough to drive 30.85 A if it were enabled"
+
+[[check]]
+variable = "m.idleBridge.*.i"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "enabled = false: the disabled leg carries no current on any pin, even when forward-biased"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.0699"
+near = 3.46888
+tol = 0.002
+why = "d = 0.2 steady state: Vm = 2.8 V (1.8 V above ground) behind Rm = 18 mOhm"
+
+[[check]]
+variable = "m.bridge.dc_n.i"
+at = "0.0699"
+near = 2.91386
+tol = 0.002
+why = "d = 0.2: the dc_n pin carries the freewheel share (1-d)*ib"
+
+[[check]]
+variable = "m.bridgeLoss"
+at = "0.0699"
+near = 1.69573
+tol = 0.002
+why = "d = 0.2: loss dominated by the diode drop (1-d)*Vdiode*ib"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.071"
+near = 0.89506
+tol = 5e-4
+why = "d = 0 diode freewheel: iL decays toward Vth/(R+Rth) = -2.879 A, 3.4689 A -> (3.4689+2.8791)*exp(-1 ms/1.9232 ms) - 2.8791"
+
+[[check]]
+variable = "m.bridge.phase.v"
+at = "0.071"
+near = -1.51487
+tol = 5e-4
+why = "during freewheel the phase is clamped one diode drop below dc_n (-1.5 V absolute, not -0.5 V): Vth - Rth*iL"
+
+[[check]]
+variable = "m.legCurrent"
+at = "0.072"
+near = 0.0
+tol = 1e-12
+why = "the leg blocks once iL < (1 V + Vdiode)/Rb = 0.15 A (t = 71.42 ms closed form) and the bleed empties the inductor"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.08"
+near = 0.0
+tol = 1e-6
+why = "after blocking the inductor discharges through the bleed (tau L/(R+Rb) = 95 us)"
+
+[[check]]
+variable = "m.legCurrent"
+at = "0.0945"
+near = 0.0
+tol = 1e-12
+why = "on the duty ramp the leg stays blocked until Vm > 1 V, i.e. d > (1 + Vdiode)/(Vdc + Vdiode) = 0.0909 (t = 94.55 ms); a model ignoring dc_n would release at d = 0.0303 (91.5 ms)"
+
+[[check]]
+variable = "m.legCurrent"
+at = "0.0947"
+near = 0.008343
+tol = 2e-5
+why = "conduction does start right after the threshold: ib ~ (Vm - 1 V + Rb*iL)/(Rm + Rb), 8.34 mA from the independent RK4 reference under the harness zero-order hold (native sim with a continuous ramp: 8.91 mA); a leg that stayed blocked fails"
+
+[[check]]
+variable = "m.loadCurrent"
+at = "0.1399"
+near = 16.32019
+tol = 0.002
+why = "d = 0.6 steady state: Vm = 9.4 V (8.4 V above ground) behind Rm = 14 mOhm"
+
+[[check]]
+variable = "m.bridgeLoss"
+at = "0.1399"
+near = 7.53833
+tol = 0.002
+why = "d = 0.6 conduction loss (1-d)*Vdiode*ib + Rm*ib^2"

@@ -1,0 +1,182 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Three independent 1 MHz mode-0 MSB-first links (half period 0.5 us; a byte
+# is 16 half periods = 8 us). The model's own asserts at 3/7/11/22 us are
+# restated here on the trace, plus the timing the documentation implies:
+# rejection is immediate, cancellation retires at the CS edge, recovery takes
+# one full byte. Every trace column also matches a native `bin/rumoca sim`
+# of the test exactly at every 50 ns sample (post-event values).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- rejected: request with CS inactive ------------------------------------
+[[check]]
+expr = "{m.rejected.completedId@1.95e-6}*10 + {m.rejected.completedId@2e-6}"
+near = 1
+tol = 0
+why = "inactive-CS request 1 retires at the submission instant (2 us), not before"
+
+[[check]]
+variable = "m.rejected.status"
+at = "all"
+from = 2e-6
+range = [2, 2]
+why = "status 2 = CS inactive, held to the end"
+
+[[check]]
+variable = "m.rejected.busy"
+at = "all"
+range = [0, 0]
+why = "a rejected request never makes the master busy"
+
+[[check]]
+variable = "m.rejected.sclk"
+at = "all"
+range = [0, 0]
+why = "no clock is generated for a rejected request"
+
+[[check]]
+variable = "m.rejected.cs_n"
+at = "all"
+range = [1, 1]
+why = "chip select never asserted"
+
+# --- cancelled: CS dropped mid-byte, then recovery --------------------------
+[[check]]
+variable = "m.cancelled.busy"
+at = "all"
+from = 2e-6
+to = 5.95e-6
+range = [1, 1]
+why = "request 1 in flight from 2 us until CS drops"
+
+[[check]]
+expr = "{m.cancelled.completedId@6e-6}*10 + {m.cancelled.status@6e-6} + 100*{m.cancelled.busy@6e-6} + 1000*{m.cancelled.sclk@6e-6}"
+near = 13
+tol = 0
+why = "CS drop at 6 us aborts request 1 at once: completedId 1, status 3, not busy, SCLK back to idle"
+
+[[check]]
+variable = "m.cancelled.rxData"
+at = "all"
+to = 19.95e-6
+range = [0, 0]
+why = "an aborted transfer delivers no received byte to the master"
+
+[[check]]
+variable = "m.cancelSlave.receivedCount"
+at = "all"
+to = 19.45e-6
+range = [0, 0]
+why = "the partial byte (4 of 8 bits) is never delivered to the slave"
+
+[[check]]
+variable = "m.cancelSlave.rxCount"
+at = "6e-6"
+near = 0
+tol = 0
+why = "slave bit counter resets when CS is released"
+
+[[check]]
+variable = "m.cancelled.sclk"
+at = "all"
+from = 6e-6
+to = 12.45e-6
+range = [0, 0]
+why = "SCLK idle between the abort and the first edge of the retry"
+
+[[check]]
+variable = "m.cancelled.status"
+at = "11.95e-6"
+near = 3
+tol = 0
+why = "abort status persists until the next request"
+
+[[check]]
+variable = "m.cancelled.busy"
+at = "all"
+from = 12e-6
+to = 19.95e-6
+range = [1, 1]
+why = "retry (request 2 at 12 us) runs a full 8 us byte"
+
+[[check]]
+variable = "m.cancelSlave.rxData"
+at = "19.5e-6"
+near = 53
+tol = 0
+why = "slave receives 0x35 on the eighth rising edge (19.5 us): framing recovered"
+
+[[check]]
+variable = "m.cancelSlave.receivedCount"
+near = 1
+tol = 0
+why = "exactly one complete byte reaches the slave"
+
+[[check]]
+expr = "{m.cancelled.completedId@20e-6}*100 + {m.cancelled.status@20e-6}*10 + {m.cancelled.busy@20e-6}"
+near = 210
+tol = 0
+why = "request 2 retires successfully at 12 + 8 = 20 us"
+
+[[check]]
+variable = "m.cancelled.rxData"
+near = 105
+tol = 0
+why = "master receives the slave's 0x69 after recovery"
+
+[[check]]
+variable = "m.cancelled.status"
+near = 1
+tol = 0
+why = "CS release at 24 us after completion is not an abort"
+
+# --- disturbed: MOSI inverted around the first sampling edge ----------------
+[[check]]
+expr = "{m.disturbed.mosi@2.5e-6} - {m.disturbedSlave.mosi@2.5e-6}"
+near = 1
+tol = 0
+why = "first MOSI bit (1) arrives inverted (0) at the first rising edge"
+
+[[check]]
+expr = "{m.disturbed.mosi@2.1e-6} + {m.disturbedSlave.mosi@2.1e-6} + 10*({m.disturbed.mosi@2.8e-6} + {m.disturbedSlave.mosi@2.8e-6})"
+near = 22
+tol = 0
+why = "the fault is confined to [2.25, 2.75) us: line agrees before and after"
+
+[[check]]
+expr = "abs({m.disturbed.mosi} - {m.disturbedSlave.mosi})"
+at = "max"
+from = 2.75e-6
+near = 0
+tol = 0
+why = "no other MOSI bit is disturbed"
+
+[[check]]
+variable = "m.disturbedSlave.rxData"
+at = "9.5e-6"
+near = 22
+tol = 0
+why = "slave gets 0x96 with the MSB flipped: 0x16 = 22"
+
+[[check]]
+variable = "m.disturbedSlave.receivedCount"
+near = 1
+tol = 0
+why = "the disturbed byte is still delivered as one byte"
+
+[[check]]
+expr = "{m.disturbed.rxData@10e-6}*10 + {m.disturbed.status@10e-6}"
+near = 1051
+tol = 0
+why = "independent MISO path intact: master receives 0x69 = 105, status 1 at 10 us"
+
+[[check]]
+variable = "m.disturbedSlave.misoEnabled"
+at = "all"
+from = 14e-6
+range = [0, 0]
+why = "slave output Hi-Z after CS release at 14 us"

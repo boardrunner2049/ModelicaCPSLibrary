@@ -1,0 +1,138 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Closed test of four CompliantPointLeg instances with prescribed (algebraic)
+# kinematics, k = 1000 N/m, c = 20 N.s/m. The scenario is the run itself
+# (0.1 s, the model's StopTime, at 1 ms). Closed forms by hand:
+#  inclined:   tip p = (0,-0.006,0.008), plane through 0 with n = (0,0.6,-0.8):
+#              gap = n.p = -0.01, v = (2,0,0) is tangential (v_n = 0), N = 10 N;
+#              viscous 2*2 = 4 N > mu N = 0.3*10 = 3 N -> friction (-3,0,0);
+#              force = N n + friction = (-3, 6, -8), power = -3*2 = -6 W.
+#  pulling:    10 mm in, v = (2,0,-1) (rising 1 m/s): 10 - 20*1 < 0 -> no
+#              force, and no friction without normal load.
+#  offset:     rLeg = (1,0,0), CG 10 mm in, v = (0,0,-1), omega = (0,-1,0):
+#              tip velocity v + omega x r = 0, so N = k*0.01 = 10 N and the
+#              moment about the CG is r x (0,0,-10) = (0,10,0).
+#  separating: CG Down = 0.01 - 0.2 t, rising 0.2 m/s: N = max(0, 1000(0.01 -
+#              0.2t) - 20*0.2) = 6 - 200 t until 0.03 s, then 0 although
+#              still penetrating; contact (gap <= 0) ends at t = 0.05 s.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.inclined.gap"
+at = "all"
+range = [-0.0100000000001, -0.0099999999999]
+why = "inclined-plane gap n.(p - p0) = -0.0036 - 0.0064 = -0.01 m"
+
+[[check]]
+variable = "m.inclined.normalForce"
+at = "all"
+range = [9.999999999, 10.000000001]
+why = "k*0.01 = 10 N; sliding velocity (2,0,0) has no normal component on this plane"
+
+[[check]]
+expr = "norm({m.inclined.force_b[1]} + 3, {m.inclined.force_b[2]} - 6, {m.inclined.force_b[3]} + 8)"
+at = "all"
+range = [0.0, 1e-9]
+why = "normal force along n plus Coulomb-capped friction mu N = 3 N opposing the slide"
+
+[[check]]
+variable = "m.inclined.tangentialPower"
+at = "all"
+range = [-6.000000001, -5.999999999]
+why = "friction dissipates mu N |v| = 3 N * 2 m/s"
+
+[[check]]
+expr = "{m.inclined.force_w[1]}*0 + {m.inclined.force_w[2]}*0.6 - {m.inclined.force_w[3]}*0.8 - {m.inclined.normalForce}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "friction lies in the plane: the force component along n is exactly the normal force"
+
+[[check]]
+expr = "abs({m.pulling.normalForce}) + abs({m.pulling.force_b[1]}) + abs({m.pulling.force_b[2]}) + abs({m.pulling.force_b[3]})"
+at = "all"
+range = [0.0, 1e-12]
+why = "unloading damper (10 - 20 N < 0) gives no tensile force and therefore no friction despite a 2 m/s slide"
+
+[[check]]
+variable = "m.pulling.contact"
+at = "all"
+range = [1.0, 1.0]
+why = "geometrically penetrating (gap -0.01) although unloaded"
+
+[[check]]
+expr = "norm({m.offset.tipVelocity_w[1]}, {m.offset.tipVelocity_w[2]}, {m.offset.tipVelocity_w[3]})"
+at = "all"
+range = [0.0, 1e-12]
+why = "omega x r = (0,-1,0) x (1,0,0) = (0,0,1) cancels the CG velocity (0,0,-1) at the tip"
+
+[[check]]
+variable = "m.offset.normalForce"
+at = "all"
+range = [9.999999999, 10.000000001]
+why = "tip at rest: spring alone, k*0.01 = 10 N (ignoring omega x r would add c*1 = 20 N)"
+
+[[check]]
+expr = "norm({m.offset.moment_b[1]}, {m.offset.moment_b[2]} - 10, {m.offset.moment_b[3]})"
+at = "all"
+range = [0.0, 1e-9]
+why = "contact moment about the CG: r x F = (1,0,0) x (0,0,-10) = (0,10,0)"
+
+[[check]]
+variable = "m.separating.normalForce"
+at = "0.0"
+near = 6.0
+tol = 1e-9
+why = "10 mm in, rising 0.2 m/s: 10 - 4 = 6 N"
+
+[[check]]
+variable = "m.separating.normalForce"
+at = "0.02"
+near = 2.0
+tol = 1e-9
+why = "6 - 200 t at 20 ms"
+
+[[check]]
+expr = "{m.separating.normalForce} - max(0, 6 - 1000*({m.separating.gap} + 0.01))"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "N = max(0, 6 - 200 t) with t = (0.01 + gap)/0.2 recovered from the gap at every sample"
+
+[[check]]
+variable = "m.separating.normalForce"
+at = "0.04"
+near = 0.0
+tol = 0
+why = "after 0.03 s the damper term exceeds the spring: clipped to zero, never tensile"
+
+[[check]]
+variable = "m.separating.contact"
+at = "0.04"
+near = 1.0
+tol = 0
+why = "still 2 mm in at 40 ms: contact flag true while the force is zero"
+
+[[check]]
+variable = "m.separating.contact"
+at = "0.049"
+near = 1.0
+tol = 0
+why = "0.2 mm in at 49 ms: still in contact"
+
+[[check]]
+variable = "m.separating.contact"
+at = "0.051"
+near = 0.0
+tol = 0
+why = "contact switches off as soon as the tip leaves the plane (0.2 mm out; at 50 ms the gap is +1.7e-18 by rounding)"
+
+[[check]]
+expr = "{m.separating.contact} + norm({m.separating.force_b[1]}, {m.separating.force_b[2]}, {m.separating.force_b[3]})"
+from = 0.06
+to = 0.1
+at = "all"
+range = [0.0, 1e-12]
+why = "model assert window (time >= 0.06): separated, no force"

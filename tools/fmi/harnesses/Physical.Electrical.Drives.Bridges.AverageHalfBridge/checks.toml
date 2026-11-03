@@ -1,0 +1,206 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Vdc = 16 V, Ron = 0.01, Rdiode = 0.02 ohm, Vdiode = 0.7 V; load R = 1 ohm, L = 0.5 mH, back-EMF E.
+# Mean high side: i = (d*Vdc - (1-d)*Vd - v_phase)/(d*Ron + (1-d)*Rd) >= 0, Idc = d*i.
+# Closed-form values below were confirmed with a native 'rumoca sim' of the same wrapper.
+# A trace row at t holds the state at t for inputs held over the step ending at t, so
+# segment values are checked just before each switching instant.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0"
+near = 5.3333
+tol = 1e-3
+why = "initialized state, all devices off, no load current: the phase is a Goff leakage divider, one Goff (high diode) to dc_p and two (low switch, low diode) to dc_n, so Vdc/3 (native 5.3333 V). A closed low switch would pin it near 0"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0009"
+near = 0.0
+tol = 1e-3
+why = "all devices off and E = 0: only off-state leakage (Goff = 1e-5 S) flows"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0059"
+near = 5.5665
+tol = 2e-3
+why = "d = 0.5, E = 2: (8 - 0.5*0.7 - 2)/(1 + 0.5*0.01 + 0.5*0.02) = 5.5665 A"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0059"
+near = 7.5665
+tol = 2e-3
+why = "steady phase voltage R*i + E = 5.5665 + 2"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0059"
+near = 2.7833
+tol = 2e-3
+why = "averaged bus current Idc = d*i = 0.5*5.5665 (high-side conduction only during d)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0109"
+near = 13.861
+tol = 0.01
+why = "full duty d = 1: (16 - 2)/(1 + 0.01) = 13.861 A (2.9 ms = 6 tau after the duty ramp)"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0109"
+near = 13.861
+tol = 0.01
+why = "at d = 1 all phase current comes from the bus"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0115"
+near = 3.3041
+tol = 1e-3
+why = "high side off at 11 ms: current freewheels through the low diode, L di/dt = -(Vd + E) - (R + Rd) i, tau = L/(R+Rd) = 0.4902 ms -> -2.6471 + (i0 + 2.6471)*exp(-0.5/0.4902). i0 = 13.8567 A (native), 4.7 mA short of 13.8614 because the 6-8 ms duty ramp lag has not fully decayed; with it 3.3041 A (native 3.30411). A 0.05 V knee error would shift this by ~30 mA"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0119"
+near = 0.0
+tol = 1e-3
+why = "freewheel current extinguishes after (L/(R+Rd))*ln(1 + 13.86*1.02/2.7) = 0.90 ms and the diode then blocks"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0159"
+near = 2.0001
+tol = 1e-3
+why = "all devices off: the floating phase sits at the back-EMF plus R*i of the 0.1 mA leakage current, E + R*i = 2.0001 V (native 2.00010). The DC value has no stiffness excuse: L*di/dt must be ~0. (The current FMU trace sits 2-15 mV low with loadL.v = -3..-14 mV while loadL.i is flat; reported as a suspected FMU bug, not absorbed in the tolerance)"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0159"
+near = 0.0
+tol = 1e-3
+why = "no conduction path: the bus supplies only leakage"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0209"
+near = -5.9406
+tol = 2e-3
+why = "low switch on with E = 6: braking current -E/(R + Ron) = -6/1.01 flows back into the phase"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0209"
+near = 0.0594
+tol = 1e-3
+why = "phase clamped to dc_n through the low switch carrying 5.94 A from phase to dc_n: Ron*5.94"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0209"
+near = 0.0
+tol = 1e-3
+why = "low-side braking circulates current without touching the bus"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0211"
+near = -2.9083
+tol = 2e-3
+why = "high-diode return, 0.1 ms after the low switch opens at 21 ms: L di/dt = (Vdc + Vd) - E - (R + Rd) i, so i = 10.4902 + (-5.9406 - 10.4902)*exp(-0.1/0.4902) = -2.908 A (native -2.90829). A missing/reversed high diode would leave no path and the current would collapse through Goff within nanoseconds"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0211"
+near = 16.7582
+tol = 1e-3
+why = "the conducting high diode clamps the phase above dc_p: Vdc + Vd + Rd*|i| = 16.7 + 0.02*2.908 = 16.7582 V (native 16.75816)"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0211"
+near = -2.9080
+tol = 2e-3
+why = "the returned inductor current flows into the bus through the high diode (negative bus current = phase current, minus leakage; native -2.90796)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0212"
+near = -0.4358
+tol = 2e-3
+why = "same decay, 0.2 ms after release: 10.4902 - 16.4308*exp(-0.2/0.4902) = -0.436 A (native -0.43577); pins the time constant and the 0.22 ms extinction"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0213"
+near = 6.0
+tol = 1e-3
+why = "after extinction the high diode blocks and the floating phase returns to the back-EMF E = 6 V (native 5.99998)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0213"
+near = 0.0
+tol = 1e-3
+why = "low switch released: high diode returns the current to the bus; it reaches zero in (L/1.02)*ln(1 + 5.94*1.02/10.7) = 0.22 ms"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0309"
+near = -3.2353
+tol = 2e-3
+why = "E = 20 > Vdc + Vd: diode regeneration -(20 - 16.7)/(R + Rd) = -3.2353 A"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0309"
+near = 16.7647
+tol = 1e-3
+why = "high diode clamps the phase at Vdc + Vd + Rd*|i|"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "0.0309"
+near = -3.2350
+tol = 2e-3
+why = "regenerated current flows into the bus (negative bus current)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0359"
+near = -3.2353
+tol = 2e-3
+why = "high side selected at d = 0.5 cannot conduct (mean voltage 7.65 V < phase 16.76 V): the averaged switch blocks, the diode keeps regenerating"
+
+[[check]]
+variable = "m.leg.high.current"
+at = "all"
+range = [0.0, 14.0]
+why = "the averaged high side conducts only forward current, bounded by the full-duty steady state"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "end"
+near = 3.4152
+tol = 2e-3
+why = "d = 0.25, E = 0: (4 - 0.75*0.7)/(1 + 0.25*0.01 + 0.75*0.02) = 3.4152 A"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "end"
+near = 0.8538
+tol = 2e-3
+why = "Idc = d*i = 0.25*3.4152: the bus delivers less current than the phase (buck action)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "all"
+range = [-5.95, 13.87]
+why = "first-order RL responses never overshoot the braking/full-duty steady states"

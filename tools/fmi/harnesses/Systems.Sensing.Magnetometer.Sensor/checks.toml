@@ -1,0 +1,109 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# World field (NED) b_w = (20, -4, 47) uT; mount R_bs = [0 -1 0; 1 0 0; 0 0 1], so the
+# sensor reads (b_body_y, -b_body_x, b_body_z) + bias, bias = (1, -2, 0.5) uT.
+# Inputs are held over each 10 ms step, so the row at T shows the attitude of T - 10 ms.
+# The FMU matches a native `rumoca sim` of the same profile to 2e-20 T.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- level, nose North: body field = world field
+[[check]]
+variable = "m.magneticField[1]"
+at = "0.5"
+near = -3.0e-6
+tol = 1e-12
+why = "sensor x = body y (East, -4 uT) + 1 uT bias"
+
+[[check]]
+variable = "m.magneticField[2]"
+at = "0.5"
+near = -22.0e-6
+tol = 1e-12
+why = "sensor y = -body x (North, 20 uT) - 2 uT bias"
+
+[[check]]
+variable = "m.magneticField[3]"
+at = "0.5"
+near = 47.5e-6
+tol = 1e-12
+why = "sensor z = body z = Down component 47 uT + 0.5 uT bias"
+
+# --- nose East: North field now on body -y, East field (-4) on body +x
+[[check]]
+variable = "m.magneticField[1]"
+at = "1.5"
+near = -19.0e-6
+tol = 1e-12
+why = "sensor x = body y = -North (-20 uT) after a 90 deg right yaw, + 1 uT bias"
+
+[[check]]
+variable = "m.magneticField[2]"
+at = "1.5"
+near = 2.0e-6
+tol = 1e-12
+why = "sensor y = -body x = -East (+4 uT) - 2 uT bias"
+
+# --- pitch up 30 deg: b_body = (cos30*N - sin30*D, E, sin30*N + cos30*D)
+[[check]]
+variable = "m.magneticField[2]"
+at = "2.5"
+near = 4.179492e-6
+tol = 1e-12
+why = "nose-up pitch rotates the steep Down field onto body -x: -(17.3205-23.5) - 2 uT"
+
+[[check]]
+variable = "m.magneticField[3]"
+at = "2.5"
+near = 51.203194e-6
+tol = 1e-12
+why = "body z picks up sin30*North: 10 + 40.7032 + 0.5 uT"
+
+# --- yaw sweep: horizontal components rotate, vertical one does not
+[[check]]
+variable = "m.magneticField[1]"
+at = "3.5"
+near = -15.790761e-6
+tol = 1e-12
+why = "yaw psi = pi/2*0.49 rad: sensor x = -sin(psi)*N + cos(psi)*E + bias"
+
+[[check]]
+variable = "m.magneticField[2]"
+at = "4.0"
+near = 1.685360e-6
+tol = 1e-12
+why = "yaw psi = pi/2*0.99 rad: sensor y = -(cos(psi)*N + sin(psi)*E) - 2 uT"
+
+[[check]]
+variable = "m.magneticField[3]"
+at = "3.75"
+near = 47.5e-6
+tol = 1e-12
+why = "mid-sweep the vertical reading still equals Down + bias: yaw does not touch body z"
+
+[[check]]
+variable = "m.magneticField[3]"
+at = "max"
+near = 51.203194e-6
+tol = 1e-12
+why = "the largest vertical reading is during the 30 deg pitch "
+from = 0.01
+
+[[check]]
+variable = "m.magneticField[2]"
+at = "min"
+from = 0.01
+near = -22.0e-6
+tol = 1e-11
+why = "most negative sensor y is -(20 uT North) - 2 uT bias with the nose North; yaws in [0, 89 deg] only reduce the body-x share of the field"
+
+[[check]]
+expr = "norm({m.magneticField[1]} - 1.0e-6, {m.magneticField[2]} + 2.0e-6, {m.magneticField[3]} - 0.5e-6)"
+at = "all"
+from = 0.01
+near = 51.234753829798e-6
+tol = 1e-15
+why = "a rotation preserves length: the bias-corrected reading keeps |b_w| = sqrt(20^2+4^2+47^2) = 51.235 uT through every attitude (a non-orthogonal or mis-indexed R product would change it)"

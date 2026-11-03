@@ -1,0 +1,305 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# command = {0.1,0.2,0.3,0.4}, actuatorIndex = {3,2,4,1}: rotor i receives
+# command[actuatorIndex[i]] = {0.3,0.2,0.4,0.1}. P0: omega -> 1000*cmd with
+# tau = 0.03 s. P1: 16 V * cmd * Kv(1000/16) -> the same, tauOmega = 0.03 s.
+# Rotor speeds {300,200,400,100}(1 - e^-t/tau); thrust 1e-5 w^2 -> {0.9,0.4,
+# 1.6,0.1} N = 3 N total, far below the 1.5*9.80665 = 14.709975 N weight.
+# QuadX rotors (FRD): 1 front-left, 2 rear-left, 3 rear-right, 4 front-right at
+# |x| = |y| = 0.1768 m; spinSign {-1,1,-1,1}, kQ = 1.5e-7.
+# In the air (t = 0.05 s, f = (1-e^-5/3)^2 = 0.657923):
+#   thrust 3f = 1.973768 N, roll moment -0.1768*0.4*f = -0.046522,
+#   pitch -0.1768*1.0*f = -0.116305, yaw -0.03 f = -0.019738 N.m,
+#   a_z = g - 3f/m = 8.4908 m/s^2.
+# Legs (0.1 m below C) start 2 cm above ground: touchdown at ~0.064 s. Legs
+# (x, y) = 1 (.17,.17) front-right, 2 (-.17,-.17) rear-left, 3 (.17,-.17)
+# front-left, 4 (-.17,.17) rear-right. On the ground they carry
+# weight - thrust = 11.709975 N. A rigid plane on four equal springs at the
+# corners of a square obeys N1 + N2 = N3 + N4; with force and roll/pitch
+# balance against the rotor thrusts this gives the static closed form
+# N = {3.08347, 2.77151, 3.29145, 2.56354} N. The FMU is within 1.6e-3 of it
+# (the remainder is the tangential leg friction of the slow yaw and the
+# ~1 mm uneven sink); tight values come from native `rumoca sim --rtol 1e-10
+# --atol 1e-12`, which agrees with the FMU at 1 s to 1e-11 (during the stiff
+# touchdown transient the two differ by up to 2e-4 in angular acceleration).
+# The net yaw torque -0.03 N.m against viscous leg friction 4*25 N.s/m at
+# r^2 = 2*0.17^2 gives a steady yaw rate -0.03/5.78 = -0.0051903 rad/s (the
+# 1.5 N Coulomb cap is not hit). P0 and P1 get the same expectations and
+# tolerances (globbed p[01]); they must be indistinguishable.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- command remapping and drive equivalence ---
+[[check]]
+variable = "m.p0Esc[1].normalizedCommand"
+at = "end"
+near = 0.3
+tol = 1e-12
+why = "rotor 1 is driven by actuator 3 (command 0.3), not actuator 1"
+
+[[check]]
+variable = "m.p1Esc[3].equivalentVoltage"
+at = "end"
+near = 6.4
+tol = 1e-12
+why = "rotor 3 <- actuator 4 (0.4): 0.4 * 16 V average voltage"
+
+[[check]]
+variable = "m.p1Esc[4].equivalentVoltage"
+at = "end"
+near = 1.6
+tol = 1e-12
+why = "rotor 4 <- actuator 1 (0.1): 0.1 * 16 V average voltage"
+
+[[check]]
+variable = "m.p[01]Motor[[]1].omega"
+at = "0.05"
+near = 243.33731915
+tol = 1e-6
+why = "P0 and P1 rotor 1: 300(1 - e^-t/0.03) at 0.05 s"
+
+[[check]]
+variable = "m.p[01]Motor[[]2].omega"
+at = "0.05"
+near = 162.22487943
+tol = 1e-6
+why = "P0 and P1 rotor 2: 200(1 - e^-t/0.03) at 0.05 s"
+
+[[check]]
+variable = "m.p[01]Motor[[]3].omega"
+at = "0.05"
+near = 324.44975886
+tol = 1e-6
+why = "P0 and P1 rotor 3: 400(1 - e^-t/0.03) at 0.05 s"
+
+[[check]]
+variable = "m.p[01]Motor[[]4].omega"
+at = "0.05"
+near = 81.11243972
+tol = 1e-6
+why = "P0 and P1 rotor 4: 100(1 - e^-t/0.03) at 0.05 s"
+
+[[check]]
+variable = "m.p[01]Motor[[]3].omega"
+at = "end"
+near = 400.0
+tol = 1e-6
+why = "33 time constants: settled at 1000 * 0.4 for both drive models"
+
+[[check]]
+variable = "m.p[01]Rotor[[]3].force_r[[]3]"
+at = "end"
+near = 1.6
+tol = 1e-9
+why = "settled thrust 1e-5 * 400^2 on rotor 3"
+
+[[check]]
+variable = "m.p[01]Rotor[[]4].force_r[[]3]"
+at = "end"
+near = 0.1
+tol = 1e-9
+why = "settled thrust 1e-5 * 100^2 on rotor 4"
+
+# --- airborne phase (t = 0.05 s): wrench and motion from the rotors alone ---
+[[check]]
+variable = "m.p[01].force_b[[]3]"
+at = "0.05"
+near = -1.9737683630163865
+tol = 1e-7
+why = "total thrust 3 f N along body -z (up); no contact yet"
+
+[[check]]
+variable = "m.p[01].moment_b[[]1]"
+at = "0.05"
+near = -0.04652216646601194
+tol = 1e-7
+why = "more thrust on the right (rotors 3, 4) rolls left: negative roll moment"
+
+[[check]]
+variable = "m.p[01].moment_b[[]2]"
+at = "0.05"
+near = -0.11630541616502983
+tol = 1e-7
+why = "more thrust at the rear (rotors 2, 3) pitches nose down: negative pitch moment"
+
+[[check]]
+variable = "m.p[01].moment_b[[]3]"
+at = "0.05"
+near = -0.019737683630163864
+tol = 1e-7
+why = "drag torques of the CW (sign -1) rotors 1, 3 dominate: net yaw -0.03 f N.m"
+
+[[check]]
+variable = "m.p[01].body.a_w[[]3]"
+at = "0.05"
+near = 8.490804424655742
+tol = 1e-5
+why = "falling with partial thrust: a_z = g - 3f/m (down positive); the 2e-3 rad tilt reached by 0.05 s (R33 = 0.9999973) adds +3.5e-6"
+
+[[check]]
+variable = "m.p[01].gear.gap[[]*]"
+at = "0.06"
+range = [0.0, 0.02]
+why = "all four legs still airborne 60 ms in (touchdown at ~64 ms)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]*]"
+at = "0.06"
+near = 0.0
+tol = 1e-12
+why = "no ground force before touchdown"
+
+# --- contact: never pulls, settles on all four legs ---
+[[check]]
+variable = "m.p[01].gear.normalForce[[]*]"
+at = "all"
+range = [0.0, 150.0]
+why = "unilateral contact never pulls; touchdown peak bounded by damping x tip speed (150 N.s/m x < 0.75 m/s) plus a few N of spring"
+
+[[check]]
+variable = "m.p[01].gear.gap[[]*]"
+at = "end"
+range = [-0.0012, -0.0008]
+why = "settled on all four legs with ~1 mm compression (11.7 N over 4 x 3000 N/m)"
+
+[[check]]
+variable = "m.p[01].body.p_w[[]3]"
+at = "end"
+near = -0.0990241535
+tol = 1e-8
+why = "settled CG height: 0.1 m leg length minus ~1 mm compression (tight native rumoca sim)"
+
+[[check]]
+variable = "m.p[01].force_b[[]3]"
+at = "end"
+near = -14.709975
+tol = 1e-5
+why = "static equilibrium: thrust + leg normal forces carry the weight m g"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]3]"
+at = "end"
+near = 3.2929894497
+tol = 1e-6
+why = "front-left leg carries most: the low-thrust side (tight native rumoca sim)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]4]"
+at = "end"
+near = 2.5619982777
+tol = 1e-6
+why = "rear-right leg carries least: under the 1.6 N rotor 3 (tight native rumoca sim)"
+
+[[check]]
+variable = "m.p[01].body.a_w[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "settled: zero inertial acceleration"
+
+[[check]]
+variable = "m.p[01].body.v_w[[]3]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "settled: no vertical motion"
+
+[[check]]
+variable = "m.p[01].measurements.acceleration[[]3]"
+at = "end"
+near = 9.80665
+tol = 1e-5
+why = "an IMU resting on the ground reads +1 g along its (up-pointing) sensor z"
+
+[[check]]
+variable = "m.p[01].body.omega_b[[]3]"
+at = "end"
+near = -0.0051903114187
+tol = 1e-9
+why = "net yaw torque -0.03 N.m balanced by viscous leg friction: steady yaw rate -0.03/5.78"
+
+[[check]]
+variable = "m.p[01].body.euler[[]3]"
+at = "end"
+near = 1.5655323176
+tol = 1e-8
+why = "east-facing start (pi/2) yawing slowly negative (tight native rumoca sim)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]1]"
+at = "end"
+near = 3.08347319
+tol = 2e-3
+why = "leg 1 (front-right): rigid-plane static closed form (friction/tilt correction < 1.6e-3)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]2]"
+at = "end"
+near = 2.77151431
+tol = 2e-3
+why = "leg 2 (rear-left): rigid-plane static closed form (friction/tilt correction < 1.6e-3)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]3]"
+at = "end"
+near = 3.29144577
+tol = 2e-3
+why = "leg 3 (front-left): rigid-plane static closed form (friction/tilt correction < 1.6e-3)"
+
+[[check]]
+variable = "m.p[01].gear.normalForce[[]4]"
+at = "end"
+near = 2.56354173
+tol = 2e-3
+why = "leg 4 (rear-right): rigid-plane static closed form (friction/tilt correction < 1.6e-3)"
+
+[[check]]
+expr = "{m.p0.gear.normalForce[1]} + {m.p0.gear.normalForce[2]} + {m.p0.gear.normalForce[3]} + {m.p0.gear.normalForce[4]}"
+at = "end"
+near = 11.709975
+tol = 1e-6
+why = "vertical balance: the legs carry weight minus settled thrust, 14.709975 - 3 N"
+
+[[check]]
+expr = "{m.p0.gear.normalForce[1]} + {m.p0.gear.normalForce[2]} - {m.p0.gear.normalForce[3]} - {m.p0.gear.normalForce[4]}"
+at = "end"
+near = 0.0
+tol = 1e-9
+why = "rigid plane on equal springs at square corners: the two diagonals carry equal load"
+
+[[check]]
+variable = "m.p[01].moment_b[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-8
+why = "settled at constant yaw rate: rotor and leg moments balance about the CG"
+
+[[check]]
+variable = "m.p[01].gear.contact[[]*]"
+at = "0.06"
+range = [0, 0]
+why = "no leg reports contact before touchdown"
+
+[[check]]
+variable = "m.p[01].gear.contact[[]*]"
+at = "all"
+from = 0.5
+range = [1, 1]
+why = "after settling every leg is in contact (no rocking on a diagonal)"
+
+[[check]]
+expr = "{m.p0.body.p_w[3]} - {m.p1.body.p_w[3]}"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "P0 (PassThrough + FirstOrderSpeed) and P1 (16 V AverageVoltage + FirstOrderVoltageToSpeed) move identically, touchdown included"
+
+[[check]]
+expr = "{m.p0.gear.normalForce[4]} - {m.p1.gear.normalForce[4]}"
+at = "all"
+near = 0.0
+tol = 1e-6
+why = "P0 and P1 feel the same contact force through the touchdown impact"

@@ -1,0 +1,143 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Inputs are functions of time only, evaluated at each 0.7 ms communication
+# point: GNSS position {t, 2t, -3t} m, velocity {1, 2, -3} m/s; ambient
+# pressure 101325 - 10t Pa, temperature 288.15 + t K, altitude 3t m, climb
+# 3 m/s; PWM 1000 + 1000t us on six channels -> normalized t. The model's
+# asserts pin position, pressure and altitude to their inputs (zero bias);
+# world.toml sets the two biases the asserts leave free, GNSS velocityBias
+# {0.25, -0.5, 0.125} m/s and barometer temperatureBias -1.5 K, to show they
+# are applied per axis and with sign. Every other output equals its
+# continuous input at the same instant: a
+# sample-and-hold at a former acquisition rate (e.g. 5 or 10 ms) would leave the
+# value of an earlier grid point. t = 0.0217 s is 31 steps, off any ms grid.
+# Native `rumoca sim` (dt 7 ms, unperturbed) agrees exactly.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.gnss.position[1]"
+at = "0.0217"
+near = 0.0217
+tol = 1e-12
+why = "GNSS north position equals the true t at an off-grid instant (no hold)"
+
+[[check]]
+variable = "m.gnss.position[3]"
+at = "0.0217"
+near = -0.0651
+tol = 1e-12
+why = "GNSS down position -3t (NED: climbing means negative z)"
+
+[[check]]
+variable = "m.gnss.position[2]"
+at = "end"
+near = 1.96
+tol = 1e-12
+why = "GNSS east position 2t at 0.98 s"
+
+[[check]]
+variable = "m.gnss.velocity[1]"
+at = "all"
+near = 1.25
+tol = 1e-12
+why = "GNSS north velocity 1 m/s plus its own axis bias +0.25"
+
+[[check]]
+variable = "m.gnss.velocity[2]"
+at = "all"
+near = 1.5
+tol = 1e-12
+why = "GNSS east velocity 2 m/s plus its own axis bias -0.5 (bias not transposed)"
+
+[[check]]
+variable = "m.gnss.velocity[3]"
+at = "all"
+near = -2.875
+tol = 1e-12
+why = "GNSS NED down velocity -3 m/s (climbing) plus bias +0.125, no sign flip"
+
+[[check]]
+variable = "m.gnss.position[2]"
+at = "0.0217"
+near = 0.0434
+tol = 1e-12
+why = "GNSS east position 2t at an off-grid instant; the velocity bias does not leak into position"
+
+[[check]]
+variable = "m.barometer.pressure"
+at = "0.0217"
+near = 101324.783
+tol = 1e-9
+why = "pressure 101325 - 10t at an off-grid instant: continuous, not held"
+
+[[check]]
+variable = "m.barometer.pressure"
+at = "end"
+near = 101315.2
+tol = 1e-9
+why = "pressure falls 10 Pa/s: 101325 - 9.8 at 0.98 s"
+
+[[check]]
+variable = "m.barometer.temperature"
+at = "end"
+near = 287.63
+tol = 1e-9
+why = "temperature 288.15 + t plus the -1.5 K bias at 0.98 s"
+
+[[check]]
+expr = "{m.barometer.temperature@0.49} - {m.barometer.temperature@0.0217}"
+near = 0.4683
+tol = 1e-9
+why = "temperature follows the ambient input continuously: +1 K/s between two off-grid instants"
+
+[[check]]
+variable = "m.barometer.altitude"
+at = "0.0217"
+near = 0.0651
+tol = 1e-12
+why = "up-positive altitude 3t: consistent with GNSS down = -3t"
+
+[[check]]
+variable = "m.barometer.altitude"
+at = "end"
+near = 2.94
+tol = 1e-12
+why = "altitude 3t at 0.98 s"
+
+[[check]]
+variable = "m.barometer.climbRate"
+at = "all"
+near = 3.0
+tol = 1e-12
+why = "climb rate 3 m/s up, matching d(altitude)/dt"
+
+[[check]]
+variable = "m.commands.normalizedCommand[[]*]"
+at = "0.0217"
+near = 0.0217
+tol = 1e-12
+why = "every PWM channel normalizes (1021.7 - 1000)/1000 continuously"
+
+[[check]]
+variable = "m.commands.normalizedCommand[[]*]"
+at = "0.49"
+near = 0.49
+tol = 1e-12
+why = "every PWM channel normalizes 1490 us to 0.49 (mid-range)"
+
+[[check]]
+variable = "m.commands.normalizedCommand[[]*]"
+at = "end"
+near = 0.98
+tol = 1e-12
+why = "1980 us normalizes to 0.98: all six channels, no trimming"
+
+[[check]]
+variable = "m.commands.normalizedCommand[[]*]"
+at = "all"
+range = [0.0, 0.98]
+why = "normalized command stays within [0, 1] (here [0, t_end])"

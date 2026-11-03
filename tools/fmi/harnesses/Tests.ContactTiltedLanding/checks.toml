@@ -1,0 +1,177 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Closed test: 1.5 kg MultirotorPlant (I = diag(0.02,0.02,0.04)), rotors off,
+# dropped from CG Down -0.3 m rolled 0.16 rad (q_start = (cos 0.08, sin 0.08,
+# 0, 0)) onto level ground, four legs at (+-0.17, +-0.17, 0.1) m in FRD,
+# k = 3000 N/m, c = 150 N.s/m, mu = 0.6. The scenario is the run itself (3 s,
+# the model's StopTime, at 1 ms).
+# Closed forms: free fall until the two right-hand tips (legs 1 and 4,
+# y = +0.17) reach the ground, CG Down = -(0.17 sin 0.16 + 0.1 cos 0.16) =
+# -0.125807 m at t = 0.18848 s; settled state: level, each leg m g/4 =
+# 3.677494 N, CG Down = -(0.1 - m g/(4k)) = -0.0987742 m.
+# The landing transient (roll-back at up to 7.7 rad/s, frictional side-slip of
+# about 6 mm) has no closed form: those checks compare with a native
+# `bin/rumoca sim` run of the same model (--dt 0.001 --rtol 1e-10 --atol 1e-12;
+# FMU vs native over the whole run: p_w within 9e-7 m, omega_b within 5e-5
+# rad/s, leg forces within 3e-3 N at the 0.211 s impact peak, identical
+# contact flags).
+# E = translational + rotational kinetic energy + gravity potential (-m g
+# Down) + leg spring energy 0.5 k pen^2: the damper, the clipping of the
+# unilateral force and friction can only remove energy.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.vehicle.body.p_w[3]} - (-0.3 + 0.5*9.80665*0.18**2)"
+at = "0.18"
+near = 0.0
+tol = 1e-12
+why = "free fall from -0.3 m before touchdown"
+
+[[check]]
+variable = "m.vehicle.body.euler[1]"
+from = 0.0
+to = 0.188
+at = "all"
+range = [0.15999999999, 0.16000000001]
+why = "the 0.16 rad roll is held in free fall (no wrench)"
+
+[[check]]
+expr = "{m.vehicle.gear.contact[1]} + {m.vehicle.gear.contact[2]} + {m.vehicle.gear.contact[3]} + {m.vehicle.gear.contact[4]}"
+at = "0.188"
+near = 0.0
+tol = 0
+why = "no contact before the lowest tips reach the ground at 0.18848 s"
+
+[[check]]
+expr = "{m.vehicle.gear.contact[1]} + {m.vehicle.gear.contact[4]} + 10*({m.vehicle.gear.contact[2]} + {m.vehicle.gear.contact[3]})"
+at = "0.189"
+near = 2.0
+tol = 0
+why = "uneven touchdown: only the two right-hand legs (1, 4; +y lowered by the positive roll) touch first"
+
+[[check]]
+expr = "{m.vehicle.gear.normalForce[1]} - {m.vehicle.gear.normalForce[4]}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "pure roll: the fore and aft legs on each side load identically"
+
+[[check]]
+expr = "{m.vehicle.body.p_w[1]}**2 + {m.vehicle.body.omega_b[2]}**2 + {m.vehicle.body.omega_b[3]}**2"
+at = "all"
+range = [0.0, 1e-24]
+why = "a pure roll disturbance stays a roll/side-slip: no pitch, yaw or forward motion"
+
+[[check]]
+expr = "0.75*({m.vehicle.body.v_b[1]}**2 + {m.vehicle.body.v_b[2]}**2 + {m.vehicle.body.v_b[3]}**2) + 0.01*({m.vehicle.body.omega_b[1]}**2 + {m.vehicle.body.omega_b[2]}**2) + 0.02*{m.vehicle.body.omega_b[3]}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]} + 1500*(max(0, -{m.vehicle.gear.gap[1]})**2 + max(0, -{m.vehicle.gear.gap[2]})**2 + max(0, -{m.vehicle.gear.gap[3]})**2 + max(0, -{m.vehicle.gear.gap[4]})**2) - 4.4129925"
+from = 0.0
+to = 0.188
+at = "all"
+range = [-1e-9, 1e-9]
+why = "free fall conserves energy: E(0) = m g 0.3 = 4.4129925 J"
+
+[[check]]
+expr = "0.75*({m.vehicle.body.v_b[1]}**2 + {m.vehicle.body.v_b[2]}**2 + {m.vehicle.body.v_b[3]}**2) + 0.01*({m.vehicle.body.omega_b[1]}**2 + {m.vehicle.body.omega_b[2]}**2) + 0.02*{m.vehicle.body.omega_b[3]}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]} + 1500*(max(0, -{m.vehicle.gear.gap[1]})**2 + max(0, -{m.vehicle.gear.gap[2]})**2 + max(0, -{m.vehicle.gear.gap[3]})**2 + max(0, -{m.vehicle.gear.gap[4]})**2) - (0.75*({m.vehicle.body.v_b[1]@0.19}**2 + {m.vehicle.body.v_b[2]@0.19}**2 + {m.vehicle.body.v_b[3]@0.19}**2) + 0.01*({m.vehicle.body.omega_b[1]@0.19}**2 + {m.vehicle.body.omega_b[2]@0.19}**2) + 0.02*{m.vehicle.body.omega_b[3]@0.19}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]@0.19} + 1500*(max(0, -{m.vehicle.gear.gap[1]@0.19})**2 + max(0, -{m.vehicle.gear.gap[2]@0.19})**2 + max(0, -{m.vehicle.gear.gap[3]@0.19})**2 + max(0, -{m.vehicle.gear.gap[4]@0.19})**2))"
+from = 0.19
+to = 0.2
+at = "max"
+range = [-1e9, 1e-12]
+why = "energy never rises during the impact"
+
+[[check]]
+expr = "0.75*({m.vehicle.body.v_b[1]}**2 + {m.vehicle.body.v_b[2]}**2 + {m.vehicle.body.v_b[3]}**2) + 0.01*({m.vehicle.body.omega_b[1]}**2 + {m.vehicle.body.omega_b[2]}**2) + 0.02*{m.vehicle.body.omega_b[3]}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]} + 1500*(max(0, -{m.vehicle.gear.gap[1]})**2 + max(0, -{m.vehicle.gear.gap[2]})**2 + max(0, -{m.vehicle.gear.gap[3]})**2 + max(0, -{m.vehicle.gear.gap[4]})**2) - (0.75*({m.vehicle.body.v_b[1]@0.2}**2 + {m.vehicle.body.v_b[2]@0.2}**2 + {m.vehicle.body.v_b[3]@0.2}**2) + 0.01*({m.vehicle.body.omega_b[1]@0.2}**2 + {m.vehicle.body.omega_b[2]@0.2}**2) + 0.02*{m.vehicle.body.omega_b[3]@0.2}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]@0.2} + 1500*(max(0, -{m.vehicle.gear.gap[1]@0.2})**2 + max(0, -{m.vehicle.gear.gap[2]@0.2})**2 + max(0, -{m.vehicle.gear.gap[3]@0.2})**2 + max(0, -{m.vehicle.gear.gap[4]@0.2})**2))"
+from = 0.2
+to = 3.0
+at = "max"
+range = [-1e9, 1e-12]
+why = "energy never rises during the roll-back and settling"
+
+[[check]]
+expr = "0.75*({m.vehicle.body.v_b[1]}**2 + {m.vehicle.body.v_b[2]}**2 + {m.vehicle.body.v_b[3]}**2) + 0.01*({m.vehicle.body.omega_b[1]}**2 + {m.vehicle.body.omega_b[2]}**2) + 0.02*{m.vehicle.body.omega_b[3]}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]} + 1500*(max(0, -{m.vehicle.gear.gap[1]})**2 + max(0, -{m.vehicle.gear.gap[2]})**2 + max(0, -{m.vehicle.gear.gap[3]})**2 + max(0, -{m.vehicle.gear.gap[4]})**2) - (0.75*({m.vehicle.body.v_b[1]@0.5}**2 + {m.vehicle.body.v_b[2]@0.5}**2 + {m.vehicle.body.v_b[3]@0.5}**2) + 0.01*({m.vehicle.body.omega_b[1]@0.5}**2 + {m.vehicle.body.omega_b[2]@0.5}**2) + 0.02*{m.vehicle.body.omega_b[3]@0.5}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]@0.5} + 1500*(max(0, -{m.vehicle.gear.gap[1]@0.5})**2 + max(0, -{m.vehicle.gear.gap[2]@0.5})**2 + max(0, -{m.vehicle.gear.gap[3]@0.5})**2 + max(0, -{m.vehicle.gear.gap[4]@0.5})**2))"
+from = 0.5
+to = 3.0
+at = "max"
+range = [-1e9, 1e-12]
+why = "energy never rises late in the settling"
+
+[[check]]
+expr = "(0.75*({m.vehicle.body.v_b[1]@0.188}**2 + {m.vehicle.body.v_b[2]@0.188}**2 + {m.vehicle.body.v_b[3]@0.188}**2) + 0.01*({m.vehicle.body.omega_b[1]@0.188}**2 + {m.vehicle.body.omega_b[2]@0.188}**2) + 0.02*{m.vehicle.body.omega_b[3]@0.188}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]@0.188} + 1500*(max(0, -{m.vehicle.gear.gap[1]@0.188})**2 + max(0, -{m.vehicle.gear.gap[2]@0.188})**2 + max(0, -{m.vehicle.gear.gap[3]@0.188})**2 + max(0, -{m.vehicle.gear.gap[4]@0.188})**2)) - (0.75*({m.vehicle.body.v_b[1]@0.3}**2 + {m.vehicle.body.v_b[2]@0.3}**2 + {m.vehicle.body.v_b[3]@0.3}**2) + 0.01*({m.vehicle.body.omega_b[1]@0.3}**2 + {m.vehicle.body.omega_b[2]@0.3}**2) + 0.02*{m.vehicle.body.omega_b[3]@0.3}**2 - 1.5*9.80665*{m.vehicle.body.p_w[3]@0.3} + 1500*(max(0, -{m.vehicle.gear.gap[1]@0.3})**2 + max(0, -{m.vehicle.gear.gap[2]@0.3})**2 + max(0, -{m.vehicle.gear.gap[3]@0.3})**2 + max(0, -{m.vehicle.gear.gap[4]@0.3})**2))"
+at = "end"
+near = 2.9490241526
+tol = 1e-6
+why = "energy dissipated between 0.188 s and 0.3 s: 2.949024 J of the 4.41 J (native sim)"
+
+[[check]]
+variable = "m.vehicle.body.omega_b[1]"
+at = "0.21"
+near = -7.728534499499822
+tol = 1e-4
+why = "roll-back rate near its -7.73 rad/s peak (native sim)"
+
+[[check]]
+variable = "m.vehicle.body.euler[1]"
+at = "0.21"
+near = 0.01018388228559821
+tol = 1e-5
+why = "roll angle mid-recovery (native sim)"
+
+[[check]]
+variable = "m.vehicle.body.p_w[2]"
+at = "0.25"
+near = -0.005938417540370896
+tol = 2e-6
+why = "frictional side-slip while the right legs push the rolling body (native sim)"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[2]"
+at = "0.25"
+near = 3.7015395982663044
+tol = 1e-3
+why = "left legs loaded after the roll-back (native sim)"
+
+[[check]]
+variable = "m.vehicle.body.p_w[2]"
+at = "end"
+near = -0.006061822010426037
+tol = 2e-6
+why = "final lateral rest position after the slip (native sim)"
+
+[[check]]
+expr = "abs({m.vehicle.body.R_wb[7]}) + abs({m.vehicle.body.R_wb[8]})"
+from = 2.5
+to = 3.0
+at = "all"
+range = [0.0, 1e-5]
+why = "model assert: four independent contacts settle the tilted vehicle level"
+
+[[check]]
+expr = "max(abs({m.vehicle.body.v_b[1]}), abs({m.vehicle.body.v_b[2]}), abs({m.vehicle.body.v_b[3]}), abs({m.vehicle.body.omega_b[1]}), abs({m.vehicle.body.omega_b[2]}), abs({m.vehicle.body.omega_b[3]}))"
+from = 2.5
+to = 3.0
+at = "all"
+range = [0.0, 1e-5]
+why = "model assert: contact damping settles translation and rotation"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+from = 2.5
+to = 3.0
+at = "all"
+range = [3.6774927, 3.6774948]
+why = "model assert (all feet support) sharpened: each leg carries m g/4 = 3.677494 N"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "end"
+near = -0.0987741687500
+tol = 1e-9
+why = "static compression m g/(4k): CG Down = -(0.1 - 1.5 g/12000)"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "all"
+range = [0.0, 1000.0]
+why = "contact never pulls"

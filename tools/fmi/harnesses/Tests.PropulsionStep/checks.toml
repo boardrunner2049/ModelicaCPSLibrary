@@ -1,0 +1,178 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# omega(t) = omegaMax*clamp(d,0,1)*(1 - exp(-t/tau)), tau = 0.05 s,
+# omegaMax = 100 rad/s. Command 0.5 -> 50 rad/s; demand 2 -> clamp 1 -> 100;
+# demand -1 -> clamp 0 -> 0. Thrust kT w^2 (kT = 1e-3), yaw moment
+# -spinSign*kQ w^2 (kQ = 2e-5). Closed form:
+#   t = tau:   w = 31.6060279414, T = 0.998941002, Q = 0.0199788200
+#   t = 3 tau: w = 47.5106465816, T = 2.257261539
+#   t = 10tau: w = 49.9977300035, T = 2.499773006, Q = 0.0499954601
+# world.toml sets cw.kT = 1.7e-3, so the CW thrust is 1.7 kT w^2:
+#   t = tau: 1.698199704, t = 3 tau: 3.837344616, t = 10 tau: 4.249614109 N.
+# Native `rumoca sim --rtol 1e-10 --atol 1e-12` of the same perturbation
+# (extends ... cw(kT = 1.7e-3)) agrees with the FMU to 7e-8 rad/s. (Native sim
+# does not apply experiment(Tolerance); at its default tolerance it trips the
+# model's own 1e-5 assert at t = 0.044 s.)
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.motor.omega"
+at = "0.05"
+near = 31.6060279414
+tol = 1e-7
+why = "one time constant: 63.2 % of the 50 rad/s step"
+
+[[check]]
+variable = "m.motor.omega"
+at = "0.15"
+near = 47.5106465816
+tol = 1e-7
+why = "three time constants: 95 % of the step"
+
+[[check]]
+variable = "m.motor.omega"
+at = "end"
+near = 49.9977300035
+tol = 1e-7
+why = "ten time constants: settled at omegaMax*0.5"
+
+[[check]]
+variable = "m.motor.omega"
+at = "all"
+range = [0.0, 50.0]
+why = "first-order step: monotone approach from below, no overshoot"
+
+[[check]]
+variable = "m.ccw.force_r[3]"
+at = "0.05"
+near = 0.998941002
+tol = 1e-6
+why = "thrust kT*w^2 follows the actual (lagging) speed, not the 50 rad/s command (2.5 N)"
+
+[[check]]
+variable = "m.ccw.force_r[3]"
+at = "0.15"
+near = 2.257261539
+tol = 1e-6
+why = "thrust kT*w^2 at three time constants"
+
+[[check]]
+variable = "m.ccw.force_r[3]"
+at = "end"
+near = 2.499773006
+tol = 1e-6
+why = "settled CCW thrust kT (50 rad/s)^2 x (1 - e^-10)^2"
+
+[[check]]
+variable = "m.cw.force_r[3]"
+at = "0.05"
+near = 1.698199704
+tol = 1e-6
+why = "CW blade with overridden kT = 1.7e-3: thrust 1.7e-3 w^2 at one time constant, along +z regardless of spin"
+
+[[check]]
+variable = "m.cw.force_r[3]"
+at = "end"
+near = 4.249614109
+tol = 1e-6
+why = "CW blade settled thrust with its own (overridden) kT"
+
+[[check]]
+expr = "{m.cw.force_r[3]} / {m.ccw.force_r[3]}"
+at = "all"
+from = 0.001
+near = 1.7
+tol = 1e-12
+why = "same shaft speed, thrust ratio = kT ratio at every instant: the coefficient belongs to its own blade"
+
+[[check]]
+expr = "{m.ccw.moment_r[3]} + {m.cw.moment_r[3]}"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "equal kQ, opposite spinSign: the pair's yaw torques cancel exactly at every instant"
+
+[[check]]
+expr = "{m.ccw.loadTorque} + {m.ccw.moment_r[3]}"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "CCW (spinSign +1): aerodynamic hub moment is minus the shaft load torque"
+
+[[check]]
+variable = "m.c*w.force_r[[]1]"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "static hover blade: thrust is purely along rotor +z"
+
+[[check]]
+variable = "m.ccw.moment_r[3]"
+at = "0.05"
+near = -0.0199788200
+tol = 1e-7
+why = "CCW (spinSign +1) rotor: reaction yaw torque -kQ w^2 opposes its spin"
+
+[[check]]
+variable = "m.ccw.moment_r[3]"
+at = "end"
+near = -0.0499954601
+tol = 1e-7
+why = "CCW reaction torque at settled speed"
+
+[[check]]
+variable = "m.cw.moment_r[3]"
+at = "end"
+near = 0.0499954601
+tol = 1e-7
+why = "CW (spinSign -1) rotor: equal and opposite yaw torque, so the pair cancels"
+
+[[check]]
+variable = "m.ccw.moment_r[3]"
+at = "all"
+range = [-0.05, 0.0]
+why = "CCW yaw torque never changes sign"
+
+[[check]]
+variable = "m.cw.moment_r[3]"
+at = "all"
+range = [0.0, 0.05]
+why = "CW yaw torque never changes sign"
+
+[[check]]
+variable = "m.c*w.loadTorque"
+at = "end"
+near = 0.0499954601
+tol = 1e-7
+why = "shaft load torque magnitude kQ w^2 is nonnegative for both directions"
+
+[[check]]
+variable = "m.saturated.omega"
+at = "0.05"
+near = 63.2120558829
+tol = 1e-7
+why = "demand 2 is clamped to 1: step to omegaMax = 100 rad/s, same tau"
+
+[[check]]
+variable = "m.saturated.omega"
+at = "all"
+range = [0.0, 100.0]
+why = "speed never exceeds omegaMax however large the demand"
+
+[[check]]
+variable = "m.saturated.omega"
+at = "end"
+near = 99.9954600070
+tol = 1e-7
+why = "saturated motor settles at omegaMax"
+
+[[check]]
+variable = "m.stopped.omega"
+at = "all"
+near = 0.0
+tol = 1e-10
+why = "negative demand is clamped to 0: the rotor never turns backwards"

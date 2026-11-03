@@ -1,0 +1,222 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Mode 0 (CPOL = CPHA = 0), MSB first, 1 MHz: one byte = 16 SCLK half periods
+# of 0.5 us; data is sampled on rising edges (2.5 + k us for byte 1) and
+# shifted on falling edges. Master sends 0xA5 = 165 = 10100101 then
+# 0x3C = 60 = 00111100; the slave answers 0x5A = 90 = 01011010 to both.
+# Line bits are sampled mid-high-phase (2.75 + k us, 14.75 + k us). Every
+# value below also matches a native `bin/rumoca sim` of the example exactly
+# (same edges, same bytes, same retirement instants).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.link.cs_n"
+at = "all"
+to = 0.95e-6
+range = [1, 1]
+why = "CS deasserted (cs_n high) before 1 us"
+
+[[check]]
+variable = "m.link.cs_n"
+at = "all"
+from = 1.0e-6
+to = 24.95e-6
+range = [0, 0]
+why = "CS asserted on [1, 25) us across both bytes"
+
+[[check]]
+variable = "m.link.cs_n"
+at = "all"
+from = 25.0e-6
+range = [1, 1]
+why = "CS released at 25 us"
+
+[[check]]
+variable = "m.link.sclk"
+at = "all"
+to = 2.45e-6
+range = [0, 0]
+why = "SCLK idles at CPOL = 0 before the first request"
+
+[[check]]
+variable = "m.link.sclk"
+at = "mean"
+from = 2.0e-6
+to = 9.95e-6
+near = 0.5
+tol = 1e-9
+why = "8 full SCLK periods with 50% duty in the 8 us byte window"
+
+[[check]]
+expr = "{m.link.sclk@2.25e-6} + 2*{m.link.sclk@2.75e-6} + 4*{m.link.sclk@3.25e-6} + 8*{m.link.sclk@9.75e-6}"
+near = 10
+tol = 0
+why = "first half period low, first rising edge at 2.5 us, falling at 3.0 us, last rising edge at 9.5 us"
+
+[[check]]
+variable = "m.link.sclk"
+at = "all"
+from = 10.0e-6
+to = 14.45e-6
+range = [0, 0]
+why = "SCLK returns to idle low after 16 edges, until the second request's first edge"
+
+[[check]]
+variable = "m.link.sclk"
+at = "mean"
+from = 14.0e-6
+to = 21.95e-6
+near = 0.5
+tol = 1e-9
+why = "second byte: 8 SCLK periods, 50% duty"
+
+[[check]]
+variable = "m.link.sclk"
+at = "all"
+from = 22.0e-6
+range = [0, 0]
+why = "SCLK idle low after the second byte and after CS release"
+
+[[check]]
+expr = "128*{m.link.mosi@2.75e-6} + 64*{m.link.mosi@3.75e-6} + 32*{m.link.mosi@4.75e-6} + 16*{m.link.mosi@5.75e-6} + 8*{m.link.mosi@6.75e-6} + 4*{m.link.mosi@7.75e-6} + 2*{m.link.mosi@8.75e-6} + {m.link.mosi@9.75e-6}"
+near = 165
+tol = 0
+why = "MOSI at the eight sampling edges of byte 1 spells 0xA5, MSB first"
+
+[[check]]
+expr = "128*{m.link.mosi@14.75e-6} + 64*{m.link.mosi@15.75e-6} + 32*{m.link.mosi@16.75e-6} + 16*{m.link.mosi@17.75e-6} + 8*{m.link.mosi@18.75e-6} + 4*{m.link.mosi@19.75e-6} + 2*{m.link.mosi@20.75e-6} + {m.link.mosi@21.75e-6}"
+near = 60
+tol = 0
+why = "MOSI at the eight sampling edges of byte 2 spells 0x3C, MSB first"
+
+[[check]]
+expr = "128*{m.device.miso@2.75e-6} + 64*{m.device.miso@3.75e-6} + 32*{m.device.miso@4.75e-6} + 16*{m.device.miso@5.75e-6} + 8*{m.device.miso@6.75e-6} + 4*{m.device.miso@7.75e-6} + 2*{m.device.miso@8.75e-6} + {m.device.miso@9.75e-6}"
+near = 90
+tol = 0
+why = "slave MISO at the sampling edges spells 0x5A, MSB first"
+
+[[check]]
+expr = "128*{m.device.miso@14.75e-6} + 64*{m.device.miso@15.75e-6} + 32*{m.device.miso@16.75e-6} + 16*{m.device.miso@17.75e-6} + 8*{m.device.miso@18.75e-6} + 4*{m.device.miso@19.75e-6} + 2*{m.device.miso@20.75e-6} + {m.device.miso@21.75e-6}"
+near = 90
+tol = 0
+why = "slave reloads 0x5A for the second byte under the same CS assertion"
+
+[[check]]
+variable = "m.link.busy"
+at = "all"
+from = 2.0e-6
+to = 9.95e-6
+range = [1, 1]
+why = "byte 1 busy from submission (2 us) for exactly 16 half periods"
+
+[[check]]
+variable = "m.link.busy"
+at = "10e-6"
+near = 0
+tol = 0
+why = "byte 1 retires at 2 + 8 = 10 us"
+
+[[check]]
+variable = "m.link.busy"
+at = "all"
+from = 14.0e-6
+to = 21.95e-6
+range = [1, 1]
+why = "byte 2 busy on [14, 22) us"
+
+[[check]]
+variable = "m.link.busy"
+at = "all"
+from = 22.0e-6
+range = [0, 0]
+why = "byte 2 retires at 22 us; no further activity"
+
+[[check]]
+expr = "{m.link.completedId@9.95e-6}*100 + {m.link.completedId@10e-6}*10 + {m.link.completedId@21.95e-6}"
+near = 11
+tol = 0
+why = "completedId: 0 until 10 us, 1 from 10 us, still 1 just before 22 us"
+
+[[check]]
+variable = "m.link.completedId"
+near = 2
+tol = 0
+why = "both requests retired"
+
+[[check]]
+variable = "m.link.status"
+at = "10e-6"
+near = 1
+tol = 0
+why = "byte 1 succeeded"
+
+[[check]]
+variable = "m.link.status"
+at = "14.5e-6"
+near = 0
+tol = 0
+why = "status returns to 0 while byte 2 is in flight"
+
+[[check]]
+variable = "m.link.status"
+near = 1
+tol = 0
+why = "byte 2 succeeded; CS release after completion does not report an abort"
+
+[[check]]
+variable = "m.link.rxData"
+at = "10e-6"
+near = 90
+tol = 0
+why = "master received the slave's 0x5A"
+
+[[check]]
+variable = "m.link.rxData"
+near = 90
+tol = 0
+why = "second byte also returns 0x5A"
+
+[[check]]
+variable = "m.device.rxData"
+at = "9.5e-6"
+near = 165
+tol = 0
+why = "slave latches 0xA5 on the eighth rising edge (9.5 us)"
+
+[[check]]
+variable = "m.device.receivedCount"
+at = "9.45e-6"
+near = 0
+tol = 0
+why = "no byte delivered before the eighth sampling edge"
+
+[[check]]
+variable = "m.receivedCommand"
+at = "21.5e-6"
+near = 60
+tol = 0
+why = "slave latches 0x3C on the eighth rising edge of byte 2 (21.5 us)"
+
+[[check]]
+variable = "m.device.receivedCount"
+near = 2
+tol = 0
+why = "exactly two bytes transferred"
+
+[[check]]
+variable = "m.device.misoEnabled"
+at = "all"
+from = 25.0e-6
+range = [0, 0]
+why = "slave output goes high-impedance once CS is released"
+
+[[check]]
+variable = "m.link.miso"
+at = "all"
+from = 25.0e-6
+range = [1, 1]
+why = "Hi-Z MISO resolves to the example's pull-up (true)"

@@ -1,0 +1,103 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Parts (Wrapper.mo; payload mass overridden to 0.5 kg in world.toml), axes C = FRD.
+# Expected values: independent numpy evaluation of
+#   m = sum m_i, c = sum m_i r_i / m,
+#   I = sum R_i J_i R_i' + m_i (|d_i|^2 E - d_i d_i'),  d_i = r_i - c.
+# The model is static; every row holds the same values, checked at the end.
+#
+# KNOWN FAILURE (suspected Rumoca bug, reported): the products of inertia come
+# out about the chassis ORIGIN instead of about the combined CG (the
+# off-diagonal parallel-axis term uses r_i, not r_i - c), e.g. I_xy = 1.776e-4
+# instead of 7.362e-4; native `rumoca sim` agrees with the FMU, and
+# Tests.ChassisMassProperties fails its own assertion for the same reason. The
+# diagonal, mass and CG are right. These checks are kept at full strength.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.assembled.mass"
+at = "end"
+near = 2.37
+tol = 1e-12
+why = "1.2 + 2*0.08 + 0.5 + 0.45 + 0.06 kg: every part counted exactly once (including the overridden payload)"
+
+[[check]]
+expr = "norm({m.assembled.cg_C[1]} - 0.03675105485232067, {m.assembled.cg_C[2]} - 0.006413502109704642, {m.assembled.cg_C[3]} - 0.021097046413502105)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "mass-weighted centre of the six parts"
+
+[[check]]
+expr = "norm({m.assembled.inertia[1]} - 0.021756462447257388, {m.assembled.inertia[5]} - 0.03338433080168777, {m.assembled.inertia[9]} - 0.04203649789029536)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "moments of inertia about the combined CG (rotated part tensors + m(|d|^2 - d_j^2))"
+
+[[check]]
+variable = "m.assembled.inertia[2]"
+at = "end"
+near = 0.0007362160337552744
+tol = 1e-12
+why = "product of inertia I_xy about the CG: rotated arm tensors, payload 5e-5 and -sum m d_x d_y"
+
+[[check]]
+variable = "m.assembled.inertia[3]"
+at = "end"
+near = -0.005272447257383966
+tol = 1e-12
+why = "product of inertia I_xz about the CG: payload -2e-5 and -sum m d_x d_z"
+
+[[check]]
+variable = "m.assembled.inertia[6]"
+at = "end"
+near = 0.0024606751054852324
+tol = 1e-12
+why = "product of inertia I_yz about the CG: payload 3e-5 and -sum m d_y d_z"
+
+[[check]]
+expr = "abs({m.assembled.inertia[2]} - {m.assembled.inertia[4]}) + abs({m.assembled.inertia[3]} - {m.assembled.inertia[7]}) + abs({m.assembled.inertia[6]} - {m.assembled.inertia[8]})"
+at = "end"
+near = 0.0
+tol = 1e-15
+why = "an inertia tensor is symmetric"
+
+[[check]]
+expr = "min({m.assembled.inertia[1]} + {m.assembled.inertia[5]} - {m.assembled.inertia[9]}, {m.assembled.inertia[5]} + {m.assembled.inertia[9]} - {m.assembled.inertia[1]}, {m.assembled.inertia[9]} + {m.assembled.inertia[1]} - {m.assembled.inertia[5]})"
+at = "end"
+range = [0.0, 1.0]
+why = "triangle inequalities of a physical mass distribution hold for the combination"
+
+[[check]]
+expr = "{m.assembled.inertia[1]}*({m.assembled.inertia[5]}*{m.assembled.inertia[9]} - {m.assembled.inertia[6]}*{m.assembled.inertia[8]}) - {m.assembled.inertia[2]}*({m.assembled.inertia[4]}*{m.assembled.inertia[9]} - {m.assembled.inertia[6]}*{m.assembled.inertia[7]}) + {m.assembled.inertia[3]}*({m.assembled.inertia[4]}*{m.assembled.inertia[8]} - {m.assembled.inertia[5]}*{m.assembled.inertia[7]})"
+at = "end"
+near = 2.9430494719695336e-05
+rtol = 1e-9
+why = "det(I) = product of the principal moments 0.0203361*0.0330413*0.0437999 kg^3.m^6 (numpy eigvalsh)"
+
+# --- aggregate mode -----------------------------------------------------------
+[[check]]
+variable = "m.aggregateOnly.mass"
+at = "end"
+near = 2.5
+tol = 1e-12
+why = "aggregate mode reports the 2.5 kg budget, not 9 kg core + 7 kg payload"
+
+[[check]]
+expr = "norm({m.aggregateOnly.cg_C[1]} - 0.02, {m.aggregateOnly.cg_C[2]} + 0.01, {m.aggregateOnly.cg_C[3]} - 0.03)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "aggregate centre of mass unchanged (the 7 kg payload at {1,1,1} is ignored)"
+
+[[check]]
+expr = "norm({m.aggregateOnly.inertia[1]} - 0.02, {m.aggregateOnly.inertia[2]} - 0.001, {m.aggregateOnly.inertia[5]} - 0.03, {m.aggregateOnly.inertia[9]} - 0.045, {m.aggregateOnly.inertia[3]}, {m.aggregateOnly.inertia[6]})"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "a single part about its own CG: the aggregate tensor (with its I_xy) passes through unchanged"

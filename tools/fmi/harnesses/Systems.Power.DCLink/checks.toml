@@ -1,0 +1,134 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Rs = 0.02 ohm, C = 2 mF, tau = Rs*C = 40 us, v(0) = 16 V.
+# Reference: exact solution of C dv/dt = (Vs - v)/Rs - iL over each held 1 us step.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.voltage"
+at = "0.0002"
+near = 16.0
+tol = 1e-6
+why = "unloaded bus stays at its 16 V start = source voltage"
+
+[[check]]
+variable = "m.voltage"
+at = "0.00024"
+near = 15.7471518
+tol = 1e-5
+why = "one tau after a 20 A load step: 16 - 0.4*(1-exp(-1)) = 15.7471518 (exact ZOH, the load is constant over each step). 1e-5 V is 0.07% of the 0.4 V transient, so a 0.1% time-constant error fails"
+
+[[check]]
+variable = "m.voltage"
+at = "0.0006"
+near = 15.6
+tol = 1e-3
+why = "loaded steady state Vs - Rs*iL = 16 - 0.02*20"
+
+[[check]]
+variable = "m.sourcePower"
+at = "0.0006"
+near = 320.0
+tol = 0.5
+why = "steady power balance: Vs*Is = Rs*Is^2 + v*iL = 8 W + 312 W with Is = iL = 20 A"
+
+[[check]]
+variable = "m.bus.lossPower"
+at = "0.0006"
+near = 8.0
+tol = 0.05
+why = "series loss Rs*Is^2 = 0.02*20^2"
+
+[[check]]
+variable = "m.bus.loadCurrent"
+at = "0.0006"
+near = 20.0
+tol = 1e-6
+why = "bus pin current equals the current drawn by the sink (KCL at p)"
+
+[[check]]
+variable = "m.voltage"
+at = "0.00064"
+near = 13.0715244
+tol = 1e-5
+why = "one tau after the source steps 16 -> 12 V: 11.6 + 4*exp(-1) = 13.0715244 (exact ZOH)"
+
+[[check]]
+variable = "m.voltage"
+at = "0.001"
+near = 11.6002
+tol = 1e-3
+why = "loaded steady state on the 12 V source: 12 - 0.4"
+
+[[check]]
+variable = "m.voltage"
+at = "0.0015"
+near = 12.2
+tol = 1e-3
+why = "regenerating load (-10 A) lifts the bus above the source: 12 + Rs*10"
+
+[[check]]
+variable = "m.sourceCurrent"
+at = "0.0015"
+near = -10.0
+tol = 0.01
+why = "returned current flows back into the ideal source"
+
+[[check]]
+variable = "m.sourcePower"
+at = "0.0015"
+near = -120.0
+tol = 0.2
+why = "source absorbs 12 V * 10 A during regeneration (negative power)"
+
+[[check]]
+variable = "m.bus.lossPower"
+at = "0.0015"
+near = 2.0
+tol = 0.01
+why = "loss Rs*Is^2 stays positive regardless of current direction"
+
+[[check]]
+variable = "m.sourceCurrent"
+at = "0.002"
+near = 5.80077
+tol = 1e-3
+why = "during the 8 kV/s ramp the source also charges C: C*dV/dt + iL = 16 - 10 = 6 A for a continuous ramp; the 1 us zero-order hold lags it by half a step (4 mV / Rs = 0.2 A), and the exact ZOH solution gives 5.80077 A"
+
+[[check]]
+variable = "m.voltage"
+at = "0.0025"
+near = 19.8759833
+tol = 1e-4
+why = "ramp tracking lag below Vs - Rs*iL = 20.2: slope*tau = 8000*40e-6 = 0.32 V for a continuous ramp, plus the 4 mV half-step hold lag; exact ZOH solution 19.8759833. The lag scales with tau, so a 1% time-constant error (3.2 mV) fails"
+
+[[check]]
+variable = "m.voltage"
+at = "end"
+near = 20.2
+tol = 1e-3
+why = "settles at Vs - Rs*iL = 20 + 0.2 after the ramp"
+
+[[check]]
+variable = "m.storedEnergy"
+at = "0"
+near = 0.256
+tol = 1e-6
+why = "initial stored energy C*16^2/2"
+
+[[check]]
+variable = "m.storedEnergy"
+at = "end"
+near = 0.40804
+tol = 1e-4
+why = "stored energy C*v^2/2 at 20.2 V"
+
+[[check]]
+variable = "m.voltage"
+at = "all"
+range = [11.59, 20.21]
+why = "first-order RC bus never overshoots its steady-state targets"

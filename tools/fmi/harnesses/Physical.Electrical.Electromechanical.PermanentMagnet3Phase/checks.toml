@@ -1,0 +1,239 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# ke = 0.01 V s/rad, polePairs = 7, theta0 = 0, star load R = 0.1 Ohm per
+# phase (star point = converter neutral). Phase current into p[j] is -e_j/R,
+# so torque = ke*sum(f_j*i_j) = -(ke^2*omega/R)*sum(f_j^2):
+#   sinusoidal  sum(f_j^2) = 3/2           -> torque = -1.5e-3*omega N m
+#   trapezoidal sum(f_j^2) = 2 + s^2, |s|<=1 -> torque in -[2, 3]e-3*omega
+# Shaft angle phi = integral of speed: 32.5 rad at 0.1 s, 22.5 rad at 0.2 s.
+# Phase j back-EMF: ke*omega*f(theta_e - (j-1)*2*pi/3), theta_e =
+# 7*(phi - phi_support) + theta0 (sinusoidal: theta0 = 0, housing phi0 = 0.1,
+# so theta_e = 7*phi - 0.7; trapezoidal: theta0 = 0.4, housing at 0).
+# The trapezoidal neutral sits at 3*sin(2*pi*50*t) V; the sinusoidal one at 0. the unit trapezoid is written as
+# f(x) = clamp((6/pi)*atan2(sin x, |cos x|), -1, 1) (3x the triangle wave).
+# Values cross-checked against native `rumoca sim` of the same wrapper.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.sinTorque"
+at = "0.0099"
+near = 0.0
+tol = 1e-12
+why = "at standstill there is no back-EMF, current or torque"
+
+[[check]]
+variable = "m.sinTorque"
+at = "0.09"
+near = -0.75
+tol = 0.002
+why = "sinusoidal generator at +500 rad/s: -1.5*ke^2*omega/R, constant (no ripple)"
+
+[[check]]
+variable = "m.sinTorque"
+at = "0.0999"
+near = -0.75
+tol = 0.002
+why = "sinusoidal torque is ripple-free: same value at another rotor angle"
+
+[[check]]
+variable = "m.sinTorque"
+at = "0.19"
+near = 0.45
+tol = 0.002
+why = "at -300 rad/s the braking torque reverses sign: +1.5*ke^2*300/R"
+
+[[check]]
+variable = "m.trapTorque"
+at = "0.08"
+range = [-1.5, -1.0]
+why = "trapezoidal generator at +500 rad/s: torque between -3 and -2 ke^2*omega/R"
+
+[[check]]
+variable = "m.trapTorque"
+at = "0.09"
+range = [-1.5, -1.0]
+why = "trapezoidal torque stays in its ripple band at another rotor angle"
+
+[[check]]
+variable = "m.trapTorque"
+at = "0.19"
+range = [0.6, 0.9]
+why = "trapezoidal braking torque at -300 rad/s: between 2 and 3 ke^2*300/R, positive"
+
+[[check]]
+variable = "m.trapTorque"
+at = "min"
+near = -1.5
+tol = 0.04
+why = "trapezoidal ripple peak at 500 rad/s reaches -3*ke^2*omega/R when the transition phase hits +-1"
+
+[[check]]
+variable = "m.trapTorque"
+at = "max"
+near = 0.9
+tol = 0.03
+why = "largest positive torque is the ripple peak at -300 rad/s: 3*ke^2*300/R"
+
+[[check]]
+variable = "m.sinMachine.backEMF*"
+at = "max"
+near = 5.0
+tol = 0.01
+why = "every phase's back-EMF peak is ke*omega = 5 V at 500 rad/s"
+
+[[check]]
+variable = "m.trapMachine.backEMF*"
+at = "min"
+near = -5.0
+tol = 0.01
+why = "every phase's trapezoidal negative plateau is -ke*omega = -5 V at 500 rad/s"
+
+[[check]]
+variable = "m.sinMachine.neutral.i"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "sinusoidal back-EMFs form a balanced set, so a symmetric star load returns no neutral current"
+
+[[check]]
+variable = "m.electricalAngle"
+at = "0.1"
+near = 226.8
+tol = 0.05
+why = "electrical angle = polePairs*(phi - phi_support) = 7*(32.5 - 0.1) rad (area under the speed profile, housing offset)"
+
+[[check]]
+variable = "m.electricalAngle"
+at = "end"
+near = 156.8
+tol = 0.06
+why = "after the reversal phi = 22.5 rad: 7*(22.5 - 0.1); the angle runs backwards with the speed"
+
+[[check]]
+variable = "m.trapPowerResidual"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "lossless trapezoidal conversion: shaft power in equals resistor losses at every step"
+
+[[check]]
+variable = "m.sinPowerResidual"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "lossless sinusoidal conversion: shaft power in equals resistor losses at every step"
+
+[[check]]
+expr = "{m.trapMachine.electricalAngle} - {m.sinMachine.electricalAngle}"
+at = "all"
+range = [1.0999999, 1.1000001]
+why = "on the shared shaft the angles differ by theta0 + polePairs*phi0_housing = 0.4 + 7*0.1 = 1.1 rad exactly (theta0 offset and support-angle reference both act)"
+
+[[check]]
+expr = "{m.sinMachine.backEMF[1]} - 0.01*{m.speed}*sin({m.sinMachine.electricalAngle})"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "sinusoidal phase 1 back-EMF = ke*omega*sin(theta_e) at every step, through the speed reversal"
+
+[[check]]
+expr = "{m.trapMachine.backEMF[1]} - 0.01*{m.speed}*max(-1, min(1, 6/pi*atan2(sin({m.trapMachine.electricalAngle}), abs(cos({m.trapMachine.electricalAngle})))))"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "trapezoidal phase 1 back-EMF = ke*omega*trapezoid(theta_e): plateau 30-150 deg, linear transitions"
+
+[[check]]
+expr = "{m.sinMachine.backEMF[2]} - 0.01*{m.speed}*sin({m.sinMachine.electricalAngle} - 2*pi/3)"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "sinusoidal phase 2 back-EMF = ke*omega*sin(theta_e - 2pi/3) at every step, through the speed reversal"
+
+[[check]]
+expr = "{m.trapMachine.backEMF[2]} - 0.01*{m.speed}*max(-1, min(1, 6/pi*atan2(sin({m.trapMachine.electricalAngle} - 2*pi/3), abs(cos({m.trapMachine.electricalAngle} - 2*pi/3)))))"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "trapezoidal phase 2 back-EMF = ke*omega*trapezoid(theta_e - 2pi/3): plateau 30-150 deg, linear transitions"
+
+[[check]]
+expr = "{m.sinMachine.backEMF[3]} - 0.01*{m.speed}*sin({m.sinMachine.electricalAngle} - 4*pi/3)"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "sinusoidal phase 3 back-EMF = ke*omega*sin(theta_e - 4pi/3) at every step, through the speed reversal"
+
+[[check]]
+expr = "{m.trapMachine.backEMF[3]} - 0.01*{m.speed}*max(-1, min(1, 6/pi*atan2(sin({m.trapMachine.electricalAngle} - 4*pi/3), abs(cos({m.trapMachine.electricalAngle} - 4*pi/3)))))"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "trapezoidal phase 3 back-EMF = ke*omega*trapezoid(theta_e - 4pi/3): plateau 30-150 deg, linear transitions"
+
+[[check]]
+variable = "m.electricalAngle"
+at = "0"
+near = -0.7
+tol = 1e-9
+why = "shaft at rest at phi = 0 against a housing at 0.1 rad: theta_e = 7*(0 - 0.1) = -0.7 rad (support angle subtracted)"
+
+[[check]]
+variable = "m.trapNeutralVoltage"
+at = "max"
+near = 3.0
+tol = 1e-3
+why = "the trapezoidal star point really is lifted (3 V peak), so the neutral reference term is exercised"
+
+[[check]]
+variable = "m.trapNeutralVoltage"
+at = "min"
+near = -3.0
+tol = 1e-3
+why = "the lift swings negative too (3 V peak sine)"
+
+[[check]]
+expr = "{m.trapMachine.p[1].v} - {m.trapNeutralVoltage} - {m.trapMachine.backEMF[1]}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "phase 1 terminal sits one back-EMF above the lifted neutral, not above ground"
+
+[[check]]
+expr = "{m.trapLoad[2].v} - {m.trapMachine.backEMF[2]}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "each star resistor sees exactly the phase-to-neutral back-EMF despite the 3 V common-mode lift (phase 2)"
+
+[[check]]
+variable = "m.neutralLiftCurrent"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "converter KCL sum(p.i) + neutral.i = 0: every phase current returns through the neutral, none through the lift source (a sign error would push 2*sum(i) through it)"
+
+[[check]]
+variable = "m.trapMachine.neutral.i"
+at = "max"
+near = 50.0
+tol = 0.1
+why = "the KCL check is not vacuous: two trapezoid plateaus cancel and the transition phase s is left, so the star current through the converter neutral is ke*omega*s/R, peaking at ke*500/0.1 = 50 A"
+
+[[check]]
+variable = "m.trapMachine.neutral.i"
+at = "min"
+near = -50.0
+tol = 0.1
+why = "and -50 A when the transition phase sits at -1"
+
+[[check]]
+expr = "{m.trapHousingTorque} + {m.trapTorque}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "support reaction: the converter pushes +torque on its support, so the fixed housing carries -torque (trapezoidal)"
+
+[[check]]
+expr = "{m.sinHousingTorque} + {m.sinTorque}"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "support reaction on the sinusoidal machine's offset housing"
+
+[[check]]
+variable = "m.sinHousingTorque"
+at = "0.09"
+near = 0.75
+tol = 0.002
+why = "the housing reaction is non-trivial: +0.75 N m while generating at +500 rad/s (equal and opposite to the shaft brake)"

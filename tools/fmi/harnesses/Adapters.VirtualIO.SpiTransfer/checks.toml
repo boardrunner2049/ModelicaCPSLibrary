@@ -1,0 +1,134 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Wrapper parameters: 2 MHz (half period 0.25 us; a byte = 16 edges = 4 us),
+# mode 3 (CPOL = 1 idle high, CPHA = 1: shift on odd edges > 1, sample on
+# even edges at t0 + 0.5(k+1) us), LSB first. Bytes: tx 0x35 = 53 =
+# 00110101 (not a palindrome, so bit order shows), slave answers 0xC5 = 197;
+# tx 0x80 / answer 0x01 (single bit at the far end of the frame). An input
+# set at t acts at t and appears in the row at t + 25 ns. A native
+# `bin/rumoca sim` of the same parameters and timeline (scratch model
+# NativeSpiTransfer) matches every column at every sample away from the
+# input-change instants.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.cs_n} - (1 - {m.csActive})"
+at = "all"
+near = 0
+tol = 0
+why = "cs_n is the inverse of the host's csActive"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+to = 2.225e-6
+range = [1, 1]
+why = "CPOL = 1: SCLK idles high from initialization until the first edge"
+
+[[check]]
+expr = "{m.sclk@2.225e-6}*100 + {m.sclk@2.25e-6}*10 + {m.sclk@2.5e-6}"
+near = 101
+tol = 0
+why = "first edge (falling) 0.25 us after submission, second (rising) at 0.5 us: 2 MHz clock"
+
+[[check]]
+variable = "m.sclk"
+at = "mean"
+from = 2.0e-6
+to = 5.975e-6
+near = 0.5
+tol = 1e-9
+why = "8 full periods in the 4 us byte, 50% duty"
+
+[[check]]
+expr = "{m.mosi@2.475e-6} + 2*{m.mosi@2.975e-6} + 4*{m.mosi@3.475e-6} + 8*{m.mosi@3.975e-6} + 16*{m.mosi@4.475e-6} + 32*{m.mosi@4.975e-6} + 64*{m.mosi@5.475e-6} + 128*{m.mosi@5.975e-6}"
+near = 53
+tol = 0
+why = "MOSI just before each sampling (even) edge spells 0x35 LSB first"
+
+[[check]]
+expr = "{m.completedId@6e-6}*10000 + {m.rxData@6e-6}*10 + {m.status@6e-6} + 100000*{m.busy@6e-6} + 1000000*{m.sclk@6e-6}"
+near = 1011971
+tol = 0
+why = "request 1 retires at 2 + 4 = 6 us: status 1, rxData 0xC5 assembled LSB first, SCLK back at idle high"
+
+[[check]]
+variable = "m.busy"
+at = "all"
+from = 2.025e-6
+to = 5.975e-6
+range = [1, 1]
+why = "busy for exactly the 4 us byte"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 6e-6
+to = 7.225e-6
+range = [1, 1]
+why = "idle high between bytes"
+
+[[check]]
+expr = "{m.mosi@10.975e-6}*10 + {m.mosi@10.725e-6}"
+near = 10
+tol = 0
+why = "tx 0x80 LSB first: only the last bit is set (presented from the 15th edge at 10.75 us to the final sampling edge)"
+
+[[check]]
+variable = "m.mosi"
+at = "all"
+from = 7.025e-6
+to = 10.725e-6
+range = [0, 0]
+why = "tx 0x80 LSB first: bits 0..6 are zero"
+
+[[check]]
+expr = "{m.completedId@11e-6}*1000 + {m.rxData@11e-6}*10 + {m.status@11e-6}"
+near = 2011
+tol = 0
+why = "request 2 retires at 11 us with rxData 0x01: the first sampled bit lands in bit 0"
+
+[[check]]
+expr = "{m.completedId@13.025e-6}*100 + {m.status@13.025e-6}*10 + {m.busy@13.025e-6}"
+near = 320
+tol = 0
+why = "request 3 submitted with CS released (host contract violated) is rejected at once: status 2, never busy"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 11e-6
+to = 15.225e-6
+range = [1, 1]
+why = "no clock for the rejected request"
+
+[[check]]
+expr = "{m.busy@16.6e-6}*10 + {m.edgeCount@16.6e-6}"
+near = 16
+tol = 0
+why = "request 4 in flight with 6 edges done when CS drops at 16.6 us"
+
+[[check]]
+expr = "{m.completedId@16.625e-6}*1000 + {m.status@16.625e-6}*100 + {m.busy@16.625e-6}*10 + {m.sclk@16.625e-6}"
+near = 4301
+tol = 0
+why = "CS drop aborts request 4 before the next edge (16.75 us): status 3, not busy, SCLK at idle high"
+
+[[check]]
+variable = "m.rxData"
+at = "all"
+from = 11e-6
+near = 1
+tol = 0
+why = "neither the rejected nor the aborted request overwrites rxData"
+
+[[check]]
+variable = "m.sclk"
+at = "all"
+from = 16.625e-6
+range = [1, 1]
+why = "clock stays idle high after the abort"

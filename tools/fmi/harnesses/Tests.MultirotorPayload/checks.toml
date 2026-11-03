@@ -1,0 +1,137 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Parts: core 2 kg at the origin, I = identity; 4 massless arms; payload 1 kg at
+# {0.3,0,-0.15}, diag(0.1,0.1,0.1). By hand: m = 3, c = {0.1,0,-0.05},
+# offsets d = (-0.1,0,0.05), (0.2,0,-0.1); sum m d d' = [0.06,0,-0.03; 0,0,0;
+# -0.03,0,0.015], sum m|d|^2 = 0.075, so I = 1.1 E + 0.075 E - sum m d d' =
+# [1.115,0,0.03; 0,1.175,0; 0.03,0,1.16] (the model's own expectation).
+# world.toml sets omega_start = (0.3,-0.5,0.8) rad/s and v_start = (0.2,0.1,0)
+# m/s (body); gravity and rotor wrenches are zero and the gear is 1 m above
+# ground, so the motion is torque- and force-free.
+#
+# KNOWN FAILURE (suspected Rumoca bug, reported): the FMU stops in
+# fmi3ExitInitializationMode on the model's own "Payload full inertia mismatch"
+# assertion (native `rumoca sim` too): I_xz comes out about the chassis origin
+# (0.045) instead of the combined CG (0.03). The conservation checks below use
+# the FMU's own inertia columns, so they test the dynamics independently.
+# diag/ (make -C diag run) evaluates these checks on an assert-free copy of the
+# model: everything passes except the two bug-A inertia checks.
+# Coverage limit: the model's literal asserts fix the payload at y = 0, so a
+# y-sign error in the CG rebase cannot show here (overriding payloads[1].r_C
+# would trip those asserts); the literal rotor/leg checks do catch an x/y
+# transposition of the CG vector and wrong geometry values.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- mass budget and rebasing ----------------------------------------------
+[[check]]
+variable = "m.vehicle.chassis.mass"
+at = "end"
+near = 3.0
+tol = 1e-12
+why = "2 kg core + 1 kg payload + massless arms: payload counted once"
+
+[[check]]
+expr = "norm({m.vehicle.chassis.cg_C[1]} - 0.1, {m.vehicle.chassis.cg_C[2]}, {m.vehicle.chassis.cg_C[3]} + 0.05)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "(2*0 + 1*{0.3,0,-0.15})/3"
+
+[[check]]
+expr = "norm({m.vehicle.chassis.inertia[1]} - 1.115, {m.vehicle.chassis.inertia[5]} - 1.175, {m.vehicle.chassis.inertia[9]} - 1.16, {m.vehicle.chassis.inertia[2]}, {m.vehicle.chassis.inertia[6]})"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "moments about the combined CG and the zero products (everything lies in the x-z plane)"
+
+[[check]]
+expr = "norm({m.vehicle.chassis.inertia[3]} - 0.03, {m.vehicle.chassis.inertia[7]} - 0.03)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "I_xz = -sum m d_x d_z = -(2*(-0.1)(0.05) + 1*(0.2)(-0.1)) = 0.03 about the CG"
+
+[[check]]
+expr = "norm({m.vehicle.rotorPosition_b[1]} - (0.07677669529663689), {m.vehicle.rotorPosition_b[2]} - (-0.17677669529663687), {m.vehicle.rotorPosition_b[3]} - (0.05), {m.vehicle.rotorPosition_b[4]} - (-0.27677669529663684), {m.vehicle.rotorPosition_b[5]} - (-0.1767766952966369), {m.vehicle.rotorPosition_b[6]} - (0.05), {m.vehicle.rotorPosition_b[7]} - (-0.27677669529663695), {m.vehicle.rotorPosition_b[8]} - (0.17677669529663687), {m.vehicle.rotorPosition_b[9]} - (0.05), {m.vehicle.rotorPosition_b[10]} - (0.07677669529663683), {m.vehicle.rotorPosition_b[11]} - (0.17677669529663692), {m.vehicle.rotorPosition_b[12]} - (0.05))"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "rotor mounts against literal values: the library's default X layout (arm tips 0.25 m at 45, 135, 225, 315 deg, y = -0.25 sin: FRD) minus the combined CG {0.1,0,-0.05}; independent of the FMU's own geometry values, so a wrong geometry, a transposed CG vector (x/y swap gives a 0.1 m y error) or a sign error in the rebase shows"
+
+[[check]]
+expr = "norm({m.vehicle.legPosition_b[1]} - (0.07), {m.vehicle.legPosition_b[2]} - (0.17), {m.vehicle.legPosition_b[3]} - (0.15000000000000002), {m.vehicle.legPosition_b[4]} - (-0.27), {m.vehicle.legPosition_b[5]} - (-0.17), {m.vehicle.legPosition_b[6]} - (0.15000000000000002), {m.vehicle.legPosition_b[7]} - (0.07), {m.vehicle.legPosition_b[8]} - (-0.17), {m.vehicle.legPosition_b[9]} - (0.15000000000000002), {m.vehicle.legPosition_b[10]} - (-0.27), {m.vehicle.legPosition_b[11]} - (0.17), {m.vehicle.legPosition_b[12]} - (0.15000000000000002))"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "leg mounts against literal values: the library's default gear corners (0.17,0.17,0.1), (-0.17,-0.17,0.1), (0.17,-0.17,0.1), (-0.17,0.17,0.1) minus the combined CG"
+
+[[check]]
+expr = "norm({m.vehicle.sensors.rImu_b[1]} + 0.05, {m.vehicle.sensors.rImu_b[2]}, {m.vehicle.sensors.rImu_b[3]} - 0.05)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "IMU at {0.05,0,0} in C is {-0.05,0,0.05} from the CG"
+
+[[check]]
+expr = "norm({m.vehicle.sensors.rGnss_b[1]} + 0.1, {m.vehicle.sensors.rGnss_b[2]}, {m.vehicle.sensors.rGnss_b[3]} - 0.15)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "GNSS at {0,0,0.1} in C is {-0.1,0,0.15} from the CG"
+
+[[check]]
+expr = "norm({m.vehicle.sensors.rBarometer_b[1]} + 0.1, {m.vehicle.sensors.rBarometer_b[2]}, {m.vehicle.sensors.rBarometer_b[3]} - 0.07)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "barometer at {0,0,0.02} in C is {-0.1,0,0.07} from the CG"
+
+# --- force- and torque-free motion -------------------------------------------
+[[check]]
+expr = "norm({m.vehicle.body.v_w[1]} + 0.1, {m.vehicle.body.v_w[2]} - 0.2, {m.vehicle.body.v_w[3]})"
+at = "all"
+range = [0.0, 1e-9]
+why = "no force: world velocity stays R(q_start) v_start = yaw 90 deg * (0.2,0.1,0) = (-0.1,0.2,0)"
+
+[[check]]
+expr = "norm({m.vehicle.body.p_w[1]@1.0} - {m.vehicle.body.p_w[1]@0} + 0.1, {m.vehicle.body.p_w[2]@1.0} - {m.vehicle.body.p_w[2]@0} - 0.2, {m.vehicle.body.p_w[3]@1.0} - {m.vehicle.body.p_w[3]@0})"
+at = "end"
+near = 0.0
+tol = 1e-8
+why = "uniform translation: displacement over 1 s equals v_w * 1 s"
+
+[[check]]
+expr = "0.5*({m.vehicle.body.omega_b[1]}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.omega_b[1]}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.omega_b[1]}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.omega_b[2]}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.omega_b[2]}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.omega_b[2]}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.omega_b[3]}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.omega_b[3]}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.omega_b[3]}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]}) - 0.5*({m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]@0})"
+at = "all"
+range = [-1e-8, 1e-8]
+why = "torque-free rotation conserves rotational kinetic energy 0.5 w' I w (0.57545 J with the correct I)"
+
+[[check]]
+expr = "norm(({m.vehicle.body.R_wb[1]}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[1]}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[1]}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[2]}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[2]}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[2]}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[3]}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[3]}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[3]}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]}) - ({m.vehicle.body.R_wb[1]@0}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[1]@0}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[1]@0}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[2]@0}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[2]@0}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[2]@0}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[3]@0}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[3]@0}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[3]@0}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]@0}), ({m.vehicle.body.R_wb[4]}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[4]}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[4]}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[5]}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[5]}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[5]}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[6]}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[6]}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[6]}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]}) - ({m.vehicle.body.R_wb[4]@0}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[4]@0}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[4]@0}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[5]@0}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[5]@0}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[5]@0}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[6]@0}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[6]@0}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[6]@0}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]@0}), ({m.vehicle.body.R_wb[7]}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[7]}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[7]}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[8]}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[8]}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[8]}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]} + {m.vehicle.body.R_wb[9]}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]} + {m.vehicle.body.R_wb[9]}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]} + {m.vehicle.body.R_wb[9]}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]}) - ({m.vehicle.body.R_wb[7]@0}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[7]@0}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[7]@0}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[8]@0}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[8]@0}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[8]@0}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.R_wb[9]@0}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.R_wb[9]@0}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.R_wb[9]@0}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]@0}))"
+at = "all"
+range = [0.0, 1e-8]
+why = "torque-free rotation conserves the world-frame angular momentum R_wb I w"
+
+[[check]]
+expr = "0.5*({m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[1]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[2]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[1]@0}*{m.vehicle.chassis.inertia[3]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[4]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[5]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[2]@0}*{m.vehicle.chassis.inertia[6]}*{m.vehicle.body.omega_b[3]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[7]}*{m.vehicle.body.omega_b[1]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[8]}*{m.vehicle.body.omega_b[2]@0} + {m.vehicle.body.omega_b[3]@0}*{m.vehicle.chassis.inertia[9]}*{m.vehicle.body.omega_b[3]@0})"
+at = "end"
+near = 0.57545
+tol = 1e-12
+why = "initial rotational energy 0.5 w' I w with the correct full tensor"
+
+[[check]]
+expr = "abs({m.vehicle.body.omega_b[1]@1.0} - 0.3) + abs({m.vehicle.body.omega_b[3]@1.0} - 0.8)"
+at = "end"
+range = [1e-4, 10]
+why = "with a full (non-diagonal) inertia the body rates do precess: omega_b is not constant (non-vacuous dynamics)"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "all"
+near = 0.0
+tol = 0
+why = "the gear stays clear of the ground (1 m below the CG), so the motion is really force-free"

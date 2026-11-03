@@ -1,0 +1,99 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# W = 2*9.80665 = 19.6133 N, k = 3000 N/m, four legs at (+-0.17,+-0.17,0.1) in C,
+# CG c = {0.04,-0.03,0.02}: leg tips 0.08 m below the CG; p_start Down =
+# 1.2 - 0.08 + W/12000 puts every tip W/(4k) = 1.6344 mm into the ground.
+# Equal leg loads N = W/4 give sum (p_i - c) x (0,0,-W/4) = c x (0,0,W)
+# = (-0.03W, -0.04W, 0) about the CG, cancelled by the external moment.
+# The rows include t = 0: the initialized state must already be in equilibrium.
+#
+# KNOWN FAILURES (suspected Rumoca bugs, reported):
+#  B: the FMU refuses fmi3ExitInitializationMode because at that point every
+#     `contact = gap <= 0` is still false (contact forces 0) and the model's
+#     first assert fires. diag/ (make -C diag run) runs these same checks on an
+#     assert-free copy: every 'all' check then fails only in its t = 0 row
+#     (passes with from = 0.001); native `rumoca sim` passes from t = 0.
+#  A: the chassis inertia gets products of inertia about the chassis origin
+#     (last check below).
+# The configuration is symmetric by necessity: the model's equation-section
+# asserts pin the gear force/moment and zero motion at every instant, so any
+# asymmetric perturbation (moment, start pose) aborts the model. Asymmetric
+# per-leg gear behaviour is covered by the LandingGearAssembly harness; here
+# the per-leg lever arms (distinct because of the CG shift) are checked.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "norm({m.vehicle.gear.force_b[1]}, {m.vehicle.gear.force_b[2]}, {m.vehicle.gear.force_b[3]} + 19.6133)"
+at = "all"
+range = [0.0, 1e-6]
+why = "the ground carries exactly the weight, pushing Up (-z FRD)"
+
+[[check]]
+expr = "norm({m.vehicle.gear.moment_b[1]} + 0.588399, {m.vehicle.gear.moment_b[2]} + 0.784532, {m.vehicle.gear.moment_b[3]})"
+at = "all"
+range = [0.0, 1e-6]
+why = "contact moment about the shifted CG = c x (0,0,W) = (-0.03W, -0.04W, 0): CG shift counted exactly once"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "all"
+range = [4.9033240, 4.9033260]
+why = "the external moment balances the CG offset, so the four legs share W/4 = 4.903325 N equally"
+
+[[check]]
+variable = "m.vehicle.gear.gap[[]*]"
+at = "all"
+range = [-0.0016344427, -0.0016344407]
+why = "each tip compressed W/(4k) = 1.63444 mm"
+
+[[check]]
+variable = "m.vehicle.gear.contact[[]*]"
+at = "all"
+near = 1.0
+tol = 0
+why = "every leg is in contact (gap < 0) from the initialized state on"
+
+[[check]]
+expr = "norm({m.vehicle.body.v_b[1]}, {m.vehicle.body.v_b[2]}, {m.vehicle.body.v_b[3]}, {m.vehicle.body.omega_b[1]}, {m.vehicle.body.omega_b[2]}, {m.vehicle.body.omega_b[3]})"
+at = "all"
+range = [0.0, 1e-6]
+why = "contact wrench plus gravity plus the external moment is zero: the vehicle stays at rest"
+
+[[check]]
+expr = "norm({m.vehicle.body.p_w[1]} - {m.vehicle.body.p_w[1]@0}, {m.vehicle.body.p_w[2]} - {m.vehicle.body.p_w[2]@0}, {m.vehicle.body.p_w[3]} - {m.vehicle.body.p_w[3]@0})"
+at = "all"
+range = [0.0, 1e-9]
+why = "no drift from the static equilibrium over 1 s"
+
+[[check]]
+expr = "norm({m.vehicle.force_b[1]}, {m.vehicle.force_b[2]}, {m.vehicle.force_b[3]} + 19.6133, {m.vehicle.moment_b[1]}, {m.vehicle.moment_b[2]}, {m.vehicle.moment_b[3]})"
+at = "all"
+range = [0.0, 1e-6]
+why = "summed non-gravity loads: the contact force alone (rotors off), and zero net moment about the CG"
+
+# --- per-leg geometry: the CG shift makes every leg's lever arm distinct, so
+# these pin each leg's own mount and moment (a permuted or mis-indexed leg would
+# show here even though the equal loads make the sums permutation-invariant) ---
+[[check]]
+expr = "norm({m.vehicle.legPosition_b[1]} - (0.13), {m.vehicle.legPosition_b[2]} - (0.2), {m.vehicle.legPosition_b[3]} - (0.08), {m.vehicle.legPosition_b[4]} - (-0.21000000000000002), {m.vehicle.legPosition_b[5]} - (-0.14), {m.vehicle.legPosition_b[6]} - (0.08), {m.vehicle.legPosition_b[7]} - (0.13), {m.vehicle.legPosition_b[8]} - (-0.14), {m.vehicle.legPosition_b[9]} - (0.08), {m.vehicle.legPosition_b[10]} - (-0.21000000000000002), {m.vehicle.legPosition_b[11]} - (0.2), {m.vehicle.legPosition_b[12]} - (0.08))"
+at = "end"
+near = 0.0
+tol = 1e-15
+why = "leg mounts rebased to the combined CG once: legPosition_b[i] = position_C[i] - (0.04,-0.03,0.02) for the four layout corners (0.17,0.17), (-0.17,-0.17), (0.17,-0.17), (-0.17,0.17)"
+
+[[check]]
+expr = "norm({m.vehicle.gear.legs[1].moment_b[1]} - (-0.980665), {m.vehicle.gear.legs[1].moment_b[2]} - (0.63743225), {m.vehicle.gear.legs[1].moment_b[3]} - (0.0), {m.vehicle.gear.legs[2].moment_b[1]} - (0.6864655000000001), {m.vehicle.gear.legs[2].moment_b[2]} - (-1.02969825), {m.vehicle.gear.legs[2].moment_b[3]} - (0.0), {m.vehicle.gear.legs[3].moment_b[1]} - (0.6864655000000001), {m.vehicle.gear.legs[3].moment_b[2]} - (0.63743225), {m.vehicle.gear.legs[3].moment_b[3]} - (0.0), {m.vehicle.gear.legs[4].moment_b[1]} - (-0.980665), {m.vehicle.gear.legs[4].moment_b[2]} - (-1.02969825), {m.vehicle.gear.legs[4].moment_b[3]} - (-0.0))"
+at = "all"
+range = [0.0, 1e-9]
+why = "each leg moment is its own lever arm x (0,0,-W/4): leg 1 (-0.9807, 0.6374, 0), leg 2 (0.6865, -1.0297, 0), leg 3 (0.6865, 0.6374, 0), leg 4 (-0.9807, -1.0297, 0)"
+
+[[check]]
+expr = "norm({m.vehicle.chassis.inertia[1]} - 0.02, {m.vehicle.chassis.inertia[5]} - 0.02, {m.vehicle.chassis.inertia[9]} - 0.04, {m.vehicle.chassis.inertia[2]}, {m.vehicle.chassis.inertia[3]}, {m.vehicle.chassis.inertia[6]})"
+at = "end"
+near = 0.0
+tol = 1e-15
+why = "a single aggregate part is already about its own CG: diag(0.02,0.02,0.04) must pass through untranslated. The static checks cannot see the inertia (omega = 0), so this is its only guard. FAILS under Rumoca bug A: products -m r_j r_k = (0.0024,-0.0016,0.0012) are added"

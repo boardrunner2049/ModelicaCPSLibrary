@@ -1,0 +1,96 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Parts of `assembled` (axes C):
+#   core    2 kg at {1,-2,3}, diag(2,3,4)
+#   arm     1 kg at {3,-1,4}, diag(0.1,0.2,0.3) in axes yawed +90 deg
+#           (R_Cj = [0,-1,0; 1,0,0; 0,0,1] -> diag(0.2,0.1,0.3) in C)
+#   payload 1 kg at {-1,-3,2}, [0.4,0.05,0; 0.05,0.5,0; 0,0,0.6]
+# m = 4, c = {1,-2,3}; offsets d = 0, {2,1,1}, {-2,-1,-1}; sum m d d' =
+# [8,4,4; 4,2,2; 4,2,2], so I = sum R J R' + (tr * E - sum m d d') =
+# [6.6,-3.95,-4; -3.95,13.6,-2; -4,-2,14.9] (hand and numpy agree).
+# The model is static; values are checked at the end row.
+# The real FMU aborts at initialization (model assert, Rumoca bug A);
+# `make -C diag run` evaluates these checks on an assert-free copy.
+# Expected there: 7/12, failing only the products-of-inertia checks.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.totalMass"
+at = "end"
+near = 4.0
+tol = 1e-12
+why = "2 + 1 + 1 kg: each part counted once"
+
+[[check]]
+expr = "norm({m.assembled.cg_C[1]} - 1, {m.assembled.cg_C[2]} + 2, {m.assembled.cg_C[3]} - 3)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "(2*{1,-2,3} + {3,-1,4} + {-1,-3,2}) / 4 = {1,-2,3}"
+
+[[check]]
+expr = "norm({m.assembled.inertia[1]} - 6.6, {m.assembled.inertia[5]} - 13.6, {m.assembled.inertia[9]} - 14.9)"
+at = "end"
+near = 0.0
+tol = 1e-10
+why = "moments about the CG: (2+0.2+0.4) + 2*(6-4) = 6.6, (3+0.1+0.5) + 2*(6-1) = 13.6, (4+0.3+0.6) + 2*(6-1) = 14.9"
+
+[[check]]
+expr = "norm({m.assembled.inertia[2]} + 3.95, {m.assembled.inertia[4]} + 3.95)"
+at = "end"
+near = 0.0
+tol = 1e-10
+why = "I_xy = payload 0.05 - sum m d_x d_y = 0.05 - 4"
+
+[[check]]
+expr = "norm({m.assembled.inertia[3]} + 4, {m.assembled.inertia[7]} + 4)"
+at = "end"
+near = 0.0
+tol = 1e-10
+why = "I_xz = -sum m d_x d_z = -(2 + 2)"
+
+[[check]]
+expr = "norm({m.assembled.inertia[6]} + 2, {m.assembled.inertia[8]} + 2)"
+at = "end"
+near = 0.0
+tol = 1e-10
+why = "I_yz = -sum m d_y d_z = -(1 + 1)"
+
+[[check]]
+variable = "m.aggregateOnly.mass"
+at = "end"
+near = 7.0
+tol = 1e-12
+why = "aggregate mode keeps the 7 kg budget and ignores the 900 kg core and 800 kg payload"
+
+[[check]]
+expr = "norm({m.aggregateOnly.cg_C[1]} - 4, {m.aggregateOnly.cg_C[2]} - 5, {m.aggregateOnly.cg_C[3]} - 6)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "aggregate centre of mass unchanged"
+
+[[check]]
+expr = "norm({m.aggregateOnly.inertia[1]} - 1, {m.aggregateOnly.inertia[5]} - 2, {m.aggregateOnly.inertia[9]} - 3, {m.aggregateOnly.inertia[2]}, {m.aggregateOnly.inertia[3]}, {m.aggregateOnly.inertia[6]})"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "a single part about its own CG: diag(1,2,3) passes through untranslated"
+
+[[check]]
+expr = "norm({m.coreOnly.mass} - 2, {m.coreOnly.cg_C[1]} - 0.2, {m.coreOnly.cg_C[2]} - 0.3, {m.coreOnly.cg_C[3]} - 0.4)"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "empty arm/payload/additional arrays keep the core properties"
+
+[[check]]
+expr = "norm({m.coreOnly.inertia[1]} - 0.1, {m.coreOnly.inertia[5]} - 0.2, {m.coreOnly.inertia[9]} - 0.3, {m.coreOnly.inertia[2]}, {m.coreOnly.inertia[3]}, {m.coreOnly.inertia[6]})"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "the only part is not translated: core tensor about its own CG"

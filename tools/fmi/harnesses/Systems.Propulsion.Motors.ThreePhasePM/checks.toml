@@ -1,0 +1,225 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# R = 0.2 Ohm, L = 0.1 mH, ke = 0.01 V s/rad, p = 7, J+JLoad = 8e-6+2e-6 =
+# 1e-5 kg m^2, b = 1e-5 N m s/rad; sinusoidal back-EMF, theta0 = 0.3 rad,
+# q-aligned voltage amplitude V (0 until 0.1 s). Start: omega = 50 rad/s,
+# i = {1, -0.4, -0.6} A (phase 3 not fixed: floating-star KCL supplies it).
+# Steady state in the rotor (dq) frame, X = p*omega*L:
+#   Id = -X*Iq/R,  V = (R + X^2/R)*Iq + ke*omega,  1.5*ke*Iq = b*omega + tauL
+#   V = +6, tauL = 0     -> omega = 563.296 rad/s, Te = 5.6330e-3 N m, Pcu = 0.20675 W
+#   V = +6, tauL = 0.01  -> omega = 514.367 rad/s, Te = 1.51437e-2 N m, Pcu = 1.29680 W
+#   V = -6, tauL = 0     -> omega = -563.296 rad/s (mirror image)
+#   (no load: Iq = 0.375531 A, Id = -0.740372 A; the same Id sign at -563 rad/s)
+# Phase j current in steady state: Iq*sin(theta_j) + Id*cos(theta_j),
+# theta_j = electricalAngle - (j-1)*2*pi/3.
+# A 2 V / 50 Hz common-mode voltage is on all three phases throughout.
+# Mechanical settling tau ~ 55 ms; each plateau is sampled >= 7 tau after a change.
+# Transient values (spin-down, stall rise) come from an independent abc-frame
+# RK4 integration of the circuit (scratch tpm2/ref.py), which agrees with
+# native `rumoca sim` of the same wrapper (rtol 1e-9) to ~1e-6 relative.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.motor.phaseCurrent[1]"
+at = "0"
+near = 1.0
+tol = 1e-9
+why = "i_start[1] = 1 A is honoured (fixed start)"
+
+[[check]]
+variable = "m.motor.phaseCurrent[2]"
+at = "0"
+near = -0.4
+tol = 1e-9
+why = "i_start[2] = -0.4 A is honoured (fixed start)"
+
+[[check]]
+variable = "m.motor.phaseCurrent[3]"
+at = "0"
+near = -0.6
+tol = 1e-9
+why = "phase 3 has no fixed start: floating-star KCL makes it -(1 - 0.4) = -0.6 A"
+
+[[check]]
+variable = "m.omega"
+at = "0"
+near = 50.0
+tol = 1e-9
+why = "omega_start = 50 rad/s is honoured"
+
+[[check]]
+variable = "m.motor.electricalAngle"
+at = "0"
+near = 0.3
+tol = 1e-12
+why = "shaft angle starts at 0, so the electrical angle is theta0 = 0.3 rad"
+
+[[check]]
+variable = "m.torque"
+at = "0"
+near = 2.778112e-3
+tol = 1e-8
+why = "initial torque ke*sum(sin(theta0 - (j-1)*2pi/3)*i_j) = 0.01*(0.29552 + 0.39029 - 0.40812); with theta0 dropped it would be -1.732e-3"
+
+[[check]]
+variable = "m.storedEnergy"
+at = "0"
+near = 0.012576
+tol = 1e-9
+why = "initial stored energy L/2*sum(i^2) + (J+JLoad)/2*omega^2 = 7.6e-5 + 0.0125 J"
+
+[[check]]
+variable = "m.omega"
+at = "0.01"
+near = 24.0503
+tol = 0.01
+why = "0 V shorts the windings: back-EMF braking ~1.5*ke^2*R/(R^2+X^2) plus friction gives tau ~ 13 ms (with J+JLoad = 1e-5), plus the brief i_start kick; reference 24.0503 rad/s"
+
+[[check]]
+variable = "m.omega"
+at = "0.0999"
+near = 0.0197
+tol = 0.001
+why = "after 0.1 s of shorted spin-down the rotor is practically at rest (reference 0.0197 rad/s)"
+
+[[check]]
+variable = "m.motor.phaseCurrent[1]"
+at = "0.0999"
+near = 0.0
+tol = 0.002
+why = "the initial currents have long decayed (tau_e = 0.5 ms); only the tiny braking current of the 0.02 rad/s rotor is left"
+
+[[check]]
+variable = "m.torque"
+at = "0.1005"
+near = 0.282686
+tol = 3e-4
+why = "stall current rise after the 6 V step at 0.1 s, one tau_e = L/R later: pure-stall closed form 1.5*ke*(V/R)*(1 - exp(-1)) = 0.2845, reduced to 0.28269 by the 8.3 rad/s the rotor already gained (back-EMF and current-vector rotation); reference value"
+
+[[check]]
+variable = "m.motor.acceleration"
+at = "0.1005"
+near = 28260.3
+tol = 30
+why = "Newton on the rigid shaft at the same instant: (Te - b*omega)/(J + JLoad) = (0.282686 - 8.3e-5)/1e-5, consistent with the torque check"
+
+[[check]]
+expr = "1e-5*{m.motor.acceleration} - ({m.torque} - 1e-5*{m.omega} - {m.loadTorque})"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "Newton at every step with the total inertia J + JLoad = 8e-6 + 2e-6 (the asymmetric split catches 2*J or 2*JLoad substitutions), viscous friction and the load torque"
+
+[[check]]
+variable = "m.omega"
+at = "0.5999"
+near = 563.296
+tol = 0.1
+why = "no-load steady speed where 1.5*ke*Iq balances viscous friction b*omega"
+
+[[check]]
+variable = "m.torque"
+at = "0.5999"
+near = 5.6330e-3
+tol = 2e-5
+why = "no-load electromagnetic torque equals the friction torque b*omega"
+
+[[check]]
+variable = "m.copperLoss"
+at = "0.5999"
+near = 0.20675
+tol = 0.002
+why = "copper loss 1.5*R*(Iq^2 + Id^2): the d-axis current X*Iq/R drawn by the uncompensated inductance dominates"
+
+[[check]]
+variable = "m.omega"
+at = "0.9999"
+near = 514.367
+tol = 0.1
+why = "a positive load torque slows the motor to the loaded equilibrium"
+
+[[check]]
+variable = "m.torque"
+at = "0.9999"
+near = 1.51437e-2
+tol = 2e-5
+why = "loaded torque balance: Te = b*omega + loadTorque"
+
+[[check]]
+variable = "m.copperLoss"
+at = "0.9999"
+near = 1.29680
+tol = 0.005
+why = "loaded copper loss from the closed-form dq currents"
+
+[[check]]
+variable = "m.omega"
+at = "end"
+near = -563.296
+tol = 0.1
+why = "negative voltage reverses the motor to the mirror-image no-load speed"
+
+[[check]]
+variable = "m.torque"
+at = "end"
+near = -5.6330e-3
+tol = 2e-5
+why = "torque reverses with the rotation (friction balance at -563 rad/s)"
+
+[[check]]
+variable = "m.omega"
+at = "all"
+range = [-563.4, 563.4]
+why = "the first-order mechanical response never overshoots the no-load speeds"
+
+[[check]]
+variable = "m.starCurrentSum"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "floating star: the three phase currents sum to zero (only two are independent)"
+
+[[check]]
+variable = "m.energyError"
+at = "all"
+range = [-2e-4, 2e-4]
+why = "integrated terminal energy (~17.6 J; native sim error 5e-8 J) = copper + friction + load energy + magnetic and kinetic storage"
+
+[[check]]
+expr = "{m.motor.phaseCurrent[1]} - (0.375531*sin({m.motor.electricalAngle}) - 0.740372*cos({m.motor.electricalAngle}))"
+at = "all"
+from = 0.55
+to = 0.6
+range = [-3e-3, 3e-3]
+why = "phase 1 current waveform at no-load steady state: Iq*sin(theta_1) + Id*cos(theta_1) (native residual 8e-4 A while the speed still settles); a transposed or mis-shifted phase fails"
+
+[[check]]
+expr = "{m.motor.phaseCurrent[2]} - (0.375531*sin({m.motor.electricalAngle} - 2*pi/3) - 0.740372*cos({m.motor.electricalAngle} - 2*pi/3))"
+at = "all"
+from = 0.55
+to = 0.6
+range = [-3e-3, 3e-3]
+why = "phase 2 current waveform at no-load steady state: Iq*sin(theta_2) + Id*cos(theta_2) (native residual 8e-4 A while the speed still settles); a transposed or mis-shifted phase fails"
+
+[[check]]
+expr = "{m.motor.phaseCurrent[3]} - (0.375531*sin({m.motor.electricalAngle} - 4*pi/3) - 0.740372*cos({m.motor.electricalAngle} - 4*pi/3))"
+at = "all"
+from = 0.55
+to = 0.6
+range = [-3e-3, 3e-3]
+why = "phase 3 current waveform at no-load steady state: Iq*sin(theta_3) + Id*cos(theta_3) (native residual 8e-4 A while the speed still settles); a transposed or mis-shifted phase fails"
+
+[[check]]
+expr = "{m.starVoltage} - {m.commonMode}"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "floating star: with balanced back-EMF and currents, the star point sits at the mean phase voltage, i.e. exactly the common-mode input (a grounded neutral would pin it to 0)"
+
+[[check]]
+variable = "m.starVoltage"
+at = "max"
+near = 2.0
+tol = 0.01
+why = "the star point actually swings with the 2 V common mode (not vacuously zero)"

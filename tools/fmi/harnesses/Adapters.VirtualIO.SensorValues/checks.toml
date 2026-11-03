@@ -1,0 +1,205 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# R_bImu = [0 0 1; 1 0 0; 0 1 0] (world.toml): FRD = (a3, a1, a2); its
+# transpose would give (a2, a3, a1). R_bMag = diag{1,-1,-1} (default): FRD =
+# (B1, -B2, -B3). GNSS position/velocity are NED already and pass through.
+# The adapter is stateless, so each row's outputs must equal the transform of
+# the same row's inputs (including the t = 0 row, where all inputs are 0).
+# Closed-form spot checks use the input applied at t - 1 ms (zero-order hold):
+#   a1 = 0.5 + 2 sin(6 pi t), a3 = -9.81 -> -12 at 0.4 s, w1 ramps 0 -> 3 on
+#   [0.2, 0.8] s, B3 steps 4.3e-5 -> -4.3e-5 at 0.6 s, p = (10,-5,-20) +
+#   t*(3,-2,-1).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "abs({m.geometry.R_bImu[3]} - 1) + abs({m.geometry.R_bImu[4]} - 1) + abs({m.geometry.R_bImu[8]} - 1) + abs({m.geometry.R_bImu[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "the world.toml R_bImu override reached the FMU (row-major [0 0 1; 1 0 0; 0 1 0])"
+
+[[check]]
+expr = "{m.acceleration_frd[1]} - ({m.measurements.acceleration[3]})"
+at = "all"
+near = 0
+tol = 0
+why = "IMU mount, every row: forward = sensor z"
+
+[[check]]
+expr = "{m.acceleration_frd[2]} - ({m.measurements.acceleration[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "IMU mount, every row: right = sensor x"
+
+[[check]]
+expr = "{m.acceleration_frd[3]} - ({m.measurements.acceleration[2]})"
+at = "all"
+near = 0
+tol = 0
+why = "IMU mount, every row: down = sensor y"
+
+[[check]]
+expr = "{m.gyro_frd[1]} - ({m.measurements.gyro[3]})"
+at = "all"
+near = 0
+tol = 0
+why = "gyro shares the IMU mount: forward = sensor z"
+
+[[check]]
+expr = "{m.gyro_frd[2]} - ({m.measurements.gyro[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "gyro shares the IMU mount: right = sensor x"
+
+[[check]]
+expr = "{m.gyro_frd[3]} - ({m.measurements.gyro[2]})"
+at = "all"
+near = 0
+tol = 0
+why = "gyro shares the IMU mount: down = sensor y"
+
+[[check]]
+expr = "{m.magneticField_frd[1]} - ({m.measurements.magneticField[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "magnetometer flipped about x: x unchanged"
+
+[[check]]
+expr = "{m.magneticField_frd[2]} - (-{m.measurements.magneticField[2]})"
+at = "all"
+near = 0
+tol = 0
+why = "magnetometer flipped about x: y reversed"
+
+[[check]]
+expr = "{m.magneticField_frd[3]} - (-{m.measurements.magneticField[3]})"
+at = "all"
+near = 0
+tol = 0
+why = "magnetometer flipped about x: z reversed"
+
+[[check]]
+expr = "{m.position_ned[1]} - ({m.measurements.position[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS position[1] already NED: passes through unconverted"
+
+[[check]]
+expr = "{m.velocity_ned[1]} - ({m.measurements.velocity[1]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS velocity[1] already NED: passes through unconverted"
+
+[[check]]
+expr = "{m.position_ned[2]} - ({m.measurements.position[2]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS position[2] already NED: passes through unconverted"
+
+[[check]]
+expr = "{m.velocity_ned[2]} - ({m.measurements.velocity[2]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS velocity[2] already NED: passes through unconverted"
+
+[[check]]
+expr = "{m.position_ned[3]} - ({m.measurements.position[3]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS position[3] already NED: passes through unconverted"
+
+[[check]]
+expr = "{m.velocity_ned[3]} - ({m.measurements.velocity[3]})"
+at = "all"
+near = 0
+tol = 0
+why = "GNSS velocity[3] already NED: passes through unconverted"
+
+[[check]]
+expr = "norm({m.acceleration_frd[1]}, {m.acceleration_frd[2]}, {m.acceleration_frd[3]}) - norm({m.measurements.acceleration[1]}, {m.measurements.acceleration[2]}, {m.measurements.acceleration[3]})"
+at = "all"
+near = 0
+tol = 1e-12
+why = "the mount is a rotation: specific-force magnitude preserved"
+
+[[check]]
+variable = "m.acceleration_frd[1]"
+at = "0.4"
+near = -9.81
+tol = 1e-12
+why = "a3 = -9.81 before the step (input held from 0.399 s)"
+
+[[check]]
+variable = "m.acceleration_frd[1]"
+at = "0.401"
+near = -12.0
+tol = 1e-12
+why = "a3 step to -12 at 0.4 s appears as FRD forward one step later"
+
+[[check]]
+variable = "m.acceleration_frd[2]"
+at = "0.251"
+near = -1.5
+tol = 1e-12
+why = "FRD right = a1 = 0.5 + 2 sin(6 pi t) at t = 0.25 s"
+
+[[check]]
+variable = "m.gyro_frd[2]"
+at = "0.501"
+near = 1.5
+tol = 1e-12
+why = "FRD right = w1, halfway up the 0 -> 3 rad/s ramp at 0.5 s"
+
+[[check]]
+variable = "m.gyro_frd[1]"
+at = "0.501"
+near = -0.4
+tol = 1e-12
+why = "FRD forward = w3, stepped 0.1 -> -0.4 at 0.5 s"
+
+[[check]]
+variable = "m.magneticField_frd[3]"
+at = "0.6"
+near = -4.3e-05
+tol = 1e-18
+why = "before the B3 step: FRD z = -4.3e-5 T"
+
+[[check]]
+variable = "m.magneticField_frd[3]"
+at = "0.601"
+near = 4.3e-05
+tol = 1e-18
+why = "B3 steps to -4.3e-5 at 0.6 s: FRD z reverses sign to +4.3e-5 T"
+
+[[check]]
+variable = "m.position_ned[1]"
+at = "end"
+near = 12.997
+tol = 1e-09
+why = "north = 10 + 3 t at the last held input (0.999 s)"
+
+[[check]]
+variable = "m.position_ned[3]"
+at = "end"
+near = -20.999
+tol = 1e-09
+why = "down = -20 - t: NED down is not flipped to up"
+
+[[check]]
+variable = "m.velocity_ned[3]"
+at = "end"
+near = -1.0
+tol = 1e-12
+why = "NED velocity down component stays -1 (climbing), not +1"

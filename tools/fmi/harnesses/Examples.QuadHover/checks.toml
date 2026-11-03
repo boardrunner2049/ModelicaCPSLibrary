@@ -1,0 +1,416 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# QuadHover with two tunable-parameter overrides (world.toml):
+#   rotors[1].kT = 1.25e-5 (others 1e-5): rotor 1 needs a lower hover speed
+#     omega_1 = sqrt(m g/(4 kT_1)) = 542.4016040 rad/s for the same thrust m g/4, so
+#     its drag torque kQ omega_1^2 = 0.044129925 N.m is smaller than the others'
+#     0.055162406; the yaw reactions no longer cancel: Mz = Q_1 - Q = -0.011032481 N.m.
+#   motors[2].omegaMax = 1250: ESC 2 must command omega_h/1250 for the same speed.
+# Thrusts are still equal and z is a principal axis (I = diag(0.02,0.02,0.04)),
+# so the vehicle stays level and spins up about body z with constant
+# alpha = Mz/Izz = -0.275812031 rad/s^2: yaw rate a t, heading pi/2 + a t^2/2.
+# Rotor i body moment = r_i x (0,0,-T) + (0,0,spinSign_i Q_i); rotorMoment_b is
+# [n,3] row-major; R_wb is row-major. Default field B_w = {0,20,45} uT NED.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- rotor speeds, ESC commands, blade loads -------------------------------
+
+[[check]]
+variable = "m.motors[1].omega"
+at = "all"
+near = 542.4016039799293
+tol = 1e-06
+why = "motor 1 starts at and holds its hover speed sqrt(m g/(n kT_1)) (no transient)"
+
+[[check]]
+variable = "m.motors[2].omega"
+at = "all"
+near = 606.4234288020211
+tol = 1e-06
+why = "motor 2 starts at and holds its hover speed sqrt(m g/(n kT_2)) (no transient)"
+
+[[check]]
+variable = "m.motors[3].omega"
+at = "all"
+near = 606.4234288020211
+tol = 1e-06
+why = "motor 3 starts at and holds its hover speed sqrt(m g/(n kT_3)) (no transient)"
+
+[[check]]
+variable = "m.motors[4].omega"
+at = "all"
+near = 606.4234288020211
+tol = 1e-06
+why = "motor 4 starts at and holds its hover speed sqrt(m g/(n kT_4)) (no transient)"
+
+[[check]]
+variable = "m.escs[1].normalizedCommand"
+at = "end"
+near = 0.5424016039799293
+tol = 1e-09
+why = "ESC 1 passes omega_h/omegaMax_1"
+
+[[check]]
+variable = "m.escs[2].normalizedCommand"
+at = "end"
+near = 0.4851387430416169
+tol = 1e-09
+why = "ESC 2 passes omega_h/omegaMax_2"
+
+[[check]]
+variable = "m.escs[3].normalizedCommand"
+at = "end"
+near = 0.6064234288020212
+tol = 1e-09
+why = "ESC 3 passes omega_h/omegaMax_3"
+
+[[check]]
+variable = "m.escs[4].normalizedCommand"
+at = "end"
+near = 0.6064234288020212
+tol = 1e-09
+why = "ESC 4 passes omega_h/omegaMax_4"
+
+[[check]]
+variable = "m.rotors[[]*].force_r[[]3]"
+at = "all"
+near = 3.67749375
+tol = 1e-09
+why = "every rotor carries m g / n: kT_i omega_i^2 is the same for all rotors"
+
+[[check]]
+variable = "m.rotors[1].loadTorque"
+at = "all"
+near = 0.044129925
+tol = 1e-10
+why = "blade 1 drag torque kQ omega_1^2"
+
+[[check]]
+variable = "m.rotors[2].loadTorque"
+at = "all"
+near = 0.05516240624999999
+tol = 1e-10
+why = "blade 2 drag torque kQ omega_2^2"
+
+[[check]]
+variable = "m.rotors[3].loadTorque"
+at = "all"
+near = 0.05516240624999999
+tol = 1e-10
+why = "blade 3 drag torque kQ omega_3^2"
+
+[[check]]
+variable = "m.rotors[4].loadTorque"
+at = "all"
+near = 0.05516240624999999
+tol = 1e-10
+why = "blade 4 drag torque kQ omega_4^2"
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "all"
+near = -14.709975
+tol = 1e-09
+why = "net rotor thrust balances the weight m g (body -z is up)"
+
+[[check]]
+variable = "m.vehicle.force_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "rotor thrust is along body z only"
+
+# --- per-rotor moment arms and yaw reactions (all four rotors) -------------
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[1]"
+at = "all"
+near = 0.6500951920990364
+tol = 1e-09
+why = "rotor 1 at (0.17678, -0.17678, 0.000) m: roll -T r_y"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[2]"
+at = "all"
+near = 0.6500951920990365
+tol = 1e-09
+why = "rotor 1 at (0.17678, -0.17678, 0.000) m: pitch T r_x"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[3]"
+at = "all"
+near = 0.044129925
+tol = 1e-09
+why = "rotor 1 at (0.17678, -0.17678, 0.000) m: yaw reaction spinSign*Q with spinSign +1 (R_br flips the rotor-local -spinSign Q)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[4]"
+at = "all"
+near = 0.6500951920990365
+tol = 1e-09
+why = "rotor 2 at (-0.17678, -0.17678, 0.000) m: roll -T r_y"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[5]"
+at = "all"
+near = -0.6500951920990364
+tol = 1e-09
+why = "rotor 2 at (-0.17678, -0.17678, 0.000) m: pitch T r_x"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[6]"
+at = "all"
+near = -0.05516240624999999
+tol = 1e-09
+why = "rotor 2 at (-0.17678, -0.17678, 0.000) m: yaw reaction spinSign*Q with spinSign -1 (R_br flips the rotor-local -spinSign Q)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[7]"
+at = "all"
+near = -0.6500951920990364
+tol = 1e-09
+why = "rotor 3 at (-0.17678, 0.17678, 0.000) m: roll -T r_y"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[8]"
+at = "all"
+near = -0.6500951920990367
+tol = 1e-09
+why = "rotor 3 at (-0.17678, 0.17678, 0.000) m: pitch T r_x"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[9]"
+at = "all"
+near = 0.05516240624999999
+tol = 1e-09
+why = "rotor 3 at (-0.17678, 0.17678, 0.000) m: yaw reaction spinSign*Q with spinSign +1 (R_br flips the rotor-local -spinSign Q)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[10]"
+at = "all"
+near = -0.6500951920990367
+tol = 1e-09
+why = "rotor 4 at (0.17678, 0.17678, 0.000) m: roll -T r_y"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[11]"
+at = "all"
+near = 0.6500951920990363
+tol = 1e-09
+why = "rotor 4 at (0.17678, 0.17678, 0.000) m: pitch T r_x"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[12]"
+at = "all"
+near = -0.05516240624999999
+tol = 1e-09
+why = "rotor 4 at (0.17678, 0.17678, 0.000) m: yaw reaction spinSign*Q with spinSign -1 (R_br flips the rotor-local -spinSign Q)"
+
+[[check]]
+variable = "m.vehicle.moment_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "roll/pitch moment arms cancel (equal thrust, symmetric arms)"
+
+[[check]]
+variable = "m.vehicle.moment_b[3]"
+at = "all"
+near = -0.01103248124999999
+tol = 1e-12
+why = "net yaw = Q_1 - Q_2 + Q_3 - Q_4 = Q_1 - Q: unbalanced by the rotor-1 kT override"
+
+# --- yaw spin-up at constant alpha about the principal z axis --------------
+
+[[check]]
+variable = "m.vehicle.truth.alpha_b[3]"
+at = "all"
+near = -0.27581203124999976
+tol = 1e-10
+why = "alpha_z = Mz / Izz"
+
+[[check]]
+variable = "m.vehicle.truth.alpha_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "pure yaw: no roll/pitch acceleration"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no roll/pitch rate develops (z principal, no roll/pitch moment)"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[3]"
+at = "2.0"
+near = -0.5516240624999995
+tol = 1e-09
+why = "yaw rate alpha t at t = 2.0"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[3]"
+at = "4.0"
+near = -1.103248124999999
+tol = 1e-09
+why = "yaw rate alpha t at t = 4.0"
+
+[[check]]
+expr = "{m.vehicle.truth.omega_b[3]@4.0} - {m.vehicle.truth.omega_b[3]@2.0}"
+at = "end"
+near = -0.5516240624999995
+tol = 1e-09
+why = "yaw rate grows by alpha * 2 s between 2 s and 4 s"
+
+[[check]]
+variable = "m.vehicle.body.euler[3]"
+at = "2.0"
+near = 1.019172264294897
+tol = 1e-08
+why = "heading pi/2 + alpha t^2/2 at t = 2.0"
+
+[[check]]
+variable = "m.vehicle.body.euler[3]"
+at = "4.0"
+near = -0.6356999232051015
+tol = 1e-08
+why = "heading pi/2 + alpha t^2/2 at t = 4.0"
+
+[[check]]
+variable = "m.vehicle.body.euler[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "stays level while spinning"
+
+# --- translation: thrust stays vertical and equal to the weight ------------
+
+[[check]]
+variable = "m.vehicle.truth.p_w[3]"
+at = "all"
+near = -1.0
+tol = 1e-09
+why = "altitude holds at p_start"
+
+[[check]]
+variable = "m.vehicle.truth.p_w[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "no horizontal drift"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "legs 0.9 m above the ground: no contact force"
+
+# --- rotor kinematics outputs ----------------------------------------------
+
+[[check]]
+variable = "m.vehicle.rotorAirVelocity_r[1]"
+at = "4.0"
+near = -0.19502855762971077
+tol = 1e-08
+why = "rotor 1 hub velocity omega x r in rotor axes (y flipped) at 4 s, x"
+
+[[check]]
+variable = "m.vehicle.rotorAirVelocity_r[2]"
+at = "4.0"
+near = 0.1950285576297108
+tol = 1e-08
+why = "rotor 1 hub velocity omega x r in rotor axes (y flipped) at 4 s, y"
+
+[[check]]
+variable = "m.vehicle.rotorAirVelocity_r[4]"
+at = "4.0"
+near = -0.1950285576297108
+tol = 1e-08
+why = "rotor 2 hub velocity omega x r in rotor axes (y flipped) at 4 s, x"
+
+[[check]]
+variable = "m.vehicle.rotorAirVelocity_r[5]"
+at = "4.0"
+near = -0.19502855762971077
+tol = 1e-08
+why = "rotor 2 hub velocity omega x r in rotor axes (y flipped) at 4 s, y"
+
+[[check]]
+expr = "{m.vehicle.rotorOmegaBody_r[3]} + {m.vehicle.truth.omega_b[3]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "carrier yaw rate in rotor axes: rotor z = -body z"
+
+# --- ideal sensors ---------------------------------------------------------
+
+[[check]]
+variable = "m.vehicle.measurements.acceleration[3]"
+at = "all"
+near = 9.80665
+tol = 1e-09
+why = "hovering IMU reads specific force g on sensor z = -body z"
+
+[[check]]
+variable = "m.vehicle.measurements.acceleration[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "IMU at the CG: no centripetal or horizontal specific force while spinning"
+
+[[check]]
+expr = "{m.vehicle.measurements.gyro[3]} + {m.vehicle.truth.omega_b[3]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "gyro z = -body yaw rate (sensor z = -body z)"
+
+[[check]]
+expr = "{m.vehicle.measurements.magneticField[1]} - 2e-05*sin({m.vehicle.body.euler[3]})"
+at = "all"
+near = 0.0
+tol = 1e-13
+why = "magnetometer x = Be sin(psi) for the level vehicle at heading psi"
+
+[[check]]
+expr = "{m.vehicle.measurements.magneticField[2]} + 2e-05*cos({m.vehicle.body.euler[3]})"
+at = "all"
+near = 0.0
+tol = 1e-13
+why = "magnetometer y = -Be cos(psi): body y = South at psi = pi/2, flipped to sensor y"
+
+[[check]]
+variable = "m.vehicle.measurements.magneticField[1]"
+at = "4.0"
+near = -1.1874817147506746e-05
+tol = 1e-12
+why = "closed form at 4 s, heading -0.635700: Be sin(psi)"
+
+[[check]]
+variable = "m.vehicle.measurements.magneticField[2]"
+at = "4.0"
+near = -1.6093126412020747e-05
+tol = 1e-12
+why = "closed form at 4 s, heading -0.635700: -Be cos(psi)"
+
+[[check]]
+variable = "m.vehicle.measurements.magneticField[3]"
+at = "all"
+near = -4.5e-05
+tol = 1e-12
+why = "level: sensor z = -Down field"
+
+[[check]]
+variable = "m.vehicle.measurements.altitude"
+at = "all"
+near = 1.0
+tol = 1e-09
+why = "barometer altitude -p_w[3] stays 1 m"

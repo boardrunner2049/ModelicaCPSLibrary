@@ -1,0 +1,75 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# PassThrough is algebraic: normalizedCommand = escCommand, no delay.
+# Inputs held from t appear in the row at t + 1 ms.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.normalizedCommand} - {m.escCommand}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "exact forwarding in every row: no delay, gain or offset"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "0.1"
+near = 0.0
+tol = 0.0
+why = "zero command before the ramp"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "0.201"
+near = 0.5
+tol = 1e-12
+why = "ramp midpoint: command held from 0.200 s is (0.2-0.1)/0.2 = 0.5"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "0.35"
+near = 1.0
+tol = 0.0
+why = "upper bound 1 is accepted and forwarded unchanged (no clamp below 1)"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "0.45"
+near = 0.35
+tol = 1e-15
+why = "step down is forwarded within one communication step"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "max"
+from = 0.5
+to = 0.9
+near = 1.0
+tol = 1e-12
+why = "sine crest reaches 1 at 0.6 s / 0.8 s"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "min"
+from = 0.6
+to = 0.9
+near = 0.0
+tol = 1e-12
+why = "sine trough reaches 0 at 0.7 s"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "all"
+range = [0.0, 1.0]
+why = "normalized output stays in [0, 1] throughout the valid scenario"
+
+[[check]]
+variable = "m.normalizedCommand"
+at = "end"
+near = 0.0
+tol = 0.0
+why = "final step back to zero"

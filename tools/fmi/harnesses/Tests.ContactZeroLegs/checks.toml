@@ -1,0 +1,29 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Closed test: a LandingGearAssembly with nLegs = 0 at the ground plane
+# (p_w = 0, identity attitude, level NED ground). The model's assert requires
+# zero force and moment; the empty leg arrays must export and run.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.gear.nLegs"
+at = "0"
+near = 0.0
+tol = 0
+why = "the zero-leg configuration reached the FMU"
+
+[[check]]
+expr = "norm({m.gear.force_b[1]}, {m.gear.force_b[2]}, {m.gear.force_b[3]}, {m.gear.moment_b[1]}, {m.gear.moment_b[2]}, {m.gear.moment_b[3]})"
+at = "all"
+range = [0.0, 0.0]
+why = "no legs, no contact wrench (exactly zero, from the initialized state on)"
+
+[[check]]
+expr = "norm({m.gear.terrainNormal_w[1]}, {m.gear.terrainNormal_w[2]}, {m.gear.terrainNormal_w[3]} + 1, {m.gear.R_wb[1]} - 1, {m.gear.R_wb[5]} - 1, {m.gear.R_wb[9]} - 1, {m.gear.p_w[3]})"
+at = "all"
+range = [0.0, 0.0]
+why = "the bound inputs are present: body at the ground plane, where any leg would be loaded, yet the wrench is zero"

@@ -1,0 +1,120 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Closed test: MultirotorWithSensors with landingGear.enabled = false, CG
+# starting 0.12 m above level ground (feet 2 cm above it), rotors forced to
+# zero wrench. The vehicle must fall freely straight through the ground
+# plane: p_Down(t) = -0.12 + g t^2/2, g = 9.80665 m/s^2. The scenario is the
+# run itself (0.6 s, the model's StopTime, at 1 ms).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.vehicle.landingGear.enabled} + {m.vehicle.gear.nLegs} + {m.vehicle.nLandingLegs}"
+at = "0"
+near = 0.0
+tol = 0
+why = "disabling the gear removes the legs altogether (zero-leg assembly)"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "0.05"
+near = -0.10774168749999999
+tol = 1e-9
+why = "free fall -0.12 + g t^2/2"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "0.05"
+near = 0.4903325
+tol = 1e-9
+why = "free-fall speed g t"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "0.157"
+near = 0.0008620579250000066
+tol = 1e-9
+why = "free fall -0.12 + g t^2/2 (CG crossed the ground plane at sqrt(0.24/g) = 0.1564 s and keeps falling)"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "0.157"
+near = 1.53964405
+tol = 1e-9
+why = "free-fall speed g t"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "0.3"
+near = 0.32129925
+tol = 1e-9
+why = "free fall -0.12 + g t^2/2"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "0.3"
+near = 2.941995
+tol = 1e-9
+why = "free-fall speed g t"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "0.5"
+near = 1.10583125
+tol = 1e-9
+why = "free fall -0.12 + g t^2/2"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "0.5"
+near = 4.903325
+tol = 1e-9
+why = "free-fall speed g t"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "0.6"
+near = 1.645197
+tol = 1e-9
+why = "free fall -0.12 + g t^2/2 (feet 0.1 m below the CG are 1.645 m below the plane: not arrested)"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "0.6"
+near = 5.88399
+tol = 1e-9
+why = "free-fall speed g t"
+
+[[check]]
+expr = "{m.vehicle.body.p_w[3]} - {m.vehicle.body.p_w[3]@0.499} - (0.5*9.80665*(0.5**2 - 0.499**2))"
+at = "0.5"
+near = 0.0
+tol = 1e-9
+why = "model assert window (time >= 0.5): still accelerating at g below the plane"
+
+[[check]]
+expr = "norm({m.vehicle.gear.force_b[1]}, {m.vehicle.gear.force_b[2]}, {m.vehicle.gear.force_b[3]}, {m.vehicle.gear.moment_b[1]}, {m.vehicle.gear.moment_b[2]}, {m.vehicle.gear.moment_b[3]})"
+at = "all"
+range = [0.0, 1e-12]
+why = "model assert: disabled gear contributes no wrench, also below the plane"
+
+[[check]]
+expr = "norm({m.vehicle.body.force_b[1]}, {m.vehicle.body.force_b[2]}, {m.vehicle.body.force_b[3]}, {m.vehicle.body.moment_b[1]}, {m.vehicle.body.moment_b[2]}, {m.vehicle.body.moment_b[3]})"
+at = "all"
+range = [0.0, 1e-12]
+why = "no non-gravity load at all reaches the rigid body"
+
+[[check]]
+expr = "norm({m.vehicle.sensors.measurements.acceleration[1]}, {m.vehicle.sensors.measurements.acceleration[2]}, {m.vehicle.sensors.measurements.acceleration[3]})"
+at = "all"
+range = [0.0, 1e-9]
+why = "model assert: a free-falling accelerometer reads zero specific force"
+
+[[check]]
+expr = "norm({m.vehicle.sensors.measurements.gyro[1]}, {m.vehicle.sensors.measurements.gyro[2]}, {m.vehicle.sensors.measurements.gyro[3]}, {m.vehicle.body.p_w[1]}, {m.vehicle.body.p_w[2]})"
+at = "all"
+range = [0.0, 1e-12]
+why = "no rotation and no horizontal drift"

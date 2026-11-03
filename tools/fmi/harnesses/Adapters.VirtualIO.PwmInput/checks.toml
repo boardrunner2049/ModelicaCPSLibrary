@@ -1,0 +1,165 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# normalizedCommand[k] = clamp((pw - pwmMin[k])/(pwmMax[k] - pwmMin[k]), 0, 1).
+# world.toml sets per-channel ranges: ch1, ch2 1000..2000 us (the defaults),
+# ch3 1100..1900 us, ch4 1050..2050 us, so each channel must use its own
+# calibration (a shared or transposed range would show on ch3/ch4).
+# Inputs are a zero-order hold: the trace row at time t shows the response to
+# the input applied at t - 1 ms, so the expected values below are evaluated at
+# t - 1 ms. The t = 0 row is the initialized state before any input acts.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.normalizedCommand[[]*]"
+at = "all"
+range = [0.0, 1.0]
+why = "the normalized command never leaves [0, 1], whatever the pulse width"
+
+# --- ch1: ramp 800 -> 2200 us over [0.5, 2.5] s, pw(t) = 800 + 700 (t - 0.5) ---
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "0.5"
+near = 0.0
+tol = 1e-12
+why = "800 us is below pwmMin: lower clamp, not a negative command"
+
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "1.001"
+near = 0.15
+tol = 1e-9
+why = "pw(1.0 s) = 1150 us -> (1150-1000)/1000 = 0.15 (linear range)"
+
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "1.501"
+near = 0.5
+tol = 1e-9
+why = "pw(1.5 s) = 1500 us is mid-range"
+
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "2.001"
+near = 0.85
+tol = 1e-9
+why = "pw(2.0 s) = 1850 us -> 0.85 (linear range)"
+
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "2.401"
+near = 1.0
+tol = 1e-12
+why = "pw(2.4 s) = 2130 us is above pwmMax: upper clamp"
+
+[[check]]
+variable = "m.normalizedCommand[1]"
+at = "end"
+near = 1.0
+tol = 1e-12
+why = "2200 us stays clamped at full command"
+
+# --- ch2: staircase 1000/1250/1500/1750/2000/0 us, 0.5 s plateaus ---
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "0.25"
+near = 0.0
+tol = 1e-12
+why = "pwmMin itself maps to exactly 0"
+
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "0.75"
+near = 0.25
+tol = 1e-12
+why = "1250 us -> 0.25"
+
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "1.25"
+near = 0.5
+tol = 1e-12
+why = "1500 us -> 0.5"
+
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "1.75"
+near = 0.75
+tol = 1e-12
+why = "1750 us -> 0.75"
+
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "2.25"
+near = 1.0
+tol = 1e-12
+why = "pwmMax itself maps to exactly 1"
+
+[[check]]
+variable = "m.normalizedCommand[2]"
+at = "end"
+near = 0.0
+tol = 1e-12
+why = "a 0 us pulse (no signal) reads zero command, not -1"
+
+# --- ch3: sine 1500 +/- 700 us at 1 Hz, range 1100..1900 us ---
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = 0.051
+near = 0.7703898700780789
+tol = 1e-9
+why = "pw(0.05 s) = 1500 + 700 sin(0.1 pi) = 1716.31 us -> (1716.31 - 1100)/800 with ch3's own range"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = 0.091
+near = 0.968848445606622
+tol = 1e-9
+why = "pw(0.09 s) = 1875.08 us, just below ch3's 1900 us pwmMax: still linear"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = 0.126
+near = 1.0
+tol = 1e-12
+why = "pw(0.125 s) = 1994.97 us exceeds ch3's 1900 us pwmMax: clamped (the default range would give 0.995)"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = "max"
+near = 1.0
+tol = 1e-12
+why = "the 2200 us crest saturates at exactly 1"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = "min"
+near = 0.0
+tol = 1e-12
+why = "the 800 us trough saturates at exactly 0"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = 0.75
+near = 0.0
+tol = 1e-12
+why = "pw(0.749 s) = 800.0 us is below pwmMin: still clamped at the trough"
+
+[[check]]
+variable = "m.normalizedCommand[3]"
+at = 1.001
+near = 0.5
+tol = 1e-9
+why = "pw(1.0 s) = 1500 us is the centre of 1100..1900: sine zero crossing maps to mid-command"
+
+# --- ch4: constant 1500 us, range 1050..2050 us, unaffected by the other channels ---
+[[check]]
+variable = "m.normalizedCommand[4]"
+at = "all"
+from = 0.001
+near = 0.45
+tol = 1e-12
+why = "(1500 - 1050)/1000 = 0.45 at every instant once the input acts: ch4's own range, and no cross-talk from the moving channels"

@@ -1,0 +1,115 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# R = 2 ohm, L = 0.02 H (tau = 10 ms), i(0) = -1 A, v = -4 V then +4 V at 0.1 s.
+#   i(t) = -2 + exp(-t/tau)                                t < 0.1
+#   i(t) = 2 + (-4 + exp(-10)) exp(-(t-0.1)/tau)           t >= 0.1
+# FMU vs native rumoca sim (dt 1e-4): max |di| 2.3e-9 A, |dE| 2.8e-9 J.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.branch.i"
+at = "0"
+near = -1.0
+tol = 1e-12
+why = "signed initial current i_start = -1 A"
+
+[[check]]
+variable = "m.branch.i"
+at = "0.01"
+near = -1.63212056
+tol = 1e-6
+why = "one tau: -2 + exp(-1)"
+
+[[check]]
+variable = "m.branch.i"
+at = "0.0999"
+near = -1.99995414
+tol = 1e-6
+why = "approaches the negative steady state -V/R = -2 A"
+
+[[check]]
+variable = "m.branch.i"
+at = "0.105"
+near = -0.42609510
+tol = 1e-6
+why = "after the voltage reversal: 2 + (-4 + e^-10) exp(-0.5)"
+
+[[check]]
+variable = "m.branch.i"
+at = "0.11"
+near = 0.52849894
+tol = 1e-6
+why = "current has reversed sign one tau after the step"
+
+[[check]]
+variable = "m.branch.i"
+at = "0.12"
+near = 1.45866501
+tol = 1e-6
+why = "two tau after the step"
+
+[[check]]
+variable = "m.branch.i"
+at = "end"
+near = 1.99981840
+tol = 1e-6
+why = "positive steady state +V/R = 2 A (10 tau)"
+
+[[check]]
+expr = "({m.branch.i@0.1069} < 0) + ({m.branch.i@0.1070} > 0)"
+near = 2.0
+tol = 0.0
+why = "zero crossing at 0.1 + tau ln((4 - e^-10)/2) = 0.106931 s"
+
+[[check]]
+expr = "{m.branch.i} - {m.expected}"
+at = "all"
+near = 0.0
+tol = 1e-6
+why = "closed-form response holds in every row (the model's own expected signal)"
+
+[[check]]
+expr = "{m.source.v} - 2 * {m.branch.i} - 0.02 * {m.der(branch.inductor.i)}"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "KVL: v = R i + L di/dt in every row"
+
+[[check]]
+expr = "{m.branch.copperLoss} - 2 * {m.branch.i}**2"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "copper loss R i^2 for both current signs"
+
+[[check]]
+expr = "{m.branch.magneticEnergy} - 0.01 * {m.branch.i}**2"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "stored energy L i^2/2 (sign-independent)"
+
+[[check]]
+expr = "{m.energy} - {m.branch.magneticEnergy}"
+at = "all"
+near = 0.0
+tol = 1e-7
+why = "passive energy balance: integral of (v i - R i^2) equals the stored magnetic energy"
+
+[[check]]
+variable = "m.branch.magneticEnergy"
+at = "min"
+from = 0.106
+to = 0.108
+range = [0.0, 1e-5]
+why = "stored energy passes through ~0 at the current reversal"
+
+[[check]]
+variable = "m.branch.i"
+at = "all"
+range = [-2.0, 2.0]
+why = "current bounded by |V|/R from a smaller start: no overshoot in a first-order RL"

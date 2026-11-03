@@ -1,0 +1,42 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# tau = 0.02 s, omegaMax = 1000 rad/s; inputs are held over each 1 ms step.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.omega"
+at = "0.1"
+near = 0.0
+tol = 1e-9
+why = "rotor at rest before the first command"
+
+[[check]]
+variable = "m.omega"
+at = "0.3"
+near = 499.977
+tol = 0.5
+why = "10 tau after demand 0.5: 500*(1-exp(-10))"
+
+[[check]]
+variable = "m.omega"
+at = "0.6"
+near = 1000.0
+tol = 1.0
+why = "demand above 1 saturates at omegaMax"
+
+[[check]]
+variable = "m.omega"
+at = "end"
+near = 0.0
+tol = 0.01
+why = "negative demand clamps to zero; 20 tau of decay"
+
+[[check]]
+variable = "m.omega"
+at = "all"
+range = [0.0, 1000.001]
+why = "speed never leaves [0, omegaMax]"

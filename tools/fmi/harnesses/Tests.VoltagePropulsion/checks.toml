@@ -1,0 +1,152 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# nominal: w = 400 + (70 - 400) exp(-t/0.03)
+# sag:     nominal until 0.15 s, then 200 + (w(0.15) - 200) exp(-(t-0.15)/0.03)
+# stopped: 70 exp(-t/0.03)
+# FMU vs native rumoca sim (dt 1e-3): max |dw| 5.4e-7 rad/s.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.nominal.omega} + {m.sag.omega} + {m.stopped.omega} + {m.p0.omega}"
+at = "0"
+near = 280.0
+tol = 1e-12
+why = "all four motors start at omega_start = 70 rad/s"
+
+[[check]]
+variable = "m.nominal.equivalentVoltage"
+at = "all"
+near = 6.4
+tol = 1e-12
+why = "0.4 x 16 V = 6.4 V, Kv x 6.4 = 400 rad/s target"
+
+[[check]]
+variable = "m.nominal.omega"
+at = "0.03"
+near = 278.599784
+tol = 1e-4
+why = "one tau: 400 - 330 exp(-1)"
+
+[[check]]
+variable = "m.nominal.omega"
+at = "0.1"
+near = 388.227582
+tol = 1e-4
+why = "first-order closed form at 0.1 s"
+
+[[check]]
+variable = "m.nominal.omega"
+at = "end"
+near = 399.999981
+tol = 1e-4
+why = "settles at Kv V = 400 rad/s"
+
+[[check]]
+expr = "{m.nominal.omega} - {m.p0.omega}"
+at = "all"
+near = 0.0
+tol = 1e-7
+why = "P1 voltage path with Kv*16 = omegaMax is equivalent to the P0 normalized-command path"
+
+[[check]]
+expr = "{m.rotors[2].force_r[3]} - {m.rotors[1].force_r[3]}"
+at = "all"
+near = 0.0
+tol = 1e-7
+why = "equal speeds give equal thrust on both rotors"
+
+[[check]]
+expr = "{m.rotors[2].moment_r[3]} - {m.rotors[1].moment_r[3]}"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "equal speeds give equal reaction moment"
+
+[[check]]
+expr = "{m.rotors[1].force_r[3]} - 1e-5 * {m.p0.omega}**2"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "thrust kT omega^2"
+
+[[check]]
+expr = "{m.rotors[2].moment_r[3]} + 1.5e-7 * {m.nominal.omega}**2"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "reaction moment -spinSign kQ omega^2 with spinSign +1"
+
+[[check]]
+expr = "{m.sag.omega} - {m.nominal.omega}"
+at = "all"
+to = 0.15
+near = 0.0
+tol = 1e-9
+why = "independent states agree while the supplies agree"
+
+[[check]]
+variable = "m.sag.equivalentVoltage"
+at = "all"
+from = 0.15
+near = 3.2
+tol = 1e-12
+why = "supply sag to 8 V halves the drive voltage (0.4 x 8 V)"
+
+[[check]]
+variable = "m.sag.omega"
+at = "0.18"
+near = 272.757900
+tol = 1e-4
+why = "one tau after the sag: 200 + (397.776 - 200) exp(-1)"
+
+[[check]]
+variable = "m.sag.omega"
+at = "0.3"
+near = 201.332607
+tol = 1e-4
+why = "voltage-sag closed form at 0.3 s"
+
+[[check]]
+variable = "m.sag.omega"
+at = "end"
+near = 200.001696
+tol = 1e-4
+why = "settles at Kv x 3.2 V = 200 rad/s"
+
+[[check]]
+expr = "{m.sagExpected} - {m.sag.omega}"
+at = "all"
+near = 0.0
+tol = 1e-4
+why = "model's own sag reference holds in every row"
+
+[[check]]
+variable = "m.stopped.equivalentVoltage"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "full command on a dead bus gives no voltage"
+
+[[check]]
+variable = "m.stopped.omega"
+at = "0.03"
+near = 25.75156088
+tol = 1e-5
+why = "zero-voltage coast 70 exp(-1)"
+
+[[check]]
+variable = "m.stopped.omega"
+at = "0.15"
+near = 0.47165629
+tol = 1e-5
+why = "zero-voltage coast 70 exp(-5)"
+
+[[check]]
+variable = "m.stopped.omega"
+at = "all"
+range = [0.0, 70.0]
+why = "coast-down is monotone toward zero, never reverses"

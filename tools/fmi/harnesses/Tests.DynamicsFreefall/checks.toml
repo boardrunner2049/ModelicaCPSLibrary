@@ -1,0 +1,247 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Ballistic flight of a TUMBLING body. world.toml overrides mass = 7.3 kg,
+# a full asymmetric inertia J = [.03 .004 -.002; .004 .05 .006; -.002 .006 .07]
+# kg m^2 and omega_start = {2,-1,3} rad/s; force and moment are zero, NED
+# g = 9.81 m/s^2. v_start = {1,2,3} is body FRD and equals world at t = 0
+# (identity start), so the CG path is still the mass- and rotation-independent
+# p(t) = {2+t, 1+2t, 5+3t+4.905t^2}, v(t) = {1, 2, 3+9.81t}: at 1 s
+# p = {3,3,12.905}; at 2 s p = {4,5,30.62}, v_z = 22.62. The body-frame
+# velocity v_b changes all the time (transport term -omega x v_b), so these
+# hold only if that term and R_wb are right.
+# Rotation is torque-free: kinetic energy w.J.w/2 = 0.362 J and world angular
+# momentum R_wb J w = {0.05, -0.024, 0.2} N m s are conserved. Attitude and
+# rates are compared with an independent RK4 (h = 1e-5 s) of Euler's equation
+# and q' = q (x) (0,w)/2; the FMU agrees with it to
+# ~5e-11 (checked at 1e-8). Native `rumoca sim --rtol 1e-10 --atol 1e-12` of
+# the same perturbation (extends ... body(mass, inertia, omega_start)) agrees
+# with the FMU to 5e-8 (the FMU is the closer of the two to the closed form).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- translation: ballistic, independent of mass and tumbling ---
+[[check]]
+variable = "m.body.p_w[3]"
+at = 1
+near = 12.905
+tol = 1e-8
+why = "down position 5 + 3t + g t^2/2 at t = 1 s"
+
+[[check]]
+variable = "m.body.p_w[1]"
+at = "end"
+near = 4.0
+tol = 1e-8
+why = "no horizontal force: north position 2 + 1*t, linear, although the body tumbles"
+
+[[check]]
+variable = "m.body.p_w[2]"
+at = "end"
+near = 5.0
+tol = 1e-8
+why = "no horizontal force: east position 1 + 2*t"
+
+[[check]]
+variable = "m.body.p_w[3]"
+at = "end"
+near = 30.62
+tol = 1e-8
+why = "down position 5 + 3*2 + 4.905*4 = 30.62 m: quadratic fall under +z NED gravity"
+
+[[check]]
+variable = "m.body.v_w[1]"
+at = "all"
+near = 1.0
+tol = 1e-7
+why = "horizontal world velocity is conserved while v_b rotates (transport term exact)"
+
+[[check]]
+variable = "m.body.v_w[2]"
+at = "all"
+near = 2.0
+tol = 1e-7
+why = "horizontal world velocity is conserved while v_b rotates"
+
+[[check]]
+variable = "m.body.v_w[3]"
+at = "end"
+near = 22.62
+tol = 1e-8
+why = "down velocity grows at g: 3 + 9.81*2"
+
+[[check]]
+expr = "norm({m.body.v_b[1]}, {m.body.v_b[2]}, {m.body.v_b[3]}) - norm({m.body.v_w[1]}, {m.body.v_w[2]}, {m.body.v_w[3]})"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "v_w = R_wb v_b is a rotation: speed is frame-independent"
+
+[[check]]
+expr = "{m.body.v_b[1]@2.0} - 1.0"
+range = [-14.0, -12.0]
+why = "the body-frame velocity really changed (v_b[1] = 1 at t = 0, ~ -12.7 at 2 s): the run exercises the transport term"
+
+[[check]]
+variable = "m.body.a_w[1]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no horizontal acceleration of a free body"
+
+[[check]]
+variable = "m.body.a_w[2]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no horizontal acceleration of a free body"
+
+[[check]]
+variable = "m.body.a_w[3]"
+at = "all"
+near = 9.81
+tol = 1e-12
+why = "inertial acceleration of a free body is exactly gravity (down), whatever its mass"
+
+[[check]]
+variable = "m.body.specificForce_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-10
+why = "a free-falling CG accelerometer reads zero specific force, even while tumbling"
+
+# --- rotation: torque-free tumbling with a full inertia ---
+[[check]]
+expr = "0.5*({m.body.omega_b[1]}*(0.03*{m.body.omega_b[1]} + 0.004*{m.body.omega_b[2]} + -0.002*{m.body.omega_b[3]}) + {m.body.omega_b[2]}*(0.004*{m.body.omega_b[1]} + 0.05*{m.body.omega_b[2]} + 0.006*{m.body.omega_b[3]}) + {m.body.omega_b[3]}*(-0.002*{m.body.omega_b[1]} + 0.006*{m.body.omega_b[2]} + 0.07*{m.body.omega_b[3]}))"
+at = "all"
+near = 0.362
+tol = 1e-9
+why = "torque-free: rotational kinetic energy w.J.w/2 = 0.362 J is conserved"
+
+[[check]]
+expr = "{m.body.R_wb[1]}*(0.03*{m.body.omega_b[1]} + 0.004*{m.body.omega_b[2]} + -0.002*{m.body.omega_b[3]}) + {m.body.R_wb[2]}*(0.004*{m.body.omega_b[1]} + 0.05*{m.body.omega_b[2]} + 0.006*{m.body.omega_b[3]}) + {m.body.R_wb[3]}*(-0.002*{m.body.omega_b[1]} + 0.006*{m.body.omega_b[2]} + 0.07*{m.body.omega_b[3]})"
+at = "all"
+near = 0.05
+tol = 1e-9
+why = "torque-free: world-frame angular momentum component 1 (R_wb J w) is conserved"
+
+[[check]]
+expr = "{m.body.R_wb[4]}*(0.03*{m.body.omega_b[1]} + 0.004*{m.body.omega_b[2]} + -0.002*{m.body.omega_b[3]}) + {m.body.R_wb[5]}*(0.004*{m.body.omega_b[1]} + 0.05*{m.body.omega_b[2]} + 0.006*{m.body.omega_b[3]}) + {m.body.R_wb[6]}*(-0.002*{m.body.omega_b[1]} + 0.006*{m.body.omega_b[2]} + 0.07*{m.body.omega_b[3]})"
+at = "all"
+near = -0.024
+tol = 1e-9
+why = "torque-free: world-frame angular momentum component 2 (R_wb J w) is conserved"
+
+[[check]]
+expr = "{m.body.R_wb[7]}*(0.03*{m.body.omega_b[1]} + 0.004*{m.body.omega_b[2]} + -0.002*{m.body.omega_b[3]}) + {m.body.R_wb[8]}*(0.004*{m.body.omega_b[1]} + 0.05*{m.body.omega_b[2]} + 0.006*{m.body.omega_b[3]}) + {m.body.R_wb[9]}*(-0.002*{m.body.omega_b[1]} + 0.006*{m.body.omega_b[2]} + 0.07*{m.body.omega_b[3]})"
+at = "all"
+near = 0.2
+tol = 1e-9
+why = "torque-free: world-frame angular momentum component 3 (R_wb J w) is conserved"
+
+[[check]]
+expr = "norm({m.body.q_wb[1]}, {m.body.q_wb[2]}, {m.body.q_wb[3]}, {m.body.q_wb[4]})"
+at = "all"
+near = 1.0
+tol = 1e-9
+why = "the attitude quaternion stays at unit norm while tumbling"
+
+[[check]]
+variable = "m.body.q_wb[1]"
+at = 1.0
+near = -0.0942676139
+tol = 1e-8
+why = "attitude at 1 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[2]"
+at = 1.0
+near = 0.1660119168
+tol = 1e-8
+why = "attitude at 1 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[3]"
+at = 1.0
+near = 0.4132123943
+tol = 1e-8
+why = "attitude at 1 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[4]"
+at = 1.0
+near = 0.8903983252
+tol = 1e-8
+why = "attitude at 1 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.omega_b[1]"
+at = 1.0
+near = 0.6312321619
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 1 s, vs RK4"
+
+[[check]]
+variable = "m.body.omega_b[2]"
+at = 1.0
+near = 3.2172670933
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 1 s, vs RK4"
+
+[[check]]
+variable = "m.body.omega_b[3]"
+at = 1.0
+near = 1.3587427489
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 1 s, vs RK4"
+
+[[check]]
+variable = "m.body.q_wb[1]"
+at = "end"
+near = -0.9408795103
+tol = 1e-8
+why = "attitude at 2 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[2]"
+at = "end"
+near = -0.0815574838
+tol = 1e-8
+why = "attitude at 2 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[3]"
+at = "end"
+near = -0.3263950178
+tol = 1e-8
+why = "attitude at 2 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.q_wb[4]"
+at = "end"
+near = -0.0395021048
+tol = 1e-8
+why = "attitude at 2 s matches an independent RK4 of Euler's equation + quaternion kinematics"
+
+[[check]]
+variable = "m.body.omega_b[1]"
+at = "end"
+near = -2.6901889575
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 2 s, vs RK4"
+
+[[check]]
+variable = "m.body.omega_b[2]"
+at = "end"
+near = 0.1258602625
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 2 s, vs RK4"
+
+[[check]]
+variable = "m.body.omega_b[3]"
+at = "end"
+near = 2.6098110668
+tol = 1e-8
+why = "Euler's equation with off-diagonal J (gyroscopic coupling) at 2 s, vs RK4"

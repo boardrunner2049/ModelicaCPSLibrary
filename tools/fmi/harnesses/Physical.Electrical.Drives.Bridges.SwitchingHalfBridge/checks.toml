@@ -1,0 +1,246 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Vdc = 16 V; switches Ron = 10 mOhm, Goff = 1e-5 S; body diodes Rdiode = 20 mOhm,
+# Vknee = 0.7 V; load R = 1 Ohm, L = 0.5 mH, back-EMF E. PWM period 40 us.
+#
+# References (agree to <= 4e-4 A, the off-state leakage):
+#  - an exact piecewise-exponential periodic-steady-state solution of the
+#    switched RL circuit (diode/switch modes as straight lines, leakage
+#    neglected): seg 1 mean 5.56651 A, ripple 5.39898..5.73405 A; seg 2 mean
+#    1.94458 A, 1.82504..2.06573 A, mean v 3.94458 V; seg 3 mean -1.15290 A,
+#    -1.28755..-1.01678 A, mean v 4.84710 V, mean Idc -0.34549 A;
+#  - native 'rumoca sim' of the same wrapper, gates from sampled MSL
+#    BooleanPulse sources with the same timing (--rtol 1e-8), resampled on
+#    the 1 us grid the way the FMU trace shows it (a row at a switching
+#    instant is the left limit).
+# Window means use from = start + 1 us so each covers exactly 10 periods
+# (400 samples); each sample is the end of a 1 us interval.
+# Row timing: gates held from t act in the row at t + 1 us. Seg 1 periods
+# start at multiples of 40 us, so the row at k*40us + 20us ends the on-time
+# (ripple peak) and the row at (k+1)*40us ends the off-time (ripple valley).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- initialized state and the floating leg ---
+[[check]]
+variable = "m.dcCurrent"
+at = "0"
+near = 0.0
+tol = 1e-3
+why = "initialized with both gates false: both switches off (off = not control), the bus feeds only the 1e-5 S leakage (native: 0.16 mA). 800 A would be a shoot-through through two closed switches"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0004"
+near = 2.0002
+tol = 1e-3
+why = "before any gate pulse no device conducts: the phase floats at the back-EMF, E + R*i_leak = 2.0002 V (native 2.00020), not at a rail. In this DC state L*di/dt must vanish, so no integrator tolerance is owed; the FMU's 2.0058 V (loadL.v != L*di/dt) is reported as a suspected FMU bug rather than absorbed"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.0004"
+near = 0.0
+tol = 1e-3
+why = "no conduction path before the first gate pulse"
+
+# --- seg 1: asynchronous PWM d = 0.5 (low gate off), E = 2 ---
+[[check]]
+variable = "m.phaseCurrent"
+at = "mean"
+from = 0.0052010
+to = 0.0056
+near = 5.5665
+tol = 2e-3
+why = "cycle-averaged current equals the averaged-leg closed form (8 - 0.5*0.7 - 2)/(1 + 0.5*0.01 + 0.5*0.02) = 5.5665 A (AverageHalfBridge model)"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "mean"
+from = 0.0052010
+to = 0.0056
+near = 7.5665
+tol = 5e-3
+why = "mean phase voltage d*Vdc - (1-d)*Vd - drops = R*i + E = 7.5665 V"
+
+[[check]]
+variable = "m.loadL.v"
+at = "mean"
+from = 0.0052010
+to = 0.0056
+near = 0.0
+tol = 5e-3
+why = "inductor volt-second balance in periodic steady state (swings are +-8.5 V)"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "mean"
+from = 0.0052010
+to = 0.0056
+near = 2.7838
+tol = 0.01
+why = "bus supplies the load only while the high switch conducts: mean Idc = d*i = 0.5*5.567 A (sampled mean 2.788 A: endpoint sampling of a square wave)"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "0.00558"
+near = 5.7340
+tol = 2e-3
+why = "ripple peak at the end of the 20 us on-time"
+
+[[check]]
+expr = "{m.phaseCurrent@0.00558} - {m.phaseCurrent@0.0056}"
+near = 0.3351
+tol = 2e-3
+why = "peak-to-peak ripple (Vdc - E - (R+Ron)*i)/L * 20 us = 8.37 V/0.5 mH * 20 us = 0.335 A"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.00558"
+near = 15.9427
+tol = 2e-3
+why = "high switch on: phase = Vdc - Ron*i = 16 - 0.01*5.734"
+
+[[check]]
+variable = "m.leg.lowDiode.i"
+at = "0.0056"
+near = 5.3988
+tol = 2e-3
+why = "asynchronous leg: in the off-time the load current freewheels through the low body diode (dc_n -> phase)"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "0.0056"
+near = -0.8080
+tol = 2e-3
+why = "freewheeling phase sits one diode drop below dc_n: -(0.7 + 0.02*5.399)"
+
+# --- seg 2: synchronous complementary PWM d = 0.25, 1 us dead time, E = 2 ---
+[[check]]
+variable = "m.phaseCurrent"
+at = "mean"
+from = 0.0104010
+to = 0.0108
+near = 1.9446
+tol = 2e-3
+why = "periodic-steady-state mean current (exact PWL solution 1.94458 A)"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "mean"
+from = 0.0104010
+to = 0.0108
+near = 3.9446
+tol = 3e-3
+why = "dead-time loss with positive current: both 1 us dead times clamp to -0.7 V, so mean v = (10*16 + 2*(-0.7))/40 - drops = 3.945 V, below the ideal 0.25*16 = 4 V"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "mean"
+from = 0.0104010
+to = 0.0108
+near = 0.4865
+tol = 6e-3
+why = "bus current flows only during the 10 us high on-time: ~0.25*1.95 A (exact 0.48645 A; sampled 0.4898 A)"
+
+[[check]]
+variable = "m.leg.lowSwitch.i"
+at = "0.01078"
+near = -1.9835
+tol = 2e-3
+why = "synchronous rectification: during the low on-time the low switch carries the full load current in reverse (dc_n -> phase)"
+
+[[check]]
+variable = "m.leg.lowDiode.i"
+at = "0.01078"
+near = 0.0
+tol = 1e-3
+why = "the closed low switch (Ron*i = 20 mV < Vknee) shunts the body diode"
+
+[[check]]
+variable = "m.leg.lowDiode.i"
+at = "0.010771"
+near = 2.0559
+tol = 2e-3
+why = "in the dead time after the high switch opens the low body diode takes the current"
+
+# --- seg 3: same synchronous PWM, E = 6 > mean leg voltage ---
+[[check]]
+variable = "m.phaseCurrent"
+at = "max"
+from = 0.0156010
+to = 0.016
+near = -1.0167
+tol = 2e-3
+why = "the synchronous leg conducts negative current all period (impossible for an asynchronous leg): ripple top -1.01678 A from the exact PWL solution"
+
+[[check]]
+variable = "m.phaseCurrent"
+at = "mean"
+from = 0.0156010
+to = 0.016
+near = -1.1529
+tol = 2e-3
+why = "reverse mean current (exact PWL -1.15290 A)"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "mean"
+from = 0.0156010
+to = 0.016
+near = 4.8471
+tol = 3e-3
+why = "dead-time error flips sign with current: both 1 us dead times now clamp to Vdc + Vd + Rd*|i| = 16.725 V instead of 0, so the mean exceeds the ideal 0.25*16 = 4 V. Ideal-device arithmetic (10*16 + 2*16.7)/40 = 4.835 V; with the resistive drops of the negative current (high on: 16 + Ron*1.15, low on for 28 us: +Ron*1.15, dead times +Rd*1.2) it is ~4.847 V; exact PWL periodic solution 4.84710 V"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "mean"
+from = 0.0156010
+to = 0.016
+near = -0.3455
+tol = 6e-3
+why = "regeneration: energy returns to the bus on average (exact PWL -0.34549 A; sampled -0.3418 A)"
+
+[[check]]
+variable = "m.leg.lowSwitch.i"
+at = "0.01598"
+near = 1.1057
+tol = 2e-3
+why = "low switch conducts the negative load current forward (phase -> dc_n)"
+
+[[check]]
+variable = "m.leg.highDiode.i"
+at = "0.016"
+near = 1.2631
+tol = 2e-3
+why = "dead time with negative current: the high body diode returns it to the bus"
+
+# --- seg 4: all gates off, E = 20 > Vdc + Vd ---
+[[check]]
+variable = "m.phaseCurrent"
+at = "end"
+near = -3.2348
+tol = 1e-3
+why = "diode regeneration -(20 - 16.7)/(R + Rd) = -3.2353 A after 4 ms = 8 L/(R+Rd) (native -3.23474)"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "end"
+near = 16.7647
+tol = 1e-3
+why = "high diode clamps the phase at Vdc + Vd + Rd*|i|"
+
+[[check]]
+variable = "m.dcCurrent"
+at = "end"
+near = -3.2344
+tol = 1e-3
+why = "the regenerated current flows into the bus"
+
+[[check]]
+variable = "m.phaseVoltage"
+at = "all"
+range = [-0.85, 16.78]
+why = "body diodes clamp the phase within one diode drop (+Rd*|i|) of the rails"

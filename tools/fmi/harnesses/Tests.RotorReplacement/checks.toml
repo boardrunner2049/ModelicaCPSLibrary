@@ -1,0 +1,259 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Replacement blade (class modifier kT = 0.5e-5) at 100 rad/s: 0.05 N per rotor
+# (the default 1e-5 blade would give 0.1 N). QuadX, arm radius 0.25 m at 45 deg
+# (FRD): rotor 1 front-left {a,-a}, 2 rear-left {-a,-a}, 3 rear-right {-a,a},
+# 4 front-right {a,a}, a = 0.1768 m; R_br = diag{1,-1,-1} turns rotor +z thrust
+# into body -z (up); spinSign {1,-1,1,-1}. Arm moment r x F with
+# F = {0,0,-0.05}: {0.05 r_y, -0.05 r_x, 0}, i.e. +/-0.0088388 per axis.
+# world.toml: rotors[1].kQ = 3e-7 (others keep 1e-7), so the yaw reactions are
+# {+3, -1, +1, -1} mN.m and the net yaw moment is +2e-3 N.m; Jzz = 0.04 kg m^2
+# gives alpha_z = 0.05 rad/s^2, w_z = 0.05 t, yaw = pi/2 + 0.025 t^2 (start
+# east-facing). Roll/pitch moments still cancel, thrust stays along world -z.
+# vehicle.p_start = {0.5, -0.3, -1}. Mass 1.5 kg, gravity off:
+# a_z = -0.2/1.5 (up), p_z(t) = -1 - t^2/15.
+# Native `rumoca sim --rtol 1e-10 --atol 1e-12` of the same perturbation (an
+# `extends Tests.RotorReplacement(rotors(kQ=...), vehicle(p_start=...))`)
+# agrees with the FMU to 5e-10 on all 405 common columns over 1 s.
+# rotorMoment_b is [4,3] row-major: rotor i, axis j -> index 3(i-1)+j.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.rotors[[]*].force_r[[]3]"
+at = "all"
+near = 0.05
+tol = 1e-12
+why = "the replacement class coefficient reaches each blade: 0.5e-5 * 100^2 = 0.05 N"
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "all"
+near = -0.2
+tol = 1e-12
+why = "the common vehicle sums four 0.05 N thrusts along body -z (up)"
+
+[[check]]
+variable = "m.vehicle.force_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "rotor thrust is purely along body z (R_br maps rotor z to body -z)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[1]"
+at = "end"
+near = 0.0088388347648
+tol = 1e-12
+why = "rotor 1 (front-left, r_y < 0) lifting: positive roll moment (rolls right wing down)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[2]"
+at = "end"
+near = 0.0088388347648
+tol = 1e-12
+why = "rotor 1 (front, r_x > 0) lifting: positive pitch moment (nose up)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[4]"
+at = "end"
+near = 0.0088388347648
+tol = 1e-12
+why = "rotor 2 (rear-left, r_y < 0) lifting: positive roll moment"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[5]"
+at = "end"
+near = -0.0088388347648
+tol = 1e-12
+why = "rotor 2 (rear, r_x < 0) lifting: negative pitch moment (nose down)"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[7]"
+at = "end"
+near = -0.0088388347648
+tol = 1e-12
+why = "rotor 3 (rear-right, r_y > 0) lifting: negative roll moment"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[8]"
+at = "end"
+near = -0.0088388347648
+tol = 1e-12
+why = "rotor 3 (rear, r_x < 0) lifting: negative pitch moment"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[10]"
+at = "end"
+near = -0.0088388347648
+tol = 1e-12
+why = "rotor 4 (front-right, r_y > 0) lifting: negative roll moment"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[11]"
+at = "end"
+near = 0.0088388347648
+tol = 1e-12
+why = "rotor 4 (front, r_x > 0) lifting: positive pitch moment"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[3]"
+at = "end"
+near = 0.003
+tol = 1e-12
+why = "rotor 1 (spinSign +1, CCW seen from above) reacts clockwise = +z (down) in FRD; kQ overridden to 3e-7, so 3 mN.m on this row only"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[6]"
+at = "end"
+near = -0.001
+tol = 1e-12
+why = "rotor 2 (spinSign -1) reacts with the opposite sign: -kQ w^2 = -1 mN.m"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[9]"
+at = "end"
+near = 0.001
+tol = 1e-12
+why = "rotor 3 (spinSign +1, default kQ): +1 mN.m"
+
+[[check]]
+variable = "m.vehicle.rotorMoment_b[12]"
+at = "end"
+near = -0.001
+tol = 1e-12
+why = "rotor 4 (spinSign -1, default kQ): -1 mN.m"
+
+[[check]]
+variable = "m.vehicle.moment_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "X layout with equal thrusts: roll and pitch arm moments cancel about the CG"
+
+[[check]]
+variable = "m.vehicle.moment_b[3]"
+at = "all"
+near = 0.002
+tol = 1e-12
+why = "net yaw = +3 - 1 + 1 - 1 mN.m: the overridden kQ is on rotor 1 only"
+
+[[check]]
+variable = "m.vehicle.body.alpha_b[3]"
+at = "all"
+near = 0.05
+tol = 1e-10
+why = "yaw acceleration Mz/Jzz = 0.002/0.04 (no gyroscopic term for w along the principal z axis)"
+
+[[check]]
+variable = "m.vehicle.body.omega_b[3]"
+at = "end"
+near = 0.05
+tol = 1e-9
+why = "yaw rate 0.05 t after 1 s"
+
+[[check]]
+variable = "m.vehicle.body.omega_b[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "zero roll/pitch moment: the vehicle only yaws"
+
+[[check]]
+variable = "m.vehicle.body.euler[3]"
+at = "end"
+near = 1.5957963268
+tol = 1e-9
+why = "east-facing start (pi/2) plus 0.025 t^2 of yaw at 1 s (q_start and Jzz honoured)"
+
+[[check]]
+expr = "norm({m.vehicle.body.q_wb[1]}, {m.vehicle.body.q_wb[2]}, {m.vehicle.body.q_wb[3]}, {m.vehicle.body.q_wb[4]})"
+at = "all"
+near = 1.0
+tol = 1e-12
+why = "the attitude quaternion stays at unit norm"
+
+[[check]]
+variable = "m.vehicle.body.euler[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "pure yaw: the vehicle stays level"
+
+[[check]]
+variable = "m.vehicle.body.a_w[3]"
+at = "all"
+near = -0.13333333333333
+tol = 1e-10
+why = "F/m = 0.2/1.5 upward (NED -z) with gravity switched off; yawing does not tilt the thrust"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = 0.5
+near = -1.0166666666667
+tol = 1e-9
+why = "uniform acceleration from rest: z = -1 - a t^2/2 at 0.5 s"
+
+[[check]]
+variable = "m.vehicle.body.p_w[3]"
+at = "end"
+near = -1.0666666666667
+tol = 1e-9
+why = "uniform acceleration from rest: z = -1 - a/2 at 1 s (climbs 6.7 cm)"
+
+[[check]]
+variable = "m.vehicle.body.v_w[3]"
+at = "end"
+near = -0.13333333333333
+tol = 1e-9
+why = "climb rate a t after 1 s"
+
+[[check]]
+variable = "m.vehicle.body.p_w[1]"
+at = "all"
+near = 0.5
+tol = 1e-12
+why = "overridden start north 0.5 m; thrust purely vertical: no north drift"
+
+[[check]]
+variable = "m.vehicle.body.p_w[2]"
+at = "all"
+near = -0.3
+tol = 1e-12
+why = "overridden start east -0.3 m; no east drift"
+
+[[check]]
+variable = "m.rotors[[]*].airVelocity_r[[]3]"
+at = "end"
+near = 0.13333333333333
+tol = 1e-9
+why = "climbing vehicle: hub air velocity along rotor +z (thrust axis) is +climb rate; the yaw spin adds only in-plane velocity"
+
+[[check]]
+expr = "norm({m.rotors[1].airVelocity_r[1]}, {m.rotors[1].airVelocity_r[2]})"
+at = "end"
+near = 0.0125
+tol = 1e-9
+why = "yaw rate 0.05 rad/s at hub radius 0.25 m: in-plane hub speed w_z r = 0.0125 m/s"
+
+[[check]]
+variable = "m.vehicle.gear.gap[[]*]"
+at = "all"
+range = [0.899999, 0.9666667]
+why = "legs 0.1 m below the CG start 0.9 m above ground and only rise: no contact"
+
+[[check]]
+variable = "m.vehicle.gear.contact[[]*]"
+at = "all"
+range = [0, 0]
+why = "no leg ever reports contact while airborne"
+
+[[check]]
+variable = "m.vehicle.gear.force_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "airborne: landing gear carries no load"

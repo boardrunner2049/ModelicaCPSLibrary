@@ -1,0 +1,156 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Two rigid bodies carry the same physical motion: oldBody in the legacy
+# ENU world / FLU body basis, body in NED / FRD, related by the constant
+# basis changes W = [0,1,0;1,0,0;0,0,-1] (ENU->NED) and B = diag(1,-1,-1)
+# (FLU->FRD). Mass 2 kg, J = [2,0.3,-0.2;0.3,3,0.4;-0.2,0.4,4] (old axes),
+# body force {1,2,4} N and moment {0.1,-0.2,0.3} N.m in old body axes, gravity
+# (0,0,-g) ENU. Every relation is checked at every 1 ms sample over 2 s
+# (20x the model's StopTime). Measured residuals are <= ~1e-14 (round-off);
+# tolerances are 1e-11 (1e-16 T for the 50 uT magnetic field), far tighter
+# than the model's own 1e-7 assert threshold.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "norm({m.body.R_wb[1]} - (({m.oldBody.R_wb[4]})), {m.body.R_wb[2]} - (({m.oldBody.R_wb[5]})*-1), {m.body.R_wb[3]} - (({m.oldBody.R_wb[6]})*-1), {m.body.R_wb[4]} - (({m.oldBody.R_wb[1]})), {m.body.R_wb[5]} - (({m.oldBody.R_wb[2]})*-1), {m.body.R_wb[6]} - (({m.oldBody.R_wb[3]})*-1), {m.body.R_wb[7]} - (((-{m.oldBody.R_wb[7]}))), {m.body.R_wb[8]} - (((-{m.oldBody.R_wb[8]}))*-1), {m.body.R_wb[9]} - (((-{m.oldBody.R_wb[9]}))*-1))"
+at = "all"
+range = [0.0, 1e-11]
+why = "attitude: R_wb(NED/FRD) = W R_wb(ENU/FLU) B, all nine elements"
+
+[[check]]
+expr = "norm({m.body.p_w[1]} - ({m.oldBody.p_w[2]}), {m.body.p_w[2]} - ({m.oldBody.p_w[1]}), {m.body.p_w[3]} - ((-{m.oldBody.p_w[3]})), {m.body.v_w[1]} - ({m.oldBody.v_w[2]}), {m.body.v_w[2]} - ({m.oldBody.v_w[1]}), {m.body.v_w[3]} - ((-{m.oldBody.v_w[3]})))"
+at = "all"
+range = [0.0, 1e-11]
+why = "world position and velocity transform with W"
+
+[[check]]
+expr = "norm({m.body.omega_b[1]} - ({m.oldBody.omega_b[1]}), {m.body.omega_b[2]} - ((-{m.oldBody.omega_b[2]})), {m.body.omega_b[3]} - ((-{m.oldBody.omega_b[3]})), {m.body.alpha_b[1]} - ({m.oldBody.alpha_b[1]}), {m.body.alpha_b[2]} - ((-{m.oldBody.alpha_b[2]})), {m.body.alpha_b[3]} - ((-{m.oldBody.alpha_b[3]})))"
+at = "all"
+range = [0.0, 1e-11]
+why = "body rate and angular acceleration transform with B (full inertia B J B)"
+
+[[check]]
+expr = "norm({m.body.a_w[1]} - ({m.oldBody.a_w[2]}), {m.body.a_w[2]} - ({m.oldBody.a_w[1]}), {m.body.a_w[3]} - ((-{m.oldBody.a_w[3]})))"
+at = "all"
+range = [0.0, 1e-11]
+why = "world acceleration transforms with W"
+
+[[check]]
+expr = "norm({m.oldBody.a_w[1]} - (({m.oldBody.R_wb[1]} + {m.oldBody.R_wb[2]}*2 + {m.oldBody.R_wb[3]}*4)/2 + (0)), {m.oldBody.a_w[2]} - (({m.oldBody.R_wb[4]} + {m.oldBody.R_wb[5]}*2 + {m.oldBody.R_wb[6]}*4)/2 + (0)), {m.oldBody.a_w[3]} - (({m.oldBody.R_wb[7]} + {m.oldBody.R_wb[8]}*2 + {m.oldBody.R_wb[9]}*4)/2 + (-9.80665)))"
+at = "all"
+range = [0.0, 1e-11]
+why = "Newton, legacy basis: a_w = R_wb F_b / m + g with g = (0,0,-9.80665), Up positive"
+
+[[check]]
+expr = "norm({m.body.a_w[1]} - (({m.body.R_wb[1]} + {m.body.R_wb[2]}*-2 + {m.body.R_wb[3]}*-4)/2 + (0)), {m.body.a_w[2]} - (({m.body.R_wb[4]} + {m.body.R_wb[5]}*-2 + {m.body.R_wb[6]}*-4)/2 + (0)), {m.body.a_w[3]} - (({m.body.R_wb[7]} + {m.body.R_wb[8]}*-2 + {m.body.R_wb[9]}*-4)/2 + (9.80665)))"
+at = "all"
+range = [0.0, 1e-11]
+why = "Newton, NED/FRD: a_w = R_wb (B F_b) / m + W g with W g = (0,0,+9.80665), Down positive"
+
+[[check]]
+expr = "norm((2*{m.oldBody.alpha_b[1]} + 0.3*{m.oldBody.alpha_b[2]} + -0.2*{m.oldBody.alpha_b[3]}) + ({m.oldBody.omega_b[2]}*(-0.2*{m.oldBody.omega_b[1]} + 0.4*{m.oldBody.omega_b[2]} + 4*{m.oldBody.omega_b[3]}) - {m.oldBody.omega_b[3]}*(0.3*{m.oldBody.omega_b[1]} + 3*{m.oldBody.omega_b[2]} + 0.4*{m.oldBody.omega_b[3]})) - (0.1), (0.3*{m.oldBody.alpha_b[1]} + 3*{m.oldBody.alpha_b[2]} + 0.4*{m.oldBody.alpha_b[3]}) + ({m.oldBody.omega_b[3]}*(2*{m.oldBody.omega_b[1]} + 0.3*{m.oldBody.omega_b[2]} + -0.2*{m.oldBody.omega_b[3]}) - {m.oldBody.omega_b[1]}*(-0.2*{m.oldBody.omega_b[1]} + 0.4*{m.oldBody.omega_b[2]} + 4*{m.oldBody.omega_b[3]})) - (-0.2), (-0.2*{m.oldBody.alpha_b[1]} + 0.4*{m.oldBody.alpha_b[2]} + 4*{m.oldBody.alpha_b[3]}) + ({m.oldBody.omega_b[1]}*(0.3*{m.oldBody.omega_b[1]} + 3*{m.oldBody.omega_b[2]} + 0.4*{m.oldBody.omega_b[3]}) - {m.oldBody.omega_b[2]}*(2*{m.oldBody.omega_b[1]} + 0.3*{m.oldBody.omega_b[2]} + -0.2*{m.oldBody.omega_b[3]})) - (0.3))"
+at = "all"
+range = [0.0, 1e-11]
+why = "Euler's equation in the legacy body axes with the full J: J alpha + omega x J omega = M"
+
+[[check]]
+expr = "norm((2*{m.body.alpha_b[1]} + -0.3*{m.body.alpha_b[2]} + 0.2*{m.body.alpha_b[3]}) + ({m.body.omega_b[2]}*(0.2*{m.body.omega_b[1]} + 0.4*{m.body.omega_b[2]} + 4*{m.body.omega_b[3]}) - {m.body.omega_b[3]}*(-0.3*{m.body.omega_b[1]} + 3*{m.body.omega_b[2]} + 0.4*{m.body.omega_b[3]})) - (0.1), (-0.3*{m.body.alpha_b[1]} + 3*{m.body.alpha_b[2]} + 0.4*{m.body.alpha_b[3]}) + ({m.body.omega_b[3]}*(2*{m.body.omega_b[1]} + -0.3*{m.body.omega_b[2]} + 0.2*{m.body.omega_b[3]}) - {m.body.omega_b[1]}*(0.2*{m.body.omega_b[1]} + 0.4*{m.body.omega_b[2]} + 4*{m.body.omega_b[3]})) - (0.2), (0.2*{m.body.alpha_b[1]} + 0.4*{m.body.alpha_b[2]} + 4*{m.body.alpha_b[3]}) + ({m.body.omega_b[1]}*(-0.3*{m.body.omega_b[1]} + 3*{m.body.omega_b[2]} + 0.4*{m.body.omega_b[3]}) - {m.body.omega_b[2]}*(2*{m.body.omega_b[1]} + -0.3*{m.body.omega_b[2]} + 0.2*{m.body.omega_b[3]})) - (-0.3))"
+at = "all"
+range = [0.0, 1e-11]
+why = "Euler's equation in the FRD with B J B and B M = (0.1,0.2,-0.3): J alpha + omega x J omega = M"
+
+[[check]]
+expr = "norm({m.sensors.measurements.acceleration[1]} - {m.oldImu.acceleration[1]}, {m.sensors.measurements.acceleration[2]} - {m.oldImu.acceleration[2]}, {m.sensors.measurements.acceleration[3]} - {m.oldImu.acceleration[3]}, {m.sensors.measurements.gyro[1]} - {m.oldImu.gyro[1]}, {m.sensors.measurements.gyro[2]} - {m.oldImu.gyro[2]}, {m.sensors.measurements.gyro[3]} - {m.oldImu.gyro[3]})"
+at = "all"
+range = [0.0, 1e-11]
+why = "IMU outputs stay in the sensor's own axes: identical in both conventions (same physical mount B*mountOld)"
+
+[[check]]
+expr = "norm({m.values.acceleration_frd[1]} - (({m.mountOld[1]})*{m.oldImu.acceleration[1]} + ({m.mountOld[2]})*{m.oldImu.acceleration[2]} + ({m.mountOld[3]})*{m.oldImu.acceleration[3]}), {m.values.acceleration_frd[2]} - (((-{m.mountOld[4]}))*{m.oldImu.acceleration[1]} + ((-{m.mountOld[5]}))*{m.oldImu.acceleration[2]} + ((-{m.mountOld[6]}))*{m.oldImu.acceleration[3]}), {m.values.acceleration_frd[3]} - (((-{m.mountOld[7]}))*{m.oldImu.acceleration[1]} + ((-{m.mountOld[8]}))*{m.oldImu.acceleration[2]} + ((-{m.mountOld[9]}))*{m.oldImu.acceleration[3]}))"
+at = "all"
+range = [0.0, 1e-11]
+why = "the adapter rotates sensor axes to FRD with the mount exactly once"
+
+[[check]]
+expr = "norm({m.sensors.measurements.magneticField[1]} - ({m.mountOld[1]}*({m.oldBody.R_wb[1]}*2e-05 + {m.oldBody.R_wb[4]}*5e-06 + {m.oldBody.R_wb[7]}*-4.5e-05) + {m.mountOld[4]}*({m.oldBody.R_wb[2]}*2e-05 + {m.oldBody.R_wb[5]}*5e-06 + {m.oldBody.R_wb[8]}*-4.5e-05) + {m.mountOld[7]}*({m.oldBody.R_wb[3]}*2e-05 + {m.oldBody.R_wb[6]}*5e-06 + {m.oldBody.R_wb[9]}*-4.5e-05)), {m.sensors.measurements.magneticField[2]} - ({m.mountOld[2]}*({m.oldBody.R_wb[1]}*2e-05 + {m.oldBody.R_wb[4]}*5e-06 + {m.oldBody.R_wb[7]}*-4.5e-05) + {m.mountOld[5]}*({m.oldBody.R_wb[2]}*2e-05 + {m.oldBody.R_wb[5]}*5e-06 + {m.oldBody.R_wb[8]}*-4.5e-05) + {m.mountOld[8]}*({m.oldBody.R_wb[3]}*2e-05 + {m.oldBody.R_wb[6]}*5e-06 + {m.oldBody.R_wb[9]}*-4.5e-05)), {m.sensors.measurements.magneticField[3]} - ({m.mountOld[3]}*({m.oldBody.R_wb[1]}*2e-05 + {m.oldBody.R_wb[4]}*5e-06 + {m.oldBody.R_wb[7]}*-4.5e-05) + {m.mountOld[6]}*({m.oldBody.R_wb[2]}*2e-05 + {m.oldBody.R_wb[5]}*5e-06 + {m.oldBody.R_wb[8]}*-4.5e-05) + {m.mountOld[9]}*({m.oldBody.R_wb[3]}*2e-05 + {m.oldBody.R_wb[6]}*5e-06 + {m.oldBody.R_wb[9]}*-4.5e-05)))"
+at = "all"
+range = [0.0, 1e-16]
+why = "magnetometer reads mountOld' R_wb(old)' B_ENU of the same field"
+
+[[check]]
+expr = "norm({m.values.position_ned[1]} - (({m.oldBody.p_w[2]} + ({m.oldBody.R_wb[4]}*{m.rOld[1]} + {m.oldBody.R_wb[5]}*{m.rOld[2]} + {m.oldBody.R_wb[6]}*{m.rOld[3]}))), {m.values.position_ned[2]} - (({m.oldBody.p_w[1]} + ({m.oldBody.R_wb[1]}*{m.rOld[1]} + {m.oldBody.R_wb[2]}*{m.rOld[2]} + {m.oldBody.R_wb[3]}*{m.rOld[3]}))), {m.values.position_ned[3]} - ((-({m.oldBody.p_w[3]} + ({m.oldBody.R_wb[7]}*{m.rOld[1]} + {m.oldBody.R_wb[8]}*{m.rOld[2]} + {m.oldBody.R_wb[9]}*{m.rOld[3]})))))"
+at = "all"
+range = [0.0, 1e-11]
+why = "GNSS antenna position (lever arm rOld) converted to NED"
+
+[[check]]
+expr = "norm({m.values.velocity_ned[1]} - (({m.oldBody.v_w[2]} + ({m.oldBody.R_wb[4]}*({m.oldBody.omega_b[2]}*{m.rOld[3]} - {m.oldBody.omega_b[3]}*{m.rOld[2]}) + {m.oldBody.R_wb[5]}*({m.oldBody.omega_b[3]}*{m.rOld[1]} - {m.oldBody.omega_b[1]}*{m.rOld[3]}) + {m.oldBody.R_wb[6]}*({m.oldBody.omega_b[1]}*{m.rOld[2]} - {m.oldBody.omega_b[2]}*{m.rOld[1]})))), {m.values.velocity_ned[2]} - (({m.oldBody.v_w[1]} + ({m.oldBody.R_wb[1]}*({m.oldBody.omega_b[2]}*{m.rOld[3]} - {m.oldBody.omega_b[3]}*{m.rOld[2]}) + {m.oldBody.R_wb[2]}*({m.oldBody.omega_b[3]}*{m.rOld[1]} - {m.oldBody.omega_b[1]}*{m.rOld[3]}) + {m.oldBody.R_wb[3]}*({m.oldBody.omega_b[1]}*{m.rOld[2]} - {m.oldBody.omega_b[2]}*{m.rOld[1]})))), {m.values.velocity_ned[3]} - ((-({m.oldBody.v_w[3]} + ({m.oldBody.R_wb[7]}*({m.oldBody.omega_b[2]}*{m.rOld[3]} - {m.oldBody.omega_b[3]}*{m.rOld[2]}) + {m.oldBody.R_wb[8]}*({m.oldBody.omega_b[3]}*{m.rOld[1]} - {m.oldBody.omega_b[1]}*{m.rOld[3]}) + {m.oldBody.R_wb[9]}*({m.oldBody.omega_b[1]}*{m.rOld[2]} - {m.oldBody.omega_b[2]}*{m.rOld[1]}))))))"
+at = "all"
+range = [0.0, 1e-11]
+why = "GNSS antenna velocity includes omega x r and is converted to NED"
+
+[[check]]
+expr = "abs({m.sensors.measurements.altitude} - {m.antennaOld[3]})"
+at = "all"
+range = [0.0, 1e-11]
+why = "barometric altitude stays up-positive: equals the ENU Up coordinate of the sensor point"
+
+[[check]]
+expr = "norm({m.rotorForce[1]} - ({m.rotorForceOld[1]}), {m.rotorForce[2]} - ((-{m.rotorForceOld[2]})), {m.rotorForce[3]} - ((-{m.rotorForceOld[3]})), {m.rotorMoment[1]} - ({m.rotorMomentOld[1]}), {m.rotorMoment[2]} - ((-{m.rotorMomentOld[2]})), {m.rotorMoment[3]} - ((-{m.rotorMomentOld[3]})))"
+at = "all"
+range = [0.0, 1e-12]
+why = "hub force and moment migrate with B; r x F of B-mapped vectors is B (r x F) because det B = +1"
+
+[[check]]
+expr = "norm({m.oldBody.p_w[1]@2.0} - {m.oldBody.p_w[1]@0}, {m.oldBody.p_w[2]@2.0} - {m.oldBody.p_w[2]@0}, {m.oldBody.p_w[3]@2.0} - {m.oldBody.p_w[3]@0})"
+at = "end"
+range = [1.0, 100.0]
+why = "the bodies really move (force plus gravity), so the contract is not checked on a still state"
+
+[[check]]
+expr = "norm({m.oldBody.omega_b[1]@2.0} - 0.1, {m.oldBody.omega_b[2]@2.0} - 0.2, {m.oldBody.omega_b[3]@2.0} + 0.3)"
+at = "end"
+range = [0.05, 100.0]
+why = "the body rates change under the applied moment and gyroscopic coupling"
+
+# --- integrated trajectory against ref_traj.py (independent scipy DOP853
+# integration of the legacy-basis body from the model's parameters; the FMU
+# matches it to ~1e-12 and native `rumoca sim` at rtol 1e-11 to ~1e-9) ---
+[[check]]
+expr = "norm({m.oldBody.q_wb[1]} - (0.9190686510970172), {m.oldBody.q_wb[2]} - (0.17352506191028616), {m.oldBody.q_wb[3]} - (-0.041741718902456974), {m.oldBody.q_wb[4]} - (0.35136803548816015))"
+at = "0"
+near = 0.0
+tol = 1e-15
+why = "initial attitude: euler321ToQuaternion({0.3,-0.2,0.7}) is roll 0.3, pitch -0.2, yaw 0.7 (ZYX), scalar first"
+
+[[check]]
+expr = "norm({m.oldBody.v_w[1]} - (0.22951876206554025), {m.oldBody.v_w[2]} - (-0.04749955669211686), {m.oldBody.v_w[3]} - (0.29165892747172045))"
+at = "0"
+near = 0.0
+tol = 1e-15
+why = "v_start is a body-axis velocity: v_w(0) = R_wb(0) (0.2,-0.1,0.3)"
+
+[[check]]
+expr = "norm({m.oldBody.p_w[1]} - (1.9883533417273698), {m.oldBody.p_w[2]} - (2.4853033683434336), {m.oldBody.p_w[3]} - (-11.559625069010096), {m.oldBody.v_w[1]} - (1.1507966446570714), {m.oldBody.v_w[2]} - (0.3722162653386204), {m.oldBody.v_w[3]} - (-14.916586532439482))"
+at = "2.0"
+near = 0.0
+tol = 1e-8
+why = "legacy body translation after 2 s (falls 14.6 m under ENU gravity plus the rotating body force)"
+
+[[check]]
+expr = "norm({m.oldBody.q_wb[1]} - (0.924246044127342), {m.oldBody.q_wb[2]} - (0.31869289243971294), {m.oldBody.q_wb[3]} - (0.13794082879844669), {m.oldBody.q_wb[4]} - (0.15867078487789255), {m.oldBody.omega_b[1]} - (0.27846727782961), {m.oldBody.omega_b[2]} - (-0.016824004193595865), {m.oldBody.omega_b[3]} - (-0.12123779338922723))"
+at = "2.0"
+near = 0.0
+tol = 1e-8
+why = "legacy body attitude and rate after 2 s: Euler's equation with the full J and the quaternion kinematics, integrated"
+
+[[check]]
+expr = "norm({m.body.p_w[1]} - (2.4853033683434336), {m.body.p_w[2]} - (1.9883533417273698), {m.body.p_w[3]} - (11.559625069010096), {m.body.v_w[1]} - (0.3722162653386204), {m.body.v_w[2]} - (1.1507966446570714), {m.body.v_w[3]} - (14.916586532439482), {m.body.omega_b[1]} - (0.27846727782961), {m.body.omega_b[2]} - (0.016824004193595865), {m.body.omega_b[3]} - (0.12123779338922723))"
+at = "2.0"
+near = 0.0
+tol = 1e-8
+why = "the NED/FRD body, integrated on its own from its own NED starts, inertia B J B and NED gravity, lands on W p, W v, B omega of the independent reference: pins the common-mode integration the relative contract checks cannot see"

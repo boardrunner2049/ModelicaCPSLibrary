@@ -1,0 +1,147 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# J = 2e-3 kg.m2, b = 0.01 N.m.s/rad, tau = J/b = 0.2 s, w(0) = omega_start = -2 rad/s
+# (tunable-parameter override in world.toml).
+# J w' = tau_drive - tau_load - b w; drive 0.1 N.m on [0.1, 2.5), load 0.15 N.m on [1.5, 2.5).
+# The system is linear, so every speed is the zero-start response plus the free decay
+# -2*exp(-t/0.2) (angle: plus -0.4*(1 - exp(-t/0.2))). Values below are the exact
+# piecewise-exponential solution evaluated at the sample times.
+# Limit: drive and load torques both act on the one rigid inertia, so swapping the
+# drive and load flange connections cannot be observed by any check (inherent to a
+# rigid shaft); only the sum of applied torques and the support reaction are tested.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.omega"
+at = "0"
+near = -2.0
+tol = 1e-9
+why = "initialized state honours the overridden omega_start = -2 rad/s (not the wrapper's binding 0)"
+
+[[check]]
+variable = "m.kineticEnergy"
+at = "0"
+near = 0.004
+tol = 1e-9
+why = "initial kinetic energy J*omega_start^2/2 = 2e-3*4/2"
+
+[[check]]
+variable = "m.acceleration"
+at = "0"
+near = 10.0
+tol = 1e-6
+why = "no applied torque: viscous friction opposes the negative spin, w' = -b*w/J = +10 rad/s2 (sign: friction decelerates toward zero)"
+
+[[check]]
+variable = "m.omega"
+at = "0.1"
+near = -1.213061
+tol = 1e-5
+why = "unforced decay of the initial spin: -2*exp(-0.1/0.2)"
+
+[[check]]
+variable = "m.acceleration"
+at = "max"
+near = 55.786
+tol = 0.05
+why = "drive step at 0.1 s: (0.1 - b*w)/J, 56.07 rad/s2 just after the step, sampled 1 ms later at w = -1.1571: 55.786"
+
+[[check]]
+variable = "m.omega"
+at = "0.3"
+near = 5.874945
+tol = 1e-4
+why = "one time constant after the step: 10 - (10 + 1.21306)*exp(-1)"
+
+[[check]]
+variable = "m.omega"
+at = "1.5"
+near = 9.989775
+tol = 1e-4
+why = "friction-limited speed tau/b = 10 rad/s reached to 10 - 11.21306*exp(-7)"
+
+[[check]]
+variable = "m.shaft.inertia.phi"
+at = "1.5"
+near = 11.602045
+tol = 1e-3
+why = "angle = integral of w: -0.4*(1-exp(-0.5)) + 10*1.4 - 0.2*11.21306*(1-exp(-7)) = 11.6020"
+
+[[check]]
+variable = "m.frictionLoss"
+at = "1.5"
+near = 0.997956
+tol = 1e-4
+why = "viscous loss b*w^2 at 9.9898 rad/s; at steady state it approaches the drive power 0.1*w"
+
+[[check]]
+variable = "m.kineticEnergy"
+at = "1.5"
+near = 0.0997956
+tol = 1e-5
+why = "kinetic energy J*w^2/2"
+
+[[check]]
+variable = "m.housing.flange.tau"
+at = "0.3"
+near = -0.041251
+tol = 1e-4
+why = "the housing is the only external support: its reaction is minus the rate of change of angular momentum, -J*w' = -(0.1 - b*5.8749)"
+
+[[check]]
+variable = "m.housing.flange.tau"
+at = "1.5"
+near = 0.0
+tol = 2e-4
+why = "near steady state drive, friction and load reactions on the housing cancel (exact -1.0e-4)"
+
+[[check]]
+variable = "m.acceleration"
+at = "min"
+near = -74.575
+tol = 0.05
+why = "load step: (0.1 - 0.15 - b*w)/J, -74.95 rad/s2 just after the step, sampled 1 ms later at w = 9.9150: -74.575 (decelerating)"
+
+[[check]]
+variable = "m.omega"
+at = "1.7"
+near = 0.51443
+tol = 1e-4
+why = "decaying toward -5 rad/s: -5 + 14.98978*exp(-1)"
+
+[[check]]
+variable = "m.omega"
+at = "2.5"
+near = -4.89900
+tol = 1e-4
+why = "net torque -0.05 N.m reverses the shaft toward -0.05/b = -5 rad/s"
+
+[[check]]
+variable = "m.shaft.inertia.phi"
+at = "2.5"
+near = 9.5798
+tol = 1e-3
+why = "angle turns back after reversal: 11.6020 - 5*1 + 14.98978*0.2*(1-exp(-5))"
+
+[[check]]
+variable = "m.omega"
+at = "end"
+near = -0.033009
+tol = 1e-5
+why = "unforced coast-down -4.899*exp(-1/0.2): friction alone decays the speed with tau = J/b"
+
+[[check]]
+variable = "m.kineticEnergy"
+at = "all"
+range = [0.0, 0.1]
+why = "kinetic energy nonnegative and bounded by J*10^2/2 (speed never exceeds 10 rad/s)"
+
+[[check]]
+variable = "m.frictionLoss"
+at = "all"
+range = [0.0, 1.0]
+why = "viscous friction only dissipates; b*w^2 <= 1 W"

@@ -1,0 +1,109 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# kT = 1e-5 N.s2 (default), kQ = 1.5e-7 N.m.s2 and spinSign = -1 (world.toml).
+# Inputs held from t appear in the row at t + 1 ms.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.spinSign"
+at = "all"
+near = -1
+tol = 0
+why = "Integer parameter override reaches the FMU"
+
+[[check]]
+variable = "m.kQ"
+at = "all"
+near = 1.5e-7
+tol = 1e-20
+why = "Real parameter override reaches the FMU"
+
+[[check]]
+expr = "{m.force_r[3]} - 1e-5 * {m.omega}**2"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "thrust kT omega^2 along rotor +z in every row"
+
+[[check]]
+expr = "abs({m.force_r[1]}) + abs({m.force_r[2]}) + abs({m.moment_r[1]}) + abs({m.moment_r[2]})"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "purely axial wrench: no in-plane force or moment even with nonzero air velocity and body rate inputs"
+
+[[check]]
+expr = "{m.loadTorque} - 1.5e-7 * {m.omega}**2"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "resisting shaft torque kQ omega^2"
+
+[[check]]
+expr = "{m.moment_r[3]} - {m.loadTorque}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "hub reaction moment -spinSign*loadTorque: +z for a clockwise (spinSign -1) rotor"
+
+[[check]]
+variable = "m.loadTorque"
+at = "all"
+range = [0.0, 0.15]
+why = "nonnegative resisting torque magnitude, at most kQ x 1000^2 = 0.15 N.m on this profile"
+
+[[check]]
+variable = "m.force_r[3]"
+at = "0.1"
+near = 0.0
+tol = 0.0
+why = "no thrust at rest"
+
+[[check]]
+variable = "m.force_r[3]"
+at = "0.301"
+near = 2.5
+tol = 1e-12
+why = "omega 500 rad/s (ramp midpoint held from 0.300 s): 1e-5 x 500^2 = 2.5 N"
+
+[[check]]
+variable = "m.force_r[3]"
+at = "0.5"
+near = 9.95006
+tol = 1e-4
+why = "end of ramp, omega 997.5 rad/s: 9.95 N (quadratic, not linear)"
+
+[[check]]
+variable = "m.moment_r[3]"
+at = "0.6"
+near = 0.024
+tol = 1e-15
+why = "omega 400 rad/s: kQ x 400^2 = 0.024 N.m"
+
+[[check]]
+variable = "m.force_r[3]"
+at = "max"
+from = 0.7
+near = 8.1
+tol = 1e-3
+why = "sine crest omega 900 rad/s: 8.1 N"
+
+[[check]]
+variable = "m.force_r[3]"
+at = "min"
+from = 0.7
+near = 0.9
+tol = 1e-3
+why = "sine trough omega 300 rad/s: 0.9 N"
+
+[[check]]
+expr = "{m.loadTorque} / max({m.force_r[3]}, 1e-30)"
+at = "all"
+from = 0.11
+near = 0.015
+tol = 1e-12
+why = "torque/thrust ratio kQ/kT is speed independent"

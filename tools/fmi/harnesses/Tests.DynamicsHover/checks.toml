@@ -1,0 +1,126 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# m = 2 kg, g = 9.81 m/s^2 (NED +z), body thrust F_z = -19.62 N = -m g at
+# identity attitude: the net force is zero, so the hover point p = {0,0,-1}
+# (1 m above the NED origin) is an equilibrium for the whole 5 s. world.toml
+# starts the body yawed by 0.7 rad (q_start = {cos .35, 0, 0, sin .35}); a yaw
+# leaves body z vertical, so the equilibrium is unchanged. Native `rumoca sim`
+# of the same perturbation (extends ... body(q_start = ...)) gives the
+# identical equilibrium (0 difference on every common column).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.body.p_w[3]"
+at = "all"
+near = -1.0
+tol = 1e-9
+why = "thrust equals weight: altitude (NED z = -1 m, i.e. 1 m up) stays put for 5 s"
+
+[[check]]
+variable = "m.body.p_w[1]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal force: no horizontal drift"
+
+[[check]]
+variable = "m.body.p_w[2]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal force: no horizontal drift"
+
+[[check]]
+variable = "m.body.v_w[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "equilibrium: the vehicle never starts moving"
+
+[[check]]
+variable = "m.body.a_w[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "R_wb*F/m + g = {0,0,-9.81} + {0,0,9.81} = 0: zero inertial acceleration"
+
+[[check]]
+variable = "m.body.specificForce_b[3]"
+at = "all"
+near = -9.81
+tol = 1e-9
+why = "a level hovering accelerometer reads thrust/mass = -g on body z (FRD: up is -z)"
+
+[[check]]
+variable = "m.body.specificForce_b[1]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no horizontal specific force at level hover"
+
+[[check]]
+variable = "m.body.specificForce_b[2]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no lateral specific force at level hover"
+
+[[check]]
+variable = "m.body.q_wb[1]"
+at = "all"
+near = 0.9393727128473789
+tol = 1e-12
+why = "no moment: the overridden start attitude (0.7 rad yaw) is held"
+
+[[check]]
+variable = "m.body.q_wb[4]"
+at = "all"
+near = 0.34289780745545134
+tol = 1e-12
+why = "no moment: the overridden start attitude (0.7 rad yaw) is held"
+
+[[check]]
+expr = "norm({m.body.q_wb[1]}, {m.body.q_wb[2]}, {m.body.q_wb[3]}, {m.body.q_wb[4]})"
+at = "all"
+near = 1.0
+tol = 1e-12
+why = "the attitude quaternion stays at unit norm"
+
+[[check]]
+variable = "m.body.euler[3]"
+at = "all"
+near = 0.7
+tol = 1e-12
+why = "display yaw reads the 0.7 rad start heading (q_start honoured)"
+
+[[check]]
+variable = "m.body.euler[1]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "level: zero roll"
+
+[[check]]
+variable = "m.body.euler[2]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "level: zero pitch"
+
+[[check]]
+variable = "m.body.R_wb[9]"
+at = "all"
+near = 1.0
+tol = 1e-12
+why = "body z stays aligned with world down, so the thrust stays vertical"
+
+[[check]]
+variable = "m.body.omega_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "no moment: no rotation"

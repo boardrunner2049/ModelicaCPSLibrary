@@ -1,0 +1,536 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Exact column names (m.x[3]) are used as is; patterns with several elements
+# are globs, where a literal [ is written [[] (m.x[[][12]] = m.x[1], m.x[2]).
+#
+# QuadX plant, m = 1.5 kg, Izz = 0.04, g = 9.80665, start NED {0,0,-1} facing
+# East (yaw psi = pi/2: body x East, body y South). IMU and magnetometer at
+# the CG with sensor axes diag(1,-1,-1) relative to body FRD, so an FRD
+# vector {x,y,z} reads {x,-y,-z}. Ambient field B_w = {20, 2, 45} uT NED;
+# level, the magnetometer reads {Bn cos psi + Be sin psi,
+# Bn sin psi - Be cos psi, -Bd}. Inputs are a zero-order hold, so the sample
+# at t reflects inputs applied at t - 1 ms.
+# Tilt manoeuvre: a rotation about the fixed body axis n = (1,1,0)/sqrt(2) by
+# theta(t) (exact: Ixx = Iyy, no yaw rate), peak Theta = 14.1421 * 0.1^2 =
+# 0.14142136 rad; collective f0/cos(theta) keeps the vertical thrust m g, so
+# the horizontal thrust g tan(theta)/sqrt(2) acts on both North and East
+# (negative: South-West). Horizontal velocity/position after the push and the
+# tilt come from integrating that closed form (ws2/cf.py in the author's
+# notes); the magnetometer under tilt is S^T Rot(n,Theta)^T Rz(pi/2)^T B_w.
+# Override (world.toml): geometry.gnssPosition_C = (0.1, 0, -0.05) m, a GNSS
+# antenna forward of and above the CG; GNSS position/velocity then carry the
+# lever arm R_wb r and R_wb (omega x r).
+# Native `rumoca sim` of the same profile (rtol 1e-9, continuous thrust)
+# agrees with the FMU to < 1e-8 through the flight and to < 3e-7 m in the
+# final slide position; checks that cite "native" use that reference.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- hover --------------------------------------------------------------
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "0.15"
+near = 9.80665
+tol = 1e-9
+why = "hovering accelerometer measures specific force g up (FRD -z, sensor +z)"
+
+[[check]]
+variable = "m.measurements.acceleration[[][12]]"
+at = "0.15"
+near = 0.0
+tol = 1e-9
+why = "level hover: no horizontal specific force"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "0.15"
+near = 2e-6
+tol = 1e-12
+why = "facing East, body x sees the East field component"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "0.15"
+near = 2e-5
+tol = 1e-12
+why = "body y is South; sensor y = -body y sees +North field"
+
+[[check]]
+variable = "m.measurements.magneticField[3]"
+at = "0.15"
+near = -4.5e-5
+tol = 1e-12
+why = "level: sensor z = -body z = -Down field"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "0.15"
+near = 1.0
+tol = 1e-9
+why = "barometer altitude is up-positive: -p_w[3]"
+
+[[check]]
+variable = "m.measurements.position[3]"
+at = "0.15"
+near = -1.05
+tol = 1e-9
+why = "GNSS reports the NED antenna position: CG at 1 m plus the 0.05 m mast (body -z = up while level)"
+
+[[check]]
+variable = "m.measurements.pressure"
+at = "0.15"
+near = 101325.0
+tol = 1e-9
+why = "ambient pressure passes through with zero bias"
+
+[[check]]
+variable = "m.measurements.temperature"
+at = "0.15"
+near = 288.15
+tol = 1e-9
+why = "ambient temperature passes through with zero bias"
+
+# --- South push 1.5 N on [0.2, 0.3) ------------------------------------
+[[check]]
+variable = "m.measurements.acceleration[2]"
+at = "0.25"
+near = -1.0
+tol = 1e-9
+why = "body +y specific force 1.5 N / 1.5 kg reads -1 on sensor y (y flip)"
+
+[[check]]
+variable = "m.measurements.acceleration[1]"
+at = "0.25"
+near = 0.0
+tol = 1e-9
+why = "the push is purely along body y"
+
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "0.25"
+near = 9.80665
+tol = 1e-9
+why = "hover thrust unchanged during the push"
+
+[[check]]
+variable = "m.measurements.velocity[1]"
+at = "0.35"
+near = -0.1
+tol = 1e-9
+why = "facing East, body y is South: 1 m/s^2 for 0.1 s gives -0.1 m/s North (GNSS NED)"
+
+[[check]]
+variable = "m.measurements.velocity[2]"
+at = "0.35"
+near = 0.0
+tol = 1e-9
+why = "no East motion from a South push"
+
+[[check]]
+variable = "m.measurements.position[1]"
+at = "0.35"
+near = -0.01
+tol = 1e-9
+why = "-0.5*1*0.1^2 - 0.1*0.05"
+
+[[check]]
+variable = "m.measurements.position[2]"
+at = "0.35"
+near = 0.1
+tol = 1e-9
+why = "no East motion; the antenna 0.1 m forward of the CG is 0.1 m East at heading pi/2"
+
+# --- tilt about n = (x+y)/sqrt(2) on [0.4, 0.9) -------------------------
+[[check]]
+variable = "m.measurements.gyro[1]"
+at = "0.45"
+near = 0.5
+tol = 1e-9
+why = "0.2 N.m / 0.02 kg m^2 for 0.05 s about body x; sensor x = body x"
+
+[[check]]
+variable = "m.measurements.gyro[2]"
+at = "0.45"
+near = -0.5
+tol = 1e-9
+why = "same rate about body y; sensor y = -body y"
+
+[[check]]
+variable = "m.measurements.gyro[3]"
+at = "0.45"
+near = 0.0
+tol = 1e-9
+why = "Ixx = Iyy: rolling and pitching together causes no yaw rate"
+
+[[check]]
+variable = "m.measurements.gyro[1]"
+at = "0.75"
+near = -0.5
+tol = 1e-9
+why = "return doublet: -0.2 N.m about x for 0.05 s"
+
+[[check]]
+variable = "m.measurements.gyro[2]"
+at = "0.75"
+near = 0.5
+tol = 1e-9
+why = "return doublet about body y, sensor y flipped"
+
+[[check]]
+variable = "m.measurements.gyro[[]*]"
+at = "0.65"
+near = 0.0
+tol = 1e-9
+why = "the doublet leaves the tilt held with zero rate"
+
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "0.65"
+near = 9.905540422
+tol = 1e-8
+why = "tilted, thrust f0/cos(Theta) per rotor: specific force g/cos(0.14142136) along sensor z"
+
+[[check]]
+variable = "m.measurements.acceleration[[][12]]"
+at = "0.65"
+near = 0.0
+tol = 1e-9
+why = "specific force has no gravity leakage into x/y under tilt (R_wb^T (a_w - g))"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "0.65"
+near = -2.594831782e-06
+tol = 1e-13
+why = "field rotated by yaw pi/2 then tilt Theta about n (closed form)"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "0.65"
+near = 1.540516822e-05
+tol = 1e-13
+why = "field rotated by yaw pi/2 then tilt Theta about n, sensor y flipped"
+
+[[check]]
+variable = "m.measurements.magneticField[3]"
+at = "0.65"
+near = -4.67434235e-05
+tol = 1e-13
+why = "tilt couples North/East into body z; sensor z = -body z"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "0.95"
+near = 1.0
+tol = 1e-7
+why = "collective f0/cos(theta) holds the vertical thrust at m g through the tilt"
+
+[[check]]
+variable = "m.measurements.velocity[1]"
+at = "0.95"
+near = -0.3957139611
+tol = 1e-7
+why = "push -0.1 plus the tilt impulse -(g/sqrt2) * integral tan(theta) dt"
+
+[[check]]
+variable = "m.measurements.velocity[2]"
+at = "0.95"
+near = -0.2957139611
+tol = 1e-7
+why = "tilt about (x+y)/sqrt2 at heading East tips thrust equally West and South"
+
+[[check]]
+variable = "m.measurements.position[1]"
+at = "1.0"
+near = -0.1784998864
+tol = 1e-7
+why = "integrated closed form of the push and the tilt"
+
+[[check]]
+variable = "m.measurements.position[2]"
+at = "1.0"
+near = -0.0034998864
+tol = 1e-7
+why = "integrated closed form of the tilt (CG -0.1034998864) plus the 0.1 m forward lever arm, East at heading pi/2"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "1.0"
+near = 2e-6
+tol = 1e-12
+why = "back level at heading pi/2: the tilt there and back is a net identity rotation"
+
+[[check]]
+variable = "m.measurements.magneticField[3]"
+at = "1.0"
+near = -4.5e-5
+tol = 1e-12
+why = "back level: sensor z = -Down field"
+
+[[check]]
+expr = "{m.measurements.position[1]} - {m.truth.p_w[1]} - ({m.truth.R_wb[1]}*0.1 + {m.truth.R_wb[2]}*0.0 + {m.truth.R_wb[3]}*-0.05)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS position = p_w + R_wb r at every sample (lever arm r = (0.1, 0, -0.05) m through push, tilt, spin and landing)"
+
+[[check]]
+expr = "{m.measurements.position[2]} - {m.truth.p_w[2]} - ({m.truth.R_wb[4]}*0.1 + {m.truth.R_wb[5]}*0.0 + {m.truth.R_wb[6]}*-0.05)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS position = p_w + R_wb r at every sample (lever arm r = (0.1, 0, -0.05) m through push, tilt, spin and landing)"
+
+[[check]]
+expr = "{m.measurements.position[3]} - {m.truth.p_w[3]} - ({m.truth.R_wb[7]}*0.1 + {m.truth.R_wb[8]}*0.0 + {m.truth.R_wb[9]}*-0.05)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS position = p_w + R_wb r at every sample (lever arm r = (0.1, 0, -0.05) m through push, tilt, spin and landing)"
+
+[[check]]
+expr = "{m.measurements.velocity[1]} - {m.truth.v_w[1]} - ({m.truth.R_wb[1]}*({m.truth.omega_b[2]}*-0.05 - {m.truth.omega_b[3]}*0.0) + {m.truth.R_wb[2]}*({m.truth.omega_b[3]}*0.1 - {m.truth.omega_b[1]}*-0.05) + {m.truth.R_wb[3]}*({m.truth.omega_b[1]}*0.0 - {m.truth.omega_b[2]}*0.1))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS velocity = v_w + R_wb (omega x r) at every sample"
+
+[[check]]
+expr = "{m.measurements.velocity[2]} - {m.truth.v_w[2]} - ({m.truth.R_wb[4]}*({m.truth.omega_b[2]}*-0.05 - {m.truth.omega_b[3]}*0.0) + {m.truth.R_wb[5]}*({m.truth.omega_b[3]}*0.1 - {m.truth.omega_b[1]}*-0.05) + {m.truth.R_wb[6]}*({m.truth.omega_b[1]}*0.0 - {m.truth.omega_b[2]}*0.1))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS velocity = v_w + R_wb (omega x r) at every sample"
+
+[[check]]
+expr = "{m.measurements.velocity[3]} - {m.truth.v_w[3]} - ({m.truth.R_wb[7]}*({m.truth.omega_b[2]}*-0.05 - {m.truth.omega_b[3]}*0.0) + {m.truth.R_wb[8]}*({m.truth.omega_b[3]}*0.1 - {m.truth.omega_b[1]}*-0.05) + {m.truth.R_wb[9]}*({m.truth.omega_b[1]}*0.0 - {m.truth.omega_b[2]}*0.1))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "GNSS velocity = v_w + R_wb (omega x r) at every sample"
+
+[[check]]
+expr = "hypot({m.measurements.velocity[1]} - {m.truth.v_w[1]}, {m.measurements.velocity[2]} - {m.truth.v_w[2]})"
+at = "all"
+from = 2.7
+to = 4.3
+near = 0.05
+tol = 1e-9
+why = "spinning at -0.5 rad/s level, the 0.1 m lever arm adds a 0.05 m/s horizontal antenna velocity"
+
+# --- climb at 1.2 m g, then constant climb rate -------------------------
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "1.9"
+near = 11.76798
+tol = 1e-6
+why = "specific force = thrust/m = 1.2 g, not the 0.2 g kinematic acceleration"
+
+[[check]]
+variable = "m.measurements.climbRate"
+at = "2.4"
+near = 0.980665
+tol = 1e-6
+why = "0.2 g for 0.5 s: barometer climb rate is up-positive"
+
+[[check]]
+variable = "m.measurements.velocity[3]"
+at = "2.4"
+near = -0.980665
+tol = 1e-6
+why = "GNSS velocity is NED: climbing is negative Down"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "2"
+near = 1.24516625
+tol = 1e-6
+why = "1 + 0.5 * 0.2 g * 0.5^2"
+
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "2.4"
+near = 9.80665
+tol = 1e-9
+why = "back at hover thrust: specific force g although the vehicle is climbing"
+
+[[check]]
+variable = "m.measurements.pressure"
+at = "2.501"
+near = 100662.5
+tol = 1e-6
+why = "pressure ramp midpoint (input held from t = 2.5)"
+
+[[check]]
+variable = "m.measurements.temperature"
+at = "2.4"
+near = 300.0
+tol = 1e-9
+why = "temperature step at 2 s passes through"
+
+# --- yaw spin-up to -0.5 rad/s, then constant spin ----------------------
+[[check]]
+variable = "m.measurements.gyro[3]"
+at = "3"
+near = 0.5
+tol = 1e-6
+why = "body yaw rate -0.2/0.04*0.1 = -0.5 rad/s; sensor z = -body z"
+
+[[check]]
+variable = "m.measurements.gyro[[][12]]"
+at = "3"
+near = 0.0
+tol = 1e-9
+why = "pure yaw: no roll or pitch rate"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "3"
+near = 6.4117155e-6
+tol = 1e-12
+why = "field rotated by heading pi/2 - 0.025 - 0.5*0.4"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "3"
+near = 1.9049669e-5
+tol = 1e-12
+why = "field rotated by heading pi/2 - 0.025 - 0.5*0.4"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "3.5"
+near = 1.0925354e-5
+tol = 1e-12
+why = "field rotated by heading pi/2 - 0.025 - 0.5*0.9"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "3.5"
+near = 1.6871178e-5
+tol = 1e-12
+why = "field rotated by heading pi/2 - 0.025 - 0.5*0.9"
+
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "3"
+near = 9.80665
+tol = 1e-9
+why = "an IMU at the CG sees no centripetal term while spinning"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "3.5"
+near = 2.71616375
+tol = 1e-6
+why = "1.24516625 + 0.980665 * 1.5 s"
+
+[[check]]
+variable = "m.measurements.pressure"
+at = "3.5"
+near = 100000.0
+tol = 1e-9
+why = "pressure ramp end value"
+
+# --- free fall ------------------------------------------------------------
+[[check]]
+variable = "m.measurements.acceleration[[]*]"
+at = "3.8"
+near = 0.0
+tol = 1e-9
+why = "accelerometer reads zero specific force in free fall"
+
+[[check]]
+variable = "m.measurements.climbRate"
+at = "3.8"
+near = -1.96133
+tol = 1e-6
+why = "0.980665 - 0.3 g: climb rate reverses under gravity"
+
+[[check]]
+variable = "m.measurements.gyro[3]"
+at = "4.2"
+near = 0.5
+tol = 1e-6
+why = "no torque in free fall: the spin is conserved"
+
+# --- touchdown and rest -------------------------------------------------
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "end"
+near = 9.80665
+tol = 1e-6
+why = "at rest on the ground the accelerometer reads g again"
+
+[[check]]
+variable = "m.measurements.acceleration[[][12]]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "level at rest: no horizontal specific force"
+
+[[check]]
+variable = "m.measurements.gyro[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "leg friction stops the spin"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "end"
+near = 0.0987742
+tol = 1e-6
+why = "leg length 0.10 m minus static compression m g / (4 k)"
+
+[[check]]
+variable = "m.measurements.climbRate"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "at rest"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "end"
+near = 1.689374e-5
+tol = 2e-10
+why = "field at the final heading 0.672268 rad where friction stops the spin and slide (native; tol ~1e-5 rad)"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "end"
+near = 1.089043e-5
+tol = 2e-10
+why = "field at the final heading 0.672268 rad where friction stops the spin and slide (native; tol ~1e-5 rad)"
+
+[[check]]
+variable = "m.measurements.magneticField[3]"
+at = "end"
+near = -4.5e-5
+tol = 1e-12
+why = "level at rest: sensor z = -Down field"
+
+[[check]]
+variable = "m.measurements.velocity[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "leg friction stops the South-West slide that the push and tilt left"
+
+[[check]]
+variable = "m.measurements.position[1]"
+at = "end"
+near = -1.4290392
+tol = 1e-5
+why = "drift plus landing slide (native CG -1.5072802) plus 0.1 m cos(final heading) lever arm"
+
+[[check]]
+variable = "m.measurements.position[2]"
+at = "end"
+near = -1.0343109
+tol = 1e-5
+why = "drift plus landing slide (native CG -1.0965872) plus 0.1 m sin(final heading) lever arm"

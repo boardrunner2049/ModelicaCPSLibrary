@@ -1,0 +1,201 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# PWM: clamp((pw - 1000)/1000, 0, 1) for pw = {900,1100,...,1600,2100} us ->
+# {0, .1, .2, .3, .4, .5, .6, 1}; every one of the eight channels is checked,
+# so a trimmed, truncated or shifted channel array would show. Sensor mounts
+# (OctoX geometry):
+# R_bImu = [0 -1 0; 1 0 0; 0 0 1] (sensor x along body right, a +90 deg yaw):
+#   accel {1,2,3} -> FRD {-2, 1, 3}, gyro {4,5,6} -> {-5, 4, 6}; a transposed
+#   matrix would give {2,-1,3} instead.
+# R_bMag = diag{1,-1,-1}: field {1,2,3}e-5 T -> {1,-2,-3}e-5 T.
+# GNSS values are already NED: position {t,2t,-3t}, velocity {1,2,-3} pass
+# through unchanged. Native `rumoca sim` agrees exactly. The inputs are
+# constants or functions of time inside the model, so the t = 0 row already
+# holds them and "all" covers the whole run.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.commands.normalizedCommand[1]"
+at = "all"
+near = 0
+tol = 1e-12
+why = "900 us is below pwmMin: clipped to 0, not -0.1"
+
+[[check]]
+variable = "m.commands.normalizedCommand[2]"
+at = "all"
+near = 0.1
+tol = 1e-12
+why = "1100 us -> 0.1 on channel 2"
+
+[[check]]
+variable = "m.commands.normalizedCommand[3]"
+at = "all"
+near = 0.2
+tol = 1e-12
+why = "1200 us -> 0.2 on channel 3"
+
+[[check]]
+variable = "m.commands.normalizedCommand[4]"
+at = "all"
+near = 0.3
+tol = 1e-12
+why = "1300 us -> 0.3 on channel 4"
+
+[[check]]
+variable = "m.commands.normalizedCommand[5]"
+at = "all"
+near = 0.4
+tol = 1e-12
+why = "1400 us -> 0.4 on channel 5"
+
+[[check]]
+variable = "m.commands.normalizedCommand[6]"
+at = "all"
+near = 0.5
+tol = 1e-12
+why = "1500 us -> 0.5 on channel 6"
+
+[[check]]
+variable = "m.commands.normalizedCommand[7]"
+at = "all"
+near = 0.6
+tol = 1e-12
+why = "1600 us -> 0.6 on channel 7: the seventh channel is not truncated away"
+
+[[check]]
+variable = "m.commands.normalizedCommand[8]"
+at = "all"
+near = 1
+tol = 1e-12
+why = "2100 us is above pwmMax: clipped to 1 on the eighth (last) channel, not 1.1"
+
+[[check]]
+variable = "m.values.acceleration_frd[1]"
+at = "all"
+near = -2
+tol = 1e-12
+why = "IMU yawed +90 deg: body forward = -(sensor y)"
+
+[[check]]
+variable = "m.values.acceleration_frd[2]"
+at = "all"
+near = 1
+tol = 1e-12
+why = "IMU yawed +90 deg: body right = sensor x"
+
+[[check]]
+variable = "m.values.acceleration_frd[3]"
+at = "all"
+near = 3
+tol = 1e-12
+why = "the yaw mount leaves the down axis untouched"
+
+[[check]]
+variable = "m.values.gyro_frd[1]"
+at = "all"
+near = -5
+tol = 1e-12
+why = "gyro shares the IMU mount: forward = -(sensor y)"
+
+[[check]]
+variable = "m.values.gyro_frd[2]"
+at = "all"
+near = 4
+tol = 1e-12
+why = "gyro shares the IMU mount: right = sensor x"
+
+[[check]]
+variable = "m.values.gyro_frd[3]"
+at = "all"
+near = 6
+tol = 1e-12
+why = "gyro down axis untouched"
+
+[[check]]
+variable = "m.values.magneticField_frd[1]"
+at = "all"
+near = 1e-05
+tol = 1e-15
+why = "magnetometer flipped about x (diag{1,-1,-1}): x unchanged"
+
+[[check]]
+variable = "m.values.magneticField_frd[2]"
+at = "all"
+near = -2e-05
+tol = 1e-15
+why = "flipped about x: y component reverses"
+
+[[check]]
+variable = "m.values.magneticField_frd[3]"
+at = "all"
+near = -3e-05
+tol = 1e-15
+why = "flipped about x: z component reverses"
+
+[[check]]
+variable = "m.values.velocity_ned[1]"
+at = "all"
+near = 1
+tol = 1e-12
+why = "NED north velocity passes through"
+
+[[check]]
+variable = "m.values.velocity_ned[2]"
+at = "all"
+near = 2
+tol = 1e-12
+why = "NED east velocity passes through"
+
+[[check]]
+variable = "m.values.velocity_ned[3]"
+at = "all"
+near = -3
+tol = 1e-12
+why = "NED velocity is not converted twice (down stays -3, not +3)"
+
+[[check]]
+variable = "m.values.position_ned[1]"
+at = "0.0217"
+near = 0.0217
+tol = 1e-12
+why = "NED position t passes through continuously at an off-grid instant, no frame flip"
+
+[[check]]
+variable = "m.values.position_ned[2]"
+at = "0.0217"
+near = 0.0434
+tol = 1e-12
+why = "NED position 2t passes through continuously at an off-grid instant, no frame flip"
+
+[[check]]
+variable = "m.values.position_ned[3]"
+at = "0.0217"
+near = -0.0651
+tol = 1e-12
+why = "NED position -3t passes through continuously at an off-grid instant, no frame flip"
+
+[[check]]
+variable = "m.values.position_ned[1]"
+at = "end"
+near = 0.98
+tol = 1e-12
+why = "NED position t passes through continuously, no frame flip"
+
+[[check]]
+variable = "m.values.position_ned[2]"
+at = "end"
+near = 1.96
+tol = 1e-12
+why = "NED position 2t passes through continuously, no frame flip"
+
+[[check]]
+variable = "m.values.position_ned[3]"
+at = "end"
+near = -2.94
+tol = 1e-12
+why = "NED position -3t passes through continuously, no frame flip"

@@ -1,0 +1,104 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# k = 3000 N/m, c = 150 N.s/m; v_n > 0 separating. Inputs held from t show in
+# the row at t + 1 ms. Phases in harness.c.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.penetration} - max(0, -{m.gap})"
+at = "all"
+range = [0.0, 0.0]
+why = "penetration = max(0, -gap) at every sample"
+
+[[check]]
+expr = "{m.normalForce} - (max(0, {m.stiffness}*{m.penetration} - {m.damping}*{m.normalVelocity}) if ({m.active} > 0.5 and {m.gap} <= 0) else 0)"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "the documented penalty law holds at every sample (including the switching samples)"
+
+[[check]]
+variable = "m.normalForce"
+at = "all"
+range = [0.0, 21.0000001]
+why = "unilateral: the contact never pulls, and never exceeds the approach peak 21 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.05"
+near = 0.0
+tol = 0
+why = "10 mm above the surface: no force"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.2"
+near = 6.0
+tol = 1e-12
+why = "2 mm static penetration: k*0.002 = 6 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.35"
+near = 21.0
+tol = 1e-12
+why = "approaching at 0.1 m/s: 6 + c*0.1 = 21 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.45"
+near = 0.0
+tol = 0
+why = "separating at 0.1 m/s: 6 - 15 < 0 is clipped to 0, the damper cannot pull"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.55"
+near = 3.0
+tol = 1e-12
+why = "separating at 0.02 m/s: 6 - 3 = 3 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.65"
+near = 15.0
+tol = 1e-12
+why = "exactly touching (gap 0, counted as contact) while approaching 0.1 m/s: damper force alone"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.751"
+near = 0.0
+tol = 0
+why = "active switched off alone at 0.75 s (nothing else changes): force drops on the next sample"
+
+[[check]]
+variable = "m.penetration"
+at = "0.77"
+near = 0.002
+tol = 1e-15
+why = "geometry is still reported while inactive"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.801"
+near = 3.0
+tol = 1e-12
+why = "re-activated at 0.80 s with v_n = +0.02 m/s: 6 - 3 = 3 N on the next sample"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.851"
+near = 0.0
+tol = 1e-9
+why = "unloading ramp: k*pen - 3 reaches zero at pen = 1 mm (inputs held from 0.85 s), 50 ms before geometric separation"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.83"
+near = 1.26
+tol = 1e-9
+why = "pen = 1.4 mm (inputs held from 0.829 s, gap = -2 mm + 0.02*0.029): 3000*0.00142 - 3 = 1.26 N"

@@ -1,0 +1,177 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Inputs held from t appear in the row at t + 1 ms. Boolean cells read 1/0.
+# Commutation tables (sector 1..6): high = {3,1,1,2,2,3}, low = {2,2,3,3,1,1},
+# written in closed form as high(S) = ((S//2 + 2) % 3) + 1 and
+# low(S) = (((S+1)//2) % 3) + 1. Enabled <=> command > 0.
+# An independent row-by-row reimplementation of the documented when-logic
+# (initial/change(enabled)/drained) reproduces every one of the 901 rows.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sector} - (1 + ((({m.electricalAngle} + pi/6) % (2*pi)) // (pi/3)))"
+at = "all"
+from = 0.001
+near = 0.0
+tol = 0.0
+why = "sector = 1 + floor(mod(theta + pi/6, 2 pi)/(pi/3)), including negative angles and multiple revolutions"
+
+[[check]]
+variable = "m.sector"
+at = "all"
+range = [1, 6]
+why = "sector index stays in 1..6"
+
+[[check]]
+expr = "{m.modulation} - min(1.0, max(0.0, {m.command}))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "modulation = clamp(command, 0, 1): 1.5 -> 1, negative -> 0, 1e-9 kept"
+
+[[check]]
+expr = "{m.highSelected[1]} - ({m.command} > 0) * (((({m.sector}//2) + 2) % 3) + 1 == 1)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase A high switch follows highTable[sector] while enabled, off otherwise"
+
+[[check]]
+expr = "{m.highSelected[2]} - ({m.command} > 0) * (((({m.sector}//2) + 2) % 3) + 1 == 2)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase B high switch follows highTable[sector] while enabled, off otherwise"
+
+[[check]]
+expr = "{m.highSelected[3]} - ({m.command} > 0) * (((({m.sector}//2) + 2) % 3) + 1 == 3)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase C high switch follows highTable[sector] while enabled, off otherwise"
+
+[[check]]
+expr = "({m.command} > 0) * ({m.lowSelected[1]} - ((((({m.sector}+1)//2) % 3) + 1) == 1))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase A low switch follows lowTable[sector] while enabled"
+
+[[check]]
+expr = "({m.command} > 0) * ({m.lowSelected[2]} - ((((({m.sector}+1)//2) % 3) + 1) == 2))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase B low switch follows lowTable[sector] while enabled"
+
+[[check]]
+expr = "({m.command} > 0) * ({m.lowSelected[3]} - ((((({m.sector}+1)//2) % 3) + 1) == 3))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "phase C low switch follows lowTable[sector] while enabled"
+
+[[check]]
+expr = "{m.highSelected[1]}*{m.lowSelected[1]} + {m.highSelected[2]}*{m.lowSelected[2]} + {m.highSelected[3]}*{m.lowSelected[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no shoot-through: a phase never has both its high and low switch selected"
+
+[[check]]
+expr = "{m.highSelected[1]} + {m.highSelected[2]} + {m.highSelected[3]} - ({m.command} > 0)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "exactly one high switch while enabled, none while disabled"
+
+[[check]]
+expr = "{m.lowSelected[1]} + {m.lowSelected[2]} + {m.lowSelected[3]} - max({m.command} > 0, {m.recirculating})"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "exactly one low switch while driving or recirculating, none in Hi-Z"
+
+[[check]]
+expr = "{m.coast} - (1 - ({m.command} > 0)) * (1 - {m.recirculating})"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "coast (all gates off) <=> disabled and not recirculating"
+
+[[check]]
+expr = "{m.recirculating} * ({m.command} > 0)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "recirculation only exists while disabled"
+
+[[check]]
+expr = "{m.coast} + (1 - {m.recirculating})"
+at = "all"
+to = 0.1
+near = 2.0
+tol = 0.0
+why = "initial zero-command operation starts in Hi-Z even with 1.5 A winding current"
+
+[[check]]
+expr = "{m.recirculating} + {m.lowSelected[3]} - {m.lowSelected[1]} - {m.lowSelected[2]}"
+at = "all"
+from = 0.401
+to = 0.5
+near = 2.0
+tol = 0.0
+why = "cutoff at 0.4 s in sector 4 (low leg C) latches C low while the angle keeps rotating through sectors 5,6,1,2"
+
+[[check]]
+variable = "m.recirculating"
+at = "0.5"
+near = 1
+tol = 0
+why = "recirculation persists while the decaying current (0.04 A amplitude at 0.499 s) exceeds the threshold"
+
+[[check]]
+expr = "{m.coast} - {m.recirculating}"
+at = "all"
+from = 0.501
+to = 0.6
+near = 1.0
+tol = 0.0
+why = "current drained to 0 at 0.5 s: release into Hi-Z, and a negative command keeps it there"
+
+[[check]]
+expr = "{m.coast} - {m.recirculating}"
+at = "all"
+from = 0.651
+to = 0.7
+near = 1.0
+tol = 0.0
+why = "cutoff with no winding current goes straight to Hi-Z (no recirculation step)"
+
+[[check]]
+expr = "{m.highSelected[2]} + {m.lowSelected[3]}"
+at = "0.701"
+near = 2.0
+tol = 0.0
+why = "a 1e-9 command enables: sector 4 drives B high, C low"
+
+[[check]]
+expr = "{m.recirculating} + {m.lowSelected[1]} - {m.lowSelected[2]} - {m.lowSelected[3]}"
+at = "all"
+from = 0.751
+to = 0.8
+near = 2.0
+tol = 0.0
+why = "cutoff by a negative command jump in sector 6 (low leg A) latches A low"
+
+[[check]]
+expr = "{m.coast} - {m.recirculating}"
+at = "all"
+from = 0.801
+near = 1.0
+tol = 0.0
+why = "0.8 mA (below the 1 mA threshold, nonzero) releases to Hi-Z; returning 0.5 A current does not re-latch"

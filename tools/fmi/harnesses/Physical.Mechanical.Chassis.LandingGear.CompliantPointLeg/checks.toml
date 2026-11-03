@@ -1,0 +1,397 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# One leg, rLeg_b = {0.12,-0.08,0.1} (world.toml override), k = 3000 N/m,
+# c = 150 N.s/m, tangential 25 N.s/m, mu = 0.6, level ground at Down = 0
+# (outward normal {0,0,-1}). Inputs are a zero-order hold, so the sample at t
+# reflects the inputs applied at t - 1 ms. Expected values are the closed-form
+# leg laws evaluated by hand (phases in harness.c); moments are r x F with the
+# asymmetric r, so every component is a distinct nonzero number.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.rLeg_b[1]"
+at = "0"
+near = 0.12
+tol = 1e-15
+why = "the asymmetric tip-offset override reached the FMU"
+
+# --- free flight -----------------------------------------------------------
+[[check]]
+variable = "m.normalForce"
+at = "0.15"
+near = 0.0
+tol = 1e-12
+why = "0.2 m above the ground: no contact force"
+
+[[check]]
+variable = "m.force_b[[]*]"
+at = "0.15"
+near = 0.0
+tol = 1e-12
+why = "no contact, no force"
+
+[[check]]
+variable = "m.contact"
+at = "0.15"
+near = 0.0
+tol = 0
+why = "contact flag is false while the gap is positive"
+
+# --- touchdown and static penetration ---------------------------------------
+[[check]]
+variable = "m.normalForce"
+at = "0.61"
+near = 88.5
+tol = 1e-9
+why = "descending at 0.5 m/s, 4.5 mm in (inputs held from 0.609 s): k*0.0045 + c*0.5 = 13.5 + 75 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "max"
+near = 103.5
+tol = 1e-9
+why = "peak just before the descent stops: k*0.0095 + c*0.5 = 28.5 + 75 N"
+
+[[check]]
+variable = "m.normalForce"
+at = "0.7"
+near = 30.0
+tol = 1e-06
+why = "static 10 mm penetration: spring alone, k*0.01 = 30 N"
+
+[[check]]
+variable = "m.contact"
+at = "0.7"
+near = 1.0
+tol = 0
+why = "contact flag is true while penetrating"
+
+[[check]]
+variable = "m.force_w[3]"
+at = "0.7"
+near = -30.0
+tol = 1e-06
+why = "ground pushes the vehicle Up, i.e. -Down in NED"
+
+[[check]]
+variable = "m.tipPosition_w[3]"
+at = "0.7"
+near = 0.01
+tol = 1e-12
+why = "tip = CG Down -0.09 m + leg 0.1 m: 10 mm below the ground plane"
+
+[[check]]
+variable = "m.moment_b[1]"
+at = "0.7"
+near = 2.4
+tol = 1e-09
+why = "r x (0,0,-30): x = r_y*F_z = -0.08*-30 (left-side tip pushed up rolls right)"
+
+[[check]]
+variable = "m.moment_b[2]"
+at = "0.7"
+near = 3.6
+tol = 1e-09
+why = "r x (0,0,-30): y = -r_x*F_z = 0.12*30 (forward tip pushed up pitches nose up)"
+
+[[check]]
+variable = "m.moment_b[3]"
+at = "0.7"
+near = 0.0
+tol = 1e-12
+why = "a vertical force has no yaw moment"
+
+# --- moving deck under a stationary vehicle ----------------------------------
+[[check]]
+variable = "m.force_b[1]"
+at = "0.9"
+near = -10.0
+tol = 1e-06
+why = "deck sliding South at 0.4 m/s: relative tip velocity +0.4 North, friction 25*0.4 N acts South"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "0.9"
+near = -4.0
+tol = 1e-06
+why = "friction dissipates F.v_rel = -10 N * 0.4 m/s"
+
+# --- vehicle sliding North ---------------------------------------------------
+[[check]]
+variable = "m.force_b[1]"
+at = "1.2"
+near = -10.0
+tol = 1e-06
+why = "sliding North at 0.4 m/s: viscous friction 25*0.4 = 10 N < mu*N = 18 N, opposing the motion"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - 2.4, {m.moment_b[2]} - 2.6, {m.moment_b[3]} + 0.8)"
+at = "1.2"
+near = 0.0
+tol = 1e-09
+why = "r x (-10,0,-30) = (2.4, 0.1*-10 + 0.12*30, -(-0.08)(-10)) = (2.4, 2.6, -0.8)"
+
+[[check]]
+variable = "m.force_b[1]"
+at = "1.6"
+near = -18.0
+tol = 1e-06
+why = "sliding at 1 m/s: viscous 25 N exceeds the Coulomb cap mu*N = 0.6*30 = 18 N"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "1.6"
+near = -18.0
+tol = 1e-06
+why = "capped friction dissipates 18 N * 1 m/s"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - 2.4, {m.moment_b[2]} - 1.8, {m.moment_b[3]} + 1.44)"
+at = "1.6"
+near = 0.0
+tol = 1e-09
+why = "r x (-18,0,-30) = (2.4, -1.8 + 3.6, -1.44) with the capped friction"
+
+# --- yaw rate about the CG ---------------------------------------------------
+[[check]]
+expr = "norm({m.tipVelocity_w[1]} - 0.16, {m.tipVelocity_w[2]} - 0.24, {m.tipVelocity_w[3]})"
+at = "2.0"
+near = 0.0
+tol = 1e-12
+why = "w x r = (0,0,2) x (0.12,-0.08,0.1) = (0.16, 0.24, 0)"
+
+[[check]]
+expr = "norm({m.force_b[1]} + 4, {m.force_b[2]} + 6, {m.force_b[3]} + 30)"
+at = "2.0"
+near = 0.0
+tol = 1e-06
+why = "viscous friction -25*(0.16,0.24) (speed 0.288 m/s, 7.2 N < 18 N cap) plus the 30 N normal force"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - 3.0, {m.moment_b[2]} - 3.2, {m.moment_b[3]} + 1.04)"
+at = "2.0"
+near = 0.0
+tol = 1e-06
+why = "r x (-4,-6,-30) = (2.4+0.6, -0.4+3.6, -0.72-0.32); the yaw moment -1.04 opposes the yaw rate"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "2.0"
+near = -2.08
+tol = 1e-06
+why = "F.v = -25*|v|^2 = -25*0.0832 W"
+
+# --- yawed 90 deg (nose East), sliding body-forward ---------------------------
+[[check]]
+expr = "norm({m.tipPosition_w[1]} - {m.p_w[1]} - 0.08, {m.tipPosition_w[2]} - {m.p_w[2]} - 0.12)"
+at = "2.4"
+near = 0.0
+tol = 1e-12
+why = "R_wb*r with R_wb = yaw 90 deg: (0.12,-0.08) body -> (0.08, 0.12) world; R_wb' would give (-0.08,-0.12)"
+
+[[check]]
+variable = "m.tipVelocity_w[2]"
+at = "2.4"
+near = 0.4
+tol = 1e-09
+why = "yawed 90 deg (nose East): body-forward 0.4 m/s is East in NED"
+
+[[check]]
+expr = "norm({m.force_w[1]}, {m.force_w[2]} + 10, {m.force_w[3]} + 30)"
+at = "2.4"
+near = 0.0
+tol = 1e-06
+why = "friction acts West in world axes, normal force Up"
+
+[[check]]
+expr = "norm({m.force_b[1]} + 10, {m.force_b[2]}, {m.force_b[3]} + 30)"
+at = "2.4"
+near = 0.0
+tol = 1e-06
+why = "rotated back to body axes (R_wb') the friction opposes body-forward motion; the normal force is unchanged"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - 2.4, {m.moment_b[2]} - 2.6, {m.moment_b[3]} + 0.8)"
+at = "2.4"
+near = 0.0
+tol = 1e-06
+why = "same body-frame load as the 1.2 s phase, so the same body moment: the moment is frame-consistent"
+
+# --- lift-off ----------------------------------------------------------------
+[[check]]
+variable = "m.normalForce"
+at = "2.61"
+near = 0.0
+tol = 1e-12
+why = "lifting at 0.5 m/s while still 5.5 mm in: k*pen - c*v = 16.5 - 75 < 0, and the unilateral contact cannot pull"
+
+[[check]]
+variable = "m.contact"
+at = "2.61"
+near = 1.0
+tol = 0
+why = "still geometrically in contact (gap < 0) although the force is clipped to zero"
+
+[[check]]
+variable = "m.gap"
+at = "3.0"
+near = 0.1895
+tol = 1e-09
+why = "climbed 0.2 m from 10 mm penetration (inputs held from 2.999 s)"
+
+# --- sloped, moving terrain at a general attitude (numpy reference: the leg law
+# evaluated independently; R = Rz(0.7) Ry(-0.15) Rx(0.2), n = 10 deg incline
+# toward azimuth 30 deg, terrainPoint (2,-1,0.5), terrain velocity (0.1,0.05,0)) ---
+[[check]]
+variable = "m.gap"
+at = "3.15"
+near = -0.008
+tol = 1e-12
+why = "gap = n.(tip - terrainPoint): the CG was placed so the tip is 8 mm into the inclined plane through (2,-1,0.5); dropping or sign-flipping terrainPoint, or using n(3) alone, changes it by > 0.1 m"
+
+[[check]]
+expr = "norm({m.tipPosition_w[1]} - (2.291807103582105), {m.tipPosition_w[2]} - (-0.8047301709523144), {m.tipPosition_w[3]} - (0.4463477349489106))"
+at = "3.15"
+near = 0.0
+tol = 1e-12
+why = "p + R_wb*r with all nine R_wb entries nonzero (roll and pitch entries included); R_wb' gives a different point"
+
+[[check]]
+expr = "norm({m.tipVelocity_w[1]} - (0.33172161897243485), {m.tipVelocity_w[2]} - (0.012388495320941394), {m.tipVelocity_w[3]} - (0.14215235731422027))"
+at = "3.15"
+near = 0.0
+tol = 1e-12
+why = "R_wb*(v_b + omega_b x r) with v_b = [0.3, -0.2, 0.1], omega_b = (0.4,-0.6,0.5): every component of v_b and omega_b enters"
+
+[[check]]
+variable = "m.normalForce"
+at = "3.15"
+near = 49.73614816324194
+tol = 1e-9
+why = "k*0.008 - c*v_n with v_n = n.(tipVelocity - terrainVelocity) = -0.171574 m/s (approaching the slope)"
+
+[[check]]
+expr = "norm({m.force_w[1]} - (-12.627498436035587), {m.force_w[2]} - (-3.00558852699048), {m.force_w[3]} - (-48.31016020834146))"
+at = "3.15"
+near = 0.0
+tol = 1e-9
+why = "N*n plus viscous friction opposing the tangential relative velocity v_rel - (n.v_rel) n (|v_t| = 0.214194 m/s, friction 5.354851 N vs cap mu*N = 29.841689 N)"
+
+[[check]]
+expr = "norm({m.force_b[1]} - (-18.68348547912579), {m.force_b[2]} - (-3.426030040373042), {m.force_b[3]} - (-46.27686837951585))"
+at = "3.15"
+near = 0.0
+tol = 1e-9
+why = "force_w rotated to body axes with R_wb' (a transpose error would show in every component)"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - (4.044752474398572), {m.moment_b[2]} - (3.684875657629322), {m.moment_b[3]} - (-1.9058024431748282))"
+at = "3.15"
+near = 0.0
+tol = 1e-9
+why = "r x force_b about the CG"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "3.15"
+near = -1.1469769754128665
+tol = 1e-9
+why = "F_t . v_t = -|F_t| |v_t|: dissipative"
+
+[[check]]
+expr = "({m.force_w[1]}*(-0.1503837331804353) + {m.force_w[2]}*(-0.08682408883346515) + {m.force_w[3]}*(-0.984807753012208)) - {m.normalForce}"
+at = "3.15"
+near = 0.0
+tol = 1e-9
+why = "friction lies in the inclined plane: the force component along n is exactly the normal force"
+
+[[check]]
+expr = "norm({m.tipVelocity_w[1]} - (3.0388199688008215), {m.tipVelocity_w[2]} - (0.2942609956204697), {m.tipVelocity_w[3]} - (-0.03719762994899972))"
+at = "3.45"
+near = 0.0
+tol = 1e-12
+why = "R_wb*(v_b + omega_b x r) with v_b = [2.5, -1.8, -0.1], omega_b = (0.4,-0.6,0.5): every component of v_b and omega_b enters"
+
+[[check]]
+variable = "m.normalForce"
+at = "3.45"
+near = 87.97889131024887
+tol = 1e-9
+why = "k*0.008 - c*v_n with v_n = n.(tipVelocity - terrainVelocity) = -0.426526 m/s (approaching the slope)"
+
+[[check]]
+expr = "norm({m.force_w[1]} - (-65.23097122010878), {m.force_w[2]} - (-11.38726356949495), {m.force_w[3]} - (-78.3711595683373))"
+at = "3.45"
+near = 0.0
+tol = 1e-9
+why = "N*n plus capped friction opposing the tangential relative velocity v_rel - (n.v_rel) n (|v_t| = 2.918182 m/s, friction 52.787335 N vs cap mu*N = 52.787335 N)"
+
+[[check]]
+expr = "norm({m.force_b[1]} - (-68.29631441870906), {m.force_b[2]} - (18.9533295766075), {m.force_b[3]} - (-74.18337256277125))"
+at = "3.45"
+near = 0.0
+tol = 1e-9
+why = "force_w rotated to body axes with R_wb' (a transpose error would show in every component)"
+
+[[check]]
+expr = "norm({m.moment_b[1]} - (4.03933684736095), {m.moment_b[2]} - (2.0723732656616436), {m.moment_b[3]} - (-3.189305604303825))"
+at = "3.45"
+near = 0.0
+tol = 1e-9
+why = "r x force_b about the CG"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "3.45"
+near = -154.04304425227713
+tol = 1e-9
+why = "F_t . v_t = -|F_t| |v_t|: dissipative"
+
+[[check]]
+expr = "({m.force_w[1]}*(-0.1503837331804353) + {m.force_w[2]}*(-0.08682408883346515) + {m.force_w[3]}*(-0.984807753012208)) - {m.normalForce}"
+at = "3.45"
+near = 0.0
+tol = 1e-9
+why = "friction lies in the inclined plane: the force component along n is exactly the normal force"
+
+[[check]]
+expr = "norm({m.force_w[1]} - {m.normalForce}*(-0.1503837331804353), {m.force_w[2]} - {m.normalForce}*(-0.08682408883346515), {m.force_w[3]} - {m.normalForce}*(-0.984807753012208)) - 0.6*{m.normalForce}"
+at = "3.45"
+near = 0.0
+tol = 1e-9
+why = "viscous demand 25*|v_t| = 72.955 N exceeds the Coulomb cap: the in-plane friction magnitude is exactly mu*N"
+
+# --- invariants --------------------------------------------------------------
+[[check]]
+variable = "m.normalForce"
+at = "all"
+range = [0.0, 103.5000001]
+why = "normal force is never negative and never exceeds the descent peak"
+
+[[check]]
+variable = "m.force_w[3]"
+at = "all"
+range = [-103.5000001, 0.0]
+why = "the ground can only push Up (-Down)"
+
+[[check]]
+variable = "m.tangentialPower"
+at = "all"
+range = [-154.0430443, 0.0]
+why = "friction never injects energy; the most negative value is the capped slope slide (mu*N*|v_t| = 154.043 W)"
+
+[[check]]
+expr = "{m.moment_b[1]} - ({m.rLeg_b[2]}*{m.force_b[3]} - {m.rLeg_b[3]}*{m.force_b[2]})"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "moment is r x F about the CG at every sample (x component)"
+
+[[check]]
+expr = "{m.moment_b[3]} - ({m.rLeg_b[1]}*{m.force_b[2]} - {m.rLeg_b[2]}*{m.force_b[1]})"
+at = "all"
+range = [-1e-9, 1e-9]
+why = "moment is r x F about the CG at every sample (z component)"

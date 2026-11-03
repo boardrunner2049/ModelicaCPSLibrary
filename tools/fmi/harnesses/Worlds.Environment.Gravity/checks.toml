@@ -1,0 +1,29 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# world.toml overrides g = 3.71 m/s2 (default: Utilities.Constants.g = 9.80665). NED world.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.gravity[3]"
+at = "all"
+near = 3.71
+tol = 1e-12
+why = "NED: gravity points Down (+z) with the overridden magnitude, not the folded constant 9.80665, constant in time"
+
+[[check]]
+variable = "m.gravity[1]"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no North component: uniform field is vertical"
+
+[[check]]
+variable = "m.gravity[2]"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no East component: uniform field is vertical"

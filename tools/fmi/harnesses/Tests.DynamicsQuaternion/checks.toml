@@ -1,0 +1,68 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Force-free rigid body, body rate {0,0,2} rad/s from an initial 90-degree roll
+# (Tests.DynamicsQuaternion). Closed forms at t = 1 s: q_wb = {s cos t, s cos t,
+# -s sin t, s sin t} with s = sqrt(0.5), v_b = {cos 2t, -sin 2t, 0},
+# v_w = {1, 0, 0}, p_w = {t, 0, 0}. The FMU matches `rumoca sim` (rtol 1e-10)
+# to 1e-9 at every native sample. Brackets are escaped: `variable` is a glob.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.body.q_wb[[]1]"
+at = "end"
+near = 0.3820514243700898
+tol = 1e-6
+why = "Hamilton composition with the body rate on the right"
+
+[[check]]
+variable = "m.body.q_wb[[]2]"
+at = "end"
+near = 0.3820514243700898
+tol = 1e-6
+why = "Hamilton composition with the body rate on the right"
+
+[[check]]
+variable = "m.body.q_wb[[]3]"
+at = "end"
+near = -0.595009839529386
+tol = 1e-6
+why = "Hamilton composition with the body rate on the right"
+
+[[check]]
+variable = "m.body.q_wb[[]4]"
+at = "end"
+near = 0.595009839529386
+tol = 1e-6
+why = "Hamilton composition with the body rate on the right"
+
+[[check]]
+variable = "m.body.v_b[[]1]"
+at = "end"
+near = -0.4161468365471424
+tol = 1e-6
+why = "body-frame velocity transport"
+
+[[check]]
+variable = "m.body.v_b[[]2]"
+at = "end"
+near = -0.9092974268256817
+tol = 1e-6
+why = "body-frame velocity transport"
+
+[[check]]
+variable = "m.body.v_w[[]1]"
+at = "all"
+near = 1.0
+tol = 1e-6
+why = "force-free: world velocity is constant"
+
+[[check]]
+variable = "m.body.p_w[[]1]"
+at = "end"
+near = 1.0
+tol = 1e-6
+why = "straight-line translation p_w = {t, 0, 0}"

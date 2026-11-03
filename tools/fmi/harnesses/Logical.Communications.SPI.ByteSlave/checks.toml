@@ -1,0 +1,96 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Mode 0, MSB first. The harness master's SCLK rises at t0 + 0.5 + i us
+# (slave samples MOSI) and falls at t0 + 1 + i us (slave shifts MISO); an
+# input set at t appears in the trace row at t + 50 ns, so slave outputs are
+# read at t0 + i + 0.45 us, just before each rising edge. Bytes:
+#   A  t0 = 2   MOSI 0xA5 = 165, MISO 0x5A = 90 (loaded at CS assertion)
+#   B  t0 = 10  MOSI 0x3C = 60,  MISO 0x99 = 153 (loaded at the 8th falling edge)
+#   partial t0 = 20, 4 clocks of 0xFF, CS released at 24.25
+#   C  t0 = 27  MOSI 0xC3 = 195, MISO 0x0F = 15 (loaded at CS assertion, 26)
+# A native `bin/rumoca sim` of the same timeline (scratch model
+# NativeByteSlave) matches every column at every sample away from the
+# input-change instants.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.misoEnabled} - (1 - {m.cs_n})"
+at = "all"
+near = 0
+tol = 0
+why = "MISO driven exactly while selected (misoEnabled = not cs_n)"
+
+[[check]]
+expr = "{m.miso} * {m.cs_n}"
+at = "all"
+near = 0
+tol = 0
+why = "miso reads false whenever the output is high impedance"
+
+[[check]]
+expr = "128*{m.miso@2.45e-6} + 64*{m.miso@3.45e-6} + 32*{m.miso@4.45e-6} + 16*{m.miso@5.45e-6} + 8*{m.miso@6.45e-6} + 4*{m.miso@7.45e-6} + 2*{m.miso@8.45e-6} + {m.miso@9.45e-6}"
+near = 90
+tol = 0
+why = "byte A: MISO before each sampling edge spells 0x5A, MSB first"
+
+[[check]]
+expr = "128*{m.miso@10.45e-6} + 64*{m.miso@11.45e-6} + 32*{m.miso@12.45e-6} + 16*{m.miso@13.45e-6} + 8*{m.miso@14.45e-6} + 4*{m.miso@15.45e-6} + 2*{m.miso@16.45e-6} + {m.miso@17.45e-6}"
+near = 153
+tol = 0
+why = "byte B back-to-back: new txData 0x99 reloaded at the byte boundary"
+
+[[check]]
+expr = "128*{m.miso@27.45e-6} + 64*{m.miso@28.45e-6} + 32*{m.miso@29.45e-6} + 16*{m.miso@30.45e-6} + 8*{m.miso@31.45e-6} + 4*{m.miso@32.45e-6} + 2*{m.miso@33.45e-6} + {m.miso@34.45e-6}"
+near = 15
+tol = 0
+why = "byte C after a cancelled partial byte: 0x0F from the CS-assert load, framing restarted"
+
+[[check]]
+variable = "m.receivedCount"
+at = "9.5e-6"
+near = 0
+tol = 0
+why = "byte A not delivered before the 8th sampling edge (row 9.5 still pre-edge)"
+
+[[check]]
+expr = "{m.rxData@9.55e-6}*10 + {m.receivedCount@9.55e-6}"
+near = 1651
+tol = 0
+why = "byte A = 0xA5 delivered on the 8th rising edge (9.5 us)"
+
+[[check]]
+expr = "{m.rxData@17.55e-6}*10 + {m.receivedCount@17.55e-6}"
+near = 602
+tol = 0
+why = "byte B = 0x3C delivered on its 8th rising edge under continuous CS"
+
+[[check]]
+variable = "m.receivedCount"
+at = "all"
+from = 17.55e-6
+to = 34.5e-6
+range = [2, 2]
+why = "the 4-bit partial byte is never delivered, and CS release/re-assert adds no count"
+
+[[check]]
+variable = "m.rxCount"
+at = "24.3e-6"
+near = 0
+tol = 0
+why = "CS release mid-byte resets the bit counter (4 bits discarded)"
+
+[[check]]
+expr = "{m.rxData@34.55e-6}*10 + {m.receivedCount@34.55e-6}"
+near = 1953
+tol = 0
+why = "byte C = 0xC3 delivered after the partial byte: no residue from the 4 discarded bits"
+
+[[check]]
+expr = "{m.rxData}*10 + {m.receivedCount} + 1000*{m.misoEnabled}"
+near = 1953
+tol = 0
+why = "final: 3 bytes, last 0xC3, MISO Hi-Z after CS release"

@@ -1,0 +1,260 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# The measurements record is not exported as FMU outputs (suspected Rumoca bug, see
+# harness.c), so these checks read the m.measurements.* locals from the trace.
+# Parameters (world.toml): mounts R_bImu = Rx(90)*Rz(90) (IMU reads (b_z,-b_x,-b_y)),
+# R_bMag = Rz(90) (magnetometer reads (b_y,-b_x,b_z)) -- distinct and non-symmetric;
+# lever arms (FRD) rImu = (0.1,0,-0.05), rGnss = (-0.2,0,-0.3) (aft, above CG),
+# rBaro = (0.15,0.1,0.05) (forward, right, below CG);
+# biases accel (0.02,0,0), gyro (0,0,0.001), mag (0,1,0) uT, position (0.5,-0.5,0.2),
+# velocity (0,0,0.05), pressure 10 Pa, temperature -0.5 K, altitude 1 m.
+# Inputs are held over each 10 ms step: the row at T reflects the kinematics of T - 10 ms.
+# Expected values: closed form (recomputed independently); the FMU also matches a native
+# `rumoca sim` of the same profile (1 ms output) on all 19 measurement channels to < 3e-14.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- hover, level, nose North at p = (10,-5,-20)
+[[check]]
+variable = "m.measurements.acceleration[1]"
+at = "1.0"
+near = -9.78665
+tol = 1e-9
+why = "hover: specific force -g on FRD z is routed to IMU x by R_bImu, + 0.02 bias (transposed mount: +g on IMU y)"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "1.0"
+near = -4.0e-6
+tol = 1e-12
+why = "nose North: magnetometer x = body y = East field -4 uT (IMU mount would give the Down 47 uT here)"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "1.0"
+near = -19.0e-6
+tol = 1e-12
+why = "nose North: magnetometer y = -body x = -20 uT North, + 1 uT bias (transposed mount: +21 uT)"
+
+[[check]]
+variable = "m.measurements.position[1]"
+at = "1.0"
+near = 10.3
+tol = 1e-9
+why = "antenna 0.2 m aft of the CG (nose North): North 10 - 0.2 + 0.5 bias"
+
+[[check]]
+variable = "m.measurements.position[3]"
+at = "1.0"
+near = -20.1
+tol = 1e-9
+why = "antenna 0.3 m above the CG: Down -20 - 0.3 + 0.2 bias"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "1.0"
+near = 20.95
+tol = 1e-9
+why = "Up-positive barometer height: CG 20 m, sensor 0.05 m below it, + 1 m bias"
+
+[[check]]
+variable = "m.measurements.pressure"
+at = "1.0"
+near = 101094.9676
+tol = 1e-3
+why = "ISA pressure at 20 m passes through with the +10 Pa bias"
+
+[[check]]
+variable = "m.measurements.temperature"
+at = "1.0"
+near = 287.52
+tol = 1e-9
+why = "ISA 288.15 - 0.13 K at 20 m, - 0.5 K bias"
+
+# --- pirouette at 0.5 rad/s: lever arms sweep circles about the CG
+[[check]]
+variable = "m.measurements.gyro[1]"
+at = "4.0"
+near = 0.5
+tol = 1e-12
+why = "yaw rate +0.5 rad/s about FRD z is sensed on IMU x (= body z); no bias on x"
+
+[[check]]
+variable = "m.measurements.acceleration[2]"
+at = "4.0"
+near = 0.025
+tol = 1e-9
+why = "centripetal -w^2*rx = -0.025 m/s2 on body x at the IMU lever arm, negated onto IMU y"
+
+[[check]]
+variable = "m.measurements.velocity[1]"
+at = "4.0"
+near = 0.0838759
+tol = 1e-6
+why = "antenna 0.2 m aft circles the CG at w*0.2 = 0.1 m/s: North part 0.1*sin(psi), psi = 0.5*1.99 = 0.995 rad"
+
+[[check]]
+variable = "m.measurements.velocity[2]"
+at = "4.0"
+near = -0.0544503
+tol = 1e-6
+why = "East part of the antenna's tangential velocity: -0.1*cos(0.995 rad)"
+
+[[check]]
+variable = "m.measurements.position[2]"
+at = "6.0"
+near = -5.6822734
+tol = 1e-6
+why = "aft antenna offset -0.2*(cos psi, sin psi) after psi = 1.995 rad: East = -5 - 0.2*sin(psi) - 0.5 bias"
+
+[[check]]
+variable = "m.measurements.magneticField[1]"
+at = "4.0"
+near = -18.953191e-6
+tol = 1e-12
+why = "nose at 57 deg: magnetometer x = body y = -sin(psi)*N + cos(psi)*E"
+
+[[check]]
+variable = "m.measurements.magneticField[2]"
+at = "6.0"
+near = 12.87737e-6
+tol = 1e-12
+why = "nose at 114 deg: magnetometer y = -body x = -(cos(psi)*N + sin(psi)*E) + 1 uT bias"
+
+[[check]]
+variable = "m.measurements.climbRate"
+at = "4.0"
+near = 0.0
+tol = 1e-12
+why = "consistency only: a yaw-only rotation gives no vertical lever-arm velocity for any r (the term itself is tested in the pull-up)"
+
+# --- climb at 2 m/s, 10 deg nose-down
+[[check]]
+variable = "m.measurements.climbRate"
+at = "8.0"
+near = 2.0
+tol = 1e-12
+why = "climbing 2 m/s without rotation: NED Down velocity -2 becomes Up-positive +2 (no bias on climb rate)"
+
+[[check]]
+variable = "m.measurements.velocity[3]"
+at = "8.0"
+near = -1.95
+tol = 1e-12
+why = "GNSS Down velocity -2 m/s + 0.05 bias"
+
+[[check]]
+variable = "m.measurements.acceleration[2]"
+at = "8.0"
+near = 1.7029069
+tol = 1e-6
+why = "nose-down 10 deg: specific force -g*sin(10 deg) along body x, negated onto IMU y"
+
+[[check]]
+variable = "m.measurements.acceleration[1]"
+at = "8.0"
+near = -9.637665
+tol = 1e-6
+why = "-g*cos(10 deg) on body z, routed to IMU x, + 0.02 bias"
+
+[[check]]
+variable = "m.measurements.position[3]"
+at = "8.0"
+near = -24.110172
+tol = 1e-6
+why = "nose-down raises the aft antenna: R*rGnss has Down -0.330 m; CG at -23.98, + 0.2 bias"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "8.0"
+near = 24.9047124
+tol = 1e-6
+why = "nose-down lowers the forward barometer: R*rBaro Down = 0.15 sin10 + 0.05 cos10 = 0.0753 m below a 23.98 m CG, + 1 m bias"
+
+# --- pull-up: q = 0.794 rad/s (row 9.0), alpha = 0.6 rad/s2, a_w = (0.8, 0, -1.0) m/s2
+[[check]]
+variable = "m.measurements.climbRate"
+at = "9.0"
+near = 3.1155413
+tol = 1e-6
+why = "CG climbs at 2.99 m/s; pitching up swings the forward barometer up by R*(omega x rBaro) = +0.1255 m/s (no lever term: 2.99; rGnss: 2.765; cross(r,omega): 2.864)"
+
+[[check]]
+variable = "m.measurements.climbRate"
+at = "10.0"
+near = 4.0919863
+tol = 1e-6
+why = "q = 1.394 rad/s at 81 deg pitch: CG 3.99 m/s plus the barometer lever-arm vertical velocity"
+
+[[check]]
+variable = "m.measurements.velocity[3]"
+at = "9.0"
+near = -2.7147733
+tol = 1e-6
+why = "aft, high antenna drops relative to the CG while pitching up: Down -2.99 + R*(omega x rGnss)_D 0.2252 + 0.05 bias"
+
+[[check]]
+variable = "m.measurements.velocity[1]"
+at = "9.0"
+near = 0.865541
+tol = 1e-6
+why = "CG North velocity 0.8*0.99 m/s plus the antenna's pitch lever-arm velocity (heading 2 rad)"
+
+[[check]]
+variable = "m.measurements.acceleration[3]"
+at = "9.0"
+near = 0.7274379
+tol = 1e-6
+why = "CG North acceleration 0.8 m/s2 at heading 2 rad projects -0.8*sin(2) on body y, negated onto IMU z (zero if imu.a_w were not wired)"
+
+[[check]]
+variable = "m.measurements.acceleration[1]"
+at = "9.0"
+near = -10.3789429
+tol = 1e-6
+why = "body z: R'(a_w - g), with the 1 m/s2 upward CG acceleration, + alpha x rImu (-0.06) + centripetal, + 0.02 bias (alpha wired to omega: -10.3983)"
+
+[[check]]
+variable = "m.measurements.acceleration[2]"
+at = "9.0"
+near = -2.9644032
+tol = 1e-6
+why = "-(body x): -g*sin(theta) at theta = 23 deg nose-up, with a_w, alpha x rImu (-0.03) and centripetal terms (alpha wired to omega: -2.9547)"
+
+[[check]]
+variable = "m.measurements.gyro[3]"
+at = "9.0"
+near = -0.793
+tol = 1e-9
+why = "pitch rate +0.794 rad/s about body y is sensed negated on IMU z (= -body y), + 0.001 bias"
+
+[[check]]
+variable = "m.measurements.magneticField[3]"
+at = "9.0"
+near = 40.917101e-6
+tol = 1e-12
+why = "pitched nose-up 23 deg: magnetometer z = body z mixes the Down and horizontal field (47 uT level)"
+
+[[check]]
+variable = "m.measurements.position[3]"
+at = "10.0"
+near = -29.6101702
+tol = 1e-6
+why = "CG Down -29.96 m after the accelerating climb; at 81 deg nose-up the aft/high antenna sits 0.15 m above it, + 0.2 bias"
+
+[[check]]
+variable = "m.measurements.pressure"
+at = "end"
+near = 100975.6027
+tol = 1e-3
+why = "ISA pressure at the final 29.96 m CG height (+10 Pa): lower than at hover"
+
+[[check]]
+variable = "m.measurements.altitude"
+at = "max"
+near = 31.1002195
+tol = 1e-6
+why = "the highest barometer reading is at the end of the climb"

@@ -1,0 +1,341 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Exact column names (m.x[3]) are used as is; patterns with several elements
+# are globs, where a literal [ is written [[] (m.x[[][12]] = m.x[1], m.x[2]).
+#
+# Plant: m = 1.5 kg, g = 9.80665, f0 = m g/4 =
+# 3.6774938 N; start NED {0,0,-1}, yaw +90 deg (body x East, body y South).
+# QuadX arm tips at (+-0.17678, +-0.17678) m; rotors 1,2 at body y = -0.17678
+# (left), 3,4 at +0.17678 (right). Landing legs 0.10 m below CG, ground z = 0.
+# Tunable-parameter overrides (world.toml), so the checks show the parameters
+# are honoured: aggregate.inertia = diag(0.02, 0.03, 0.04) (Iyy 0.03 instead
+# of the default 0.02, so roll and pitch respond differently and a swapped or
+# transposed inertia would fail) and landingGear.stiffness = 4000 N/m (default
+# 3000; sets the static compression).
+# Closed forms are noted per check. The landing phase matches native `rumoca
+# sim` of the same profile and parameters (rtol 1e-9): final position within
+# 6.3e-7 m, final heading within 7.7e-7 rad; checks citing "native" use it.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- hover: thrust 4 f0 balances weight exactly --------------------------
+[[check]]
+variable = "m.truth.p_w[[][12]]"
+at = "1.0"
+near = 0.0
+tol = 1e-9
+why = "hover at m g: no horizontal drift"
+
+[[check]]
+variable = "m.truth.p_w[3]"
+at = "1.0"
+near = -1.0
+tol = 1e-9
+why = "hover at m g: altitude stays at p_start"
+
+[[check]]
+variable = "m.force_b[3]"
+at = "0.5"
+near = -14.709975
+tol = 1e-9
+why = "four rotor-local +z thrusts f0 map to body -z (up) through R_br = diag(1,-1,-1)"
+
+[[check]]
+variable = "m.rotorAirVelocity_r[[][258]]"
+at = "0.9"
+near = -3.0
+tol = 1e-9
+why = "3 m/s North wind at rest, body y = South, rotor y = -body y: air velocity -3 along rotor y"
+
+[[check]]
+variable = "m.rotorAirVelocity_r[11]"
+at = "0.9"
+near = -3.0
+tol = 1e-9
+why = "same wind transport for rotor 4"
+
+[[check]]
+variable = "m.rotorAirVelocity_r[[][13]]"
+at = "0.9"
+near = 0.0
+tol = 1e-9
+why = "North wind has no body-x (East) or vertical component in hover"
+
+[[check]]
+variable = "m.truth.v_w[[]*]"
+at = "1.0"
+near = 0.0
+tol = 1e-9
+why = "the plant has no drag model: wind does not move the vehicle"
+
+# --- climb at 1.2 m g for 0.5 s: a = 0.2 g up ----------------------------
+[[check]]
+variable = "m.truth.a_w[3]"
+at = "1.25"
+near = -1.96133
+tol = 1e-6
+why = "(1.2 m g - m g)/m = 0.2 g, upward is NED -z"
+
+[[check]]
+variable = "m.truth.v_w[3]"
+at = "1.5"
+near = -0.980665
+tol = 1e-6
+why = "v = 0.2 g * 0.5 s upward"
+
+[[check]]
+variable = "m.truth.p_w[3]"
+at = "1.5"
+near = -1.2451663
+tol = 1e-6
+why = "z = -1 - 0.5 * 0.2 g * 0.5^2"
+
+[[check]]
+variable = "m.rotorAirVelocity_r[3]"
+at = "1.5"
+near = 0.980665
+tol = 1e-6
+why = "climbing hub moves along rotor +z relative to still air"
+
+[[check]]
+variable = "m.truth.p_w[3]"
+at = "2.0"
+near = -1.7354988
+tol = 1e-6
+why = "coast at hover thrust: constant 0.980665 m/s climb for 0.5 s"
+
+# --- 3 N body-x push for 0.2 s (body x = East) ---------------------------
+[[check]]
+variable = "m.truth.v_w[2]"
+at = "1.7"
+near = 0.4
+tol = 1e-6
+why = "F t / m = 3 * 0.2 / 1.5 East, since q_start faces East"
+
+[[check]]
+variable = "m.truth.v_w[1]"
+at = "1.7"
+near = 0.0
+tol = 1e-9
+why = "a body-x push at yaw 90 deg has no North component"
+
+[[check]]
+variable = "m.truth.p_w[2]"
+at = "2.0"
+near = 0.16
+tol = 1e-6
+why = "0.5 * 2 * 0.2^2 + 0.4 * 0.3 East"
+
+# --- yaw doublet: rotor-1 local moment +-0.2 N.m, 0.1 s each --------------
+[[check]]
+variable = "m.moment_b[3]"
+at = "2.05"
+near = -0.2
+tol = 1e-9
+why = "rotor-local +z moment is body -z through R_br"
+
+[[check]]
+variable = "m.truth.omega_b[3]"
+at = "2.1"
+near = -0.5
+tol = 1e-6
+why = "-0.2 / 0.04 * 0.1 s"
+
+[[check]]
+variable = "m.rotorOmegaBody_r[3]"
+at = "2.1"
+near = 0.5
+tol = 1e-6
+why = "carrier yaw rate seen in rotor axes flips sign (rotor z = body -z)"
+
+[[check]]
+variable = "m.truth.omega_b[3]"
+at = "2.2"
+near = 0.0
+tol = 1e-9
+why = "the reverse half of the doublet stops the yaw rate"
+
+[[check]]
+variable = "m.body.euler[3]"
+at = "2.2"
+near = 1.5207963
+tol = 1e-6
+why = "heading pi/2 - 5 rad/s^2 * 0.1^2 s^2"
+
+[[check]]
+variable = "m.truth.v_w[2]"
+at = "2.2"
+near = 0.4
+tol = 1e-6
+why = "pure yaw leaves the world velocity unchanged (cross(omega, v_b) transport term)"
+
+# --- roll doublet: +0.2 N on rotors 1,2 (left), -0.2 N on 3,4 -------------
+[[check]]
+variable = "m.moment_b[1]"
+at = "2.25"
+near = 0.14142136
+tol = 1e-8
+why = "4 * 0.2 N * 0.17678 m: left rotors pushing up roll the body right (+x)"
+
+[[check]]
+variable = "m.force_b[3]"
+at = "2.25"
+near = -14.709975
+tol = 1e-9
+why = "the differential pair leaves collective thrust at m g"
+
+[[check]]
+variable = "m.truth.omega_b[1]"
+at = "2.3"
+near = 0.70710678
+tol = 1e-6
+why = "0.141421 / 0.02 * 0.1 s"
+
+[[check]]
+variable = "m.body.euler[1]"
+at = "2.4"
+near = 0.070710678
+tol = 1e-6
+why = "roll after the doublet: alpha * 0.1^2"
+
+# --- thrust cut, pitch doublet from externalMoment_b, free fall ----------
+[[check]]
+variable = "m.truth.omega_b[2]"
+at = "2.5"
+near = 0.333333333333
+tol = 1e-9
+why = "external pitch moment 0.1 N.m / Iyy 0.03 (override) * 0.1 s"
+
+[[check]]
+variable = "m.truth.omega_b[2]"
+at = "2.6"
+near = 0.0
+tol = 1e-9
+why = "the reverse half of the pitch doublet stops the pitch rate"
+
+[[check]]
+variable = "m.truth.omega_b[2]"
+at = "2.3"
+near = 0.0
+tol = 1e-12
+why = "a pure roll moment about the principal x axis causes no pitch rate"
+
+[[check]]
+expr = "{m.truth.v_w[3]@3.0} - {m.truth.v_w[3]@2.6}"
+near = 3.92266
+tol = 1e-9
+why = "free fall: the Down velocity grows by g * 0.4 s"
+
+[[check]]
+expr = "abs({m.truth.v_w[1]@3.0} - {m.truth.v_w[1]@2.6}) + abs({m.truth.v_w[2]@3.0} - {m.truth.v_w[2]@2.6})"
+near = 0.0
+tol = 1e-9
+why = "free fall: horizontal velocity is conserved"
+
+[[check]]
+variable = "m.truth.a_w[3]"
+at = "2.8"
+near = 9.80665
+tol = 1e-9
+why = "no thrust and no contact: acceleration is gravity alone"
+
+[[check]]
+variable = "m.truth.a_w[[][12]]"
+at = "2.8"
+near = 0.0
+tol = 1e-9
+why = "free fall has no horizontal acceleration"
+
+[[check]]
+variable = "m.truth.v_w[3]"
+at = "3.0"
+near = 4.905204
+tol = 1e-5
+why = "v(2.4) + 0.6 g, v(2.4) set by the tilted thrust during the roll doublet (native)"
+
+[[check]]
+variable = "m.gear.normalForce[[]*]"
+at = "3.0"
+near = 0.0
+tol = 0.0
+why = "legs (0.10 m below CG) are still above the ground at z = -0.95"
+
+# --- touchdown and rest on four compliant legs ---------------------------
+[[check]]
+variable = "m.gear.normalForce[[]*]"
+at = "min"
+range = [0.0, 1e9]
+why = "unilateral contact never pulls the vehicle toward the ground"
+
+[[check]]
+variable = "m.gear.normalForce[[]*]"
+at = "end"
+near = 3.6774938
+tol = 1e-5
+why = "at rest each of four symmetric legs carries m g / 4"
+
+[[check]]
+variable = "m.gear.gap[[]*]"
+at = "end"
+near = -0.000919373438
+tol = 1e-9
+why = "static compression m g / (4 k) with the stiffness override k = 4000 N/m"
+
+[[check]]
+variable = "m.truth.p_w[3]"
+at = "end"
+near = -0.0990806266
+tol = 1e-9
+why = "CG at leg length 0.10 m minus the static compression above the ground"
+
+[[check]]
+variable = "m.force_b[3]"
+at = "end"
+near = -14.709975
+tol = 1e-5
+why = "at rest the ground supports exactly the weight"
+
+[[check]]
+variable = "m.truth.v_w[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "contact damping and friction bring the vehicle to rest"
+
+[[check]]
+variable = "m.truth.omega_b[[]*]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "rotation also settles on the ground"
+
+[[check]]
+variable = "m.body.euler[[][12]]"
+at = "end"
+near = 0.0
+tol = 1e-6
+why = "the tilted touchdown levels out on symmetric legs"
+
+[[check]]
+variable = "m.truth.p_w[1]"
+at = "end"
+near = -0.0489398
+tol = 5e-6
+why = "friction-limited slide after touchdown (native)"
+
+[[check]]
+variable = "m.truth.p_w[2]"
+at = "end"
+near = 0.6373239
+tol = 5e-6
+why = "friction-limited slide after touchdown (native)"
+
+[[check]]
+variable = "m.body.euler[3]"
+at = "end"
+near = 1.5246325
+tol = 5e-6
+why = "heading after the yaw doublet and touchdown (native)"

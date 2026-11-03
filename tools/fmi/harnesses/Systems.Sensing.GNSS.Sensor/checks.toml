@@ -1,0 +1,124 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Trajectory: p = (20 cos 0.5t, 20 sin 0.5t, -10 - t) m NED, v = dp/dt; biases (world.toml)
+# positionBias = (1.0, -0.5, 0.3) m, velocityBias = (0.05, -0.02, 0.10) m/s.
+# Inputs are held over each 10 ms step, so the row at T reflects the trajectory at T - 10 ms.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- quarter turn (t = 3.14 s): antenna due East of the centre, moving South
+[[check]]
+variable = "m.position[2]"
+at = "3.15"
+near = 19.499994
+tol = 1e-6
+why = "East = 20 sin(1.57) - 0.5 m bias: a quarter turn from North to East"
+
+[[check]]
+variable = "m.velocity[1]"
+at = "3.15"
+near = -9.949997
+tol = 1e-6
+why = "tangential speed R*w = 10 m/s points South at the East-most point, + 0.05 bias"
+
+[[check]]
+variable = "m.velocity[2]"
+at = "3.15"
+near = -0.012037
+tol = 1e-6
+why = "East velocity ~0 at the East-most point (cos(1.57) * 10 - 0.02 bias)"
+
+# --- half turn (t = 6.28 s): antenna due South, moving West
+[[check]]
+variable = "m.position[1]"
+at = "6.29"
+near = -18.999975
+tol = 1e-6
+why = "North = 20 cos(3.14) + 1 m bias: opposite side of the circle"
+
+[[check]]
+variable = "m.velocity[2]"
+at = "6.29"
+near = -10.019987
+tol = 1e-6
+why = "moving West at 10 m/s on the South side, - 0.02 bias"
+
+# --- three-quarter turn: antenna due West
+[[check]]
+variable = "m.position[2]"
+at = "9.43"
+near = -20.499943
+tol = 1e-6
+why = "East = 20 sin(4.71) - 0.5 m bias"
+
+[[check]]
+variable = "m.velocity[1]"
+at = "9.43"
+near = 10.049971
+tol = 1e-6
+why = "moving North at 10 m/s on the West side, + 0.05 bias"
+
+# --- climb: NED Down coordinate decreases, Down velocity negative
+[[check]]
+variable = "m.position[3]"
+at = "end"
+near = -22.69
+tol = 1e-9
+why = "height 10 + 12.99 m means Down = -22.99 m, + 0.3 m bias"
+
+[[check]]
+variable = "m.velocity[3]"
+at = "6.0"
+near = -0.9
+tol = 1e-12
+why = "climbing 1 m/s is -1 m/s in NED Down, + 0.10 bias"
+
+# --- whole-run kinematics (from 0.01 s: the t = 0 row is the state before the first
+# inputs act). Bias-corrected readings: p - positionBias, v - velocityBias.
+[[check]]
+expr = "hypot({m.position[1]} - 1.0, {m.position[2]} + 0.5)"
+at = "all"
+from = 0.01
+near = 20.0
+tol = 1e-9
+why = "horizontal position stays on the 20 m circle around the origin once the biases are removed (a bias applied to the wrong axis would break this)"
+
+[[check]]
+expr = "hypot({m.velocity[1]} - 0.05, {m.velocity[2]} + 0.02)"
+at = "all"
+from = 0.01
+near = 10.0
+tol = 1e-9
+why = "uniform circular motion: constant horizontal speed R*w = 20*0.5 = 10 m/s"
+
+[[check]]
+expr = "({m.position[1]} - 1.0) * ({m.velocity[1]} - 0.05) + ({m.position[2]} + 0.5) * ({m.velocity[2]} + 0.02)"
+at = "all"
+from = 0.01
+near = 0.0
+tol = 1e-9
+why = "on a circle the velocity is tangential: radius . velocity = 0 at every sample (position and velocity channels not swapped or mis-indexed)"
+
+[[check]]
+expr = "({m.position[1]} - 1.0) * ({m.velocity[2]} + 0.02) - ({m.position[2]} + 0.5) * ({m.velocity[1]} - 0.05)"
+at = "all"
+from = 0.01
+near = 200.0
+tol = 1e-9
+why = "angular momentum per unit mass r x v (Down component) = +R^2 w = 200 m2/s: the motion is North -> East (clockwise seen from above), consistent with the position sequence"
+
+[[check]]
+expr = "({m.position[3]@12.0} - {m.position[3]@2.0}) / 10.0 - ({m.velocity[3]@6.0} - 0.10)"
+near = 0.0
+tol = 1e-9
+why = "the reported Down velocity equals the slope of the reported Down position (velocity is the derivative of position)"
+
+[[check]]
+variable = "m.position[3]"
+at = "min"
+near = -22.69
+tol = 1e-9
+why = "the antenna ends at its highest point: altitude only increases"

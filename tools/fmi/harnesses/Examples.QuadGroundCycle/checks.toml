@@ -1,0 +1,339 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# m = 1.5 kg, g = 9.80665, 4 legs 0.10 m below the CG, k = 3000 N/m and
+# c = 150 N.s/m each (total 12000 N/m, 600 N.s/m: zeta = 2.24, overdamped),
+# leg force max(0, k pen + c v_down) while gap <= 0. Rotors kT = 1e-5; motors
+# tau = 0.03 s; command on [2, 2.7) s asks w_c = sqrt(1.3 m g/(4 kT)) = 691.429 rad/s.
+# "ref" = independent 1-D reference (scipy LSODA, rtol 1e-12) of
+#   z'' = g - 4 kT w^2/m - 4 F_leg/m,  w' = (w_c(t) - w)/tau,
+# valid because the motion stays purely vertical (checked below). The FMU
+# agrees with it to 1e-9 m; native `rumoca sim` agrees with the FMU to 2e-7 m.
+# Times are on the 2 ms communication grid.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- initial state and free fall ------------------------------------------
+
+[[check]]
+variable = "m.vehicle.gear.gap[[]*]"
+at = "0"
+near = 0.02
+tol = 1e-12
+why = "documented: unpowered feet start 2 cm above the plane"
+
+[[check]]
+variable = "m.altitude"
+at = "0.05"
+near = 0.1077416875
+tol = 1e-9
+why = "free fall: 0.12 - g t^2/2 at 50 ms"
+
+[[check]]
+variable = "m.verticalVelocity"
+at = "0.05"
+near = 0.4903325
+tol = 1e-9
+why = "free fall: v = g t at 50 ms (Down positive)"
+
+[[check]]
+variable = "m.acceleration_frd[[]*]"
+at = "all"
+to = 0.062
+near = 0.0
+tol = 1e-9
+why = "IMU reads zero specific force in free fall"
+
+# --- first touchdown (t = sqrt(2*0.02/g) = 63.87 ms) ----------------------
+
+[[check]]
+variable = "m.contactCount"
+at = "0.062"
+near = 0
+tol = 0
+why = "no contact before touchdown at 63.87 ms"
+
+[[check]]
+variable = "m.contactCount"
+at = "0.064"
+near = 4
+tol = 0
+why = "all four feet touch together at 63.87 ms (level, symmetric)"
+
+[[check]]
+variable = "m.normalLoad"
+at = "max"
+to = 1.0
+near = 357.8970895618066
+tol = 1e-3
+why = "first impact peak (sampled at 64 ms) = ref; the damper dominates at 0.595 m/s"
+
+[[check]]
+variable = "m.altitude"
+at = "0.1"
+near = 0.09856321420040251
+tol = 1e-8
+why = "overdamped settling after the first touchdown, ref at 0.1 s"
+
+# --- rest on the gear --------------------------------------------------------
+
+[[check]]
+variable = "m.altitude"
+at = "all"
+from = 1.0
+to = 2.0
+near = 0.09877416875
+tol = 1e-9
+why = "rest: CG 0.1 m above ground minus static deflection m g/(4k) = 1.2258 mm"
+
+[[check]]
+variable = "m.normalLoad"
+at = "all"
+from = 1.0
+to = 2.0
+near = 14.709975
+tol = 1e-7
+why = "rest: ground carries the weight m g"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "1.5"
+near = 3.67749375
+tol = 1e-8
+why = "rest: each leg carries m g/4 (CG centred among the legs)"
+
+[[check]]
+variable = "m.acceleration_frd[3]"
+at = "all"
+from = 1.0
+to = 2.0
+near = -9.80665
+tol = 1e-8
+why = "IMU at rest reads -g on body z (FRD, up is -z)"
+
+[[check]]
+variable = "m.normalLoad"
+at = "all"
+range = [0.0, 1e9]
+why = "unilateral contact: the ground never pulls on the feet"
+
+# --- spin-up, lift-off, powered climb --------------------------------------
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "2.0"
+near = 0.0
+tol = 1e-12
+why = "motors stopped until the command at 2 s"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "2.1"
+near = 666.7630539418215
+tol = 1e-6
+why = "first-order spin-up w_c (1 - exp(-0.1/0.03))"
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "2.7"
+near = 691.4290906735807
+tol = 1e-6
+why = "steady speed w_c = sqrt(1.3 m g/(4 kT)) before cutoff"
+
+[[check]]
+variable = "m.normalLoad"
+at = "2.09"
+near = 0.0
+tol = 0.0
+why = "unloading: contact still geometric (gap < 0) but spring+damper force clamps at zero"
+
+[[check]]
+variable = "m.contactCount"
+at = "2.09"
+near = 4
+tol = 0
+why = "feet still compressed at 2.090 s"
+
+[[check]]
+variable = "m.contactCount"
+at = "2.092"
+near = 0
+tol = 0
+why = "lift-off at 2.0915 s (ref)"
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "all"
+from = 2.5
+to = 2.7
+near = -19.1229675
+tol = 1e-5
+why = "documented: steady thrust 1.3 times weight (body -z is up)"
+
+[[check]]
+variable = "m.acceleration_frd[3]"
+at = "2.5"
+near = -12.748643526830767
+tol = 1e-8
+why = "airborne IMU reads thrust/m only: -1.3 g (1 - exp(-0.5/0.03))^2"
+
+[[check]]
+variable = "m.altitude"
+at = "2.3"
+near = 0.16647092863181281
+tol = 1e-8
+why = "powered climb, ref at 2.3 s"
+
+[[check]]
+variable = "m.altitude"
+at = "2.7"
+near = 0.6499618893731763
+tol = 1e-8
+why = "powered climb, ref at cutoff"
+
+[[check]]
+variable = "m.verticalVelocity"
+at = "2.7"
+near = -1.7971237973844407
+tol = 1e-7
+why = "climb rate at cutoff, ref"
+
+# --- cutoff and ballistic arc -----------------------------------------------
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "2.8"
+near = 24.666036780786087
+tol = 1e-6
+why = "documented cutoff at 2.7 s: exponential spin-down w(2.7) exp(-0.1/0.03)"
+
+[[check]]
+variable = "m.altitude"
+at = "max"
+near = 0.8486655764306827
+tol = 1e-8
+why = "apex 0.8487 m (sampled at 2.902 s), ref"
+
+[[check]]
+variable = "m.acceleration_frd[[]*]"
+at = "all"
+from = 3.0
+to = 3.292
+near = 0.0
+tol = 1e-7
+why = "ballistic after spin-down: IMU reads zero specific force"
+
+[[check]]
+variable = "m.vehicle.truth.a_w[3]"
+at = "all"
+from = 3.0
+to = 3.292
+near = 9.80665
+tol = 1e-7
+why = "ballistic: acceleration g Down"
+
+[[check]]
+expr = "0.5*{m.verticalVelocity@3.292}**2 - 0.5*{m.verticalVelocity@3.0}**2 - 9.80665*({m.altitude@3.0} - {m.altitude@3.292})"
+at = "end"
+near = 0.0
+tol = 1e-7
+why = "energy conservation per unit mass over the unpowered ballistic arc 3.0 -> 3.292 s"
+
+# --- second touchdown (3.2935 s, 3.832 m/s) ----------------------------------
+
+[[check]]
+variable = "m.contactCount"
+at = "3.292"
+near = 0
+tol = 0
+why = "airborne until the second touchdown at 3.2935 s (ref)"
+
+[[check]]
+variable = "m.contactCount"
+at = "3.294"
+near = 4
+tol = 0
+why = "documented second landing: all four feet at 3.2935 s"
+
+[[check]]
+variable = "m.verticalVelocity"
+at = "3.292"
+near = 3.8171833276426796
+tol = 1e-6
+why = "sink rate just before touchdown, ref"
+
+[[check]]
+variable = "m.normalLoad"
+at = "max"
+from = 3.2
+near = 1908.2135272508742
+tol = 0.01
+why = "second impact peak (sampled at 3.294 s), ref"
+
+[[check]]
+variable = "m.altitude"
+at = "3.3"
+near = 0.0914761995607015
+tol = 1e-8
+why = "maximum compression region of the second landing, ref"
+
+[[check]]
+variable = "m.altitude"
+at = "3.5"
+near = 0.0986538963831487
+tol = 1e-8
+why = "settling after the second landing, ref"
+
+[[check]]
+variable = "m.altitude"
+at = "end"
+near = 0.09877416875
+tol = 1e-9
+why = "back at rest on the gear: static deflection m g/(4k)"
+
+[[check]]
+variable = "m.normalLoad"
+at = "end"
+near = 14.709975
+tol = 1e-7
+why = "back at rest: ground carries m g"
+
+[[check]]
+variable = "m.contactCount"
+at = "end"
+near = 4
+tol = 0
+why = "all feet down at the end"
+
+# --- the motion stays vertical ---------------------------------------------
+
+[[check]]
+variable = "m.vehicle.truth.p_w[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal drift (symmetric thrust and contact, friction has nothing to act on)"
+
+[[check]]
+variable = "m.vehicle.body.euler[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "attitude stays level: symmetric legs and equal rotors"
+
+[[check]]
+variable = "m.vehicle.body.euler[3]"
+at = "all"
+near = 1.5707963267948966
+tol = 1e-9
+why = "heading stays East (q_start): alternating spin signs cancel the yaw reactions"
+
+[[check]]
+variable = "m.vehicle.truth.omega_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no body rotation"

@@ -1,0 +1,126 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# c_t = 25 N.s/m, mu = 0.6, regularization 1e-6 m/s. Inputs held from t show
+# in the row at t + 1 ms. Phases in harness.c.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.power} - ({m.force_w[1]}*{m.velocityTangential_w[1]} + {m.force_w[2]}*{m.velocityTangential_w[2]} + {m.force_w[3]}*{m.velocityTangential_w[3]})"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "power = F.v at every sample"
+
+[[check]]
+variable = "m.power"
+at = "all"
+range = [-18.0, 0.0]
+why = "friction is dissipative: power never positive"
+
+[[check]]
+expr = "norm({m.force_w[1]}, {m.force_w[2]}, {m.force_w[3]}) - (min(25*norm({m.velocityTangential_w[1]}, {m.velocityTangential_w[2]}, {m.velocityTangential_w[3]}), 0.6*{m.normalForce}) if ({m.active} > 0.5 and {m.normalForce} > 0) else 0) * min(1, norm({m.velocityTangential_w[1]}, {m.velocityTangential_w[2]}, {m.velocityTangential_w[3]})/1e-6)"
+at = "all"
+range = [-1e-12, 1e-12]
+why = "magnitude law min(c_t|v|, mu N) when active and loaded, else 0 (scaled by |v|/1e-6 below the regularization speed)"
+
+[[check]]
+expr = "norm({m.force_w[1]}, {m.force_w[2]}, {m.force_w[3]})"
+at = "0.05"
+near = 0.0
+tol = 0
+why = "at rest: no friction force"
+
+[[check]]
+expr = "norm({m.force_w[1]} + 5, {m.force_w[2]}, {m.force_w[3]})"
+at = "0.15"
+near = 0.0
+tol = 1e-12
+why = "v = (0.2,0,0): viscous -25*v = (-5,0,0), below the 12 N cap"
+
+[[check]]
+variable = "m.power"
+at = "0.15"
+near = -1.0
+tol = 1e-12
+why = "dissipation 5 N * 0.2 m/s"
+
+[[check]]
+expr = "norm({m.force_w[1]} + 7.2, {m.force_w[2]} - 9.6, {m.force_w[3]})"
+at = "0.25"
+near = 0.0
+tol = 1e-12
+why = "v = (0.3,-0.4,0): viscous 12.5 N capped at mu*N = 12 N along -v/|v| = (-0.6,0.8,0)"
+
+[[check]]
+variable = "m.power"
+at = "0.25"
+near = -6.0
+tol = 1e-12
+why = "capped dissipation 12 N * 0.5 m/s"
+
+[[check]]
+expr = "norm({m.force_w[1]} + 2.5, {m.force_w[2]} + 5, {m.force_w[3]} - 5)"
+at = "0.35"
+near = 0.0
+tol = 1e-12
+why = "v = (0.1,0.2,-0.2): viscous -25*v in all three axes (7.5 N < 12 N)"
+
+[[check]]
+variable = "m.power"
+at = "0.35"
+near = -2.25
+tol = 1e-12
+why = "-c_t |v|^2 = -25*0.09"
+
+[[check]]
+expr = "norm({m.force_w[1]}, {m.force_w[2]}, {m.force_w[3]})"
+at = "0.45"
+near = 0.0
+tol = 0
+why = "negative (tensile) normal load: no friction although active and sliding"
+
+[[check]]
+expr = "norm({m.force_w[1]} + 2.5, {m.force_w[2]} + 5, {m.force_w[3]} - 5)"
+at = "0.53"
+near = 0.0
+tol = 1e-12
+why = "normal load restored: viscous friction returns"
+
+[[check]]
+expr = "norm({m.force_w[1]}, {m.force_w[2]}, {m.force_w[3]})"
+at = "0.551"
+near = 0.0
+tol = 0
+why = "active switched off alone at 0.55 s: no friction on the next sample"
+
+[[check]]
+expr = "norm({m.force_w[1]} + 2.5, {m.force_w[2]} + 5, {m.force_w[3]} - 5)"
+at = "0.581"
+near = 0.0
+tol = 1e-12
+why = "active switched on alone at 0.58 s: friction back on the next sample"
+
+[[check]]
+variable = "m.force_w[1]"
+at = "0.7"
+near = -2.5e-9
+tol = 1e-20
+why = "below the regularization speed: F = -c_t |v| v / 1e-6 = -25*1e-8*1e-8/1e-6, vanishing continuously at rest"
+
+[[check]]
+variable = "m.force_w[2]"
+at = "0.9"
+near = 8.91
+tol = 1e-9
+why = "v = (0,-1,0), N = 30*(0.899-0.8)/0.2 = 14.85 N: viscous 25 N exceeds mu*N, so F_y = +0.6*14.85 opposing v"
+
+[[check]]
+expr = "{m.power} + 0.6*{m.normalForce}"
+from = 0.801
+to = 1.0
+at = "all"
+range = [-1e-12, 1e-12]
+why = "during the load ramp the friction is Coulomb-capped throughout: power = -mu*N*|v|"

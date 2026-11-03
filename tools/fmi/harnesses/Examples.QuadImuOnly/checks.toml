@@ -1,0 +1,188 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# Exact hover: m = 1.5 kg, g = 9.80665, kT = 1e-5, kQ = 1.5e-7, 4 rotors at
+# w_h = sqrt(m g/(4 kT)) = 606.4234288 rad/s, T = m g/4 = 3.67749375 N each.
+# q_start = {sqrt(.5),0,0,sqrt(.5)} (East-facing): R_wb row-major
+# {0,-1,0, 1,0,0, 0,0,1}. IMU: r_b = 0, R_bs = diag(1,-1,-1). The model's own
+# assert (t >= 0.01): |acceleration - {0,0,g}| < 1e-8 and |gyro| < 1e-8.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- the model's own measurement contract (its assert) -----------------------
+
+[[check]]
+variable = "m.acceleration[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-8
+why = "model assert: hover specific force has no x/y component in IMU axes"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+near = 9.80665
+tol = 1e-8
+why = "model assert: hover IMU reads +g on sensor z (= -body z, up)"
+
+[[check]]
+variable = "m.gyro[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-8
+why = "model assert: hover IMU reads zero angular rate"
+
+# --- IMU composition: mount and output equations against truth ----------------
+
+[[check]]
+variable = "m.imu.r_b[[]*]"
+at = "end"
+near = 0.0
+tol = 0.0
+why = "IMU at the CG: imuPosition_C - cg_C = 0"
+
+[[check]]
+expr = "{m.imu.R_bs[1]} - {m.imu.R_bs[5]} - {m.imu.R_bs[9]}"
+at = "end"
+near = 3.0
+tol = 0.0
+why = "R_bs = R_bImu = diag(1,-1,-1)"
+
+[[check]]
+expr = "abs({m.imu.R_bs[2]}) + abs({m.imu.R_bs[3]}) + abs({m.imu.R_bs[4]}) + abs({m.imu.R_bs[6]}) + abs({m.imu.R_bs[7]}) + abs({m.imu.R_bs[8]})"
+at = "end"
+near = 0.0
+tol = 0.0
+why = "R_bs off-diagonal entries are zero"
+
+[[check]]
+expr = "{m.acceleration[1]} - ({m.truth.R_wb[1]}*({m.truth.a_w[1]}-{m.vehicle.gravity_w[1]}) + {m.truth.R_wb[4]}*({m.truth.a_w[2]}-{m.vehicle.gravity_w[2]}) + {m.truth.R_wb[7]}*({m.truth.a_w[3]}-{m.vehicle.gravity_w[3]}))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "sensor x specific force = +body x of R_wb^T (a_w - g_w) (r_b = 0)"
+
+[[check]]
+expr = "{m.acceleration[2]} + ({m.truth.R_wb[2]}*({m.truth.a_w[1]}-{m.vehicle.gravity_w[1]}) + {m.truth.R_wb[5]}*({m.truth.a_w[2]}-{m.vehicle.gravity_w[2]}) + {m.truth.R_wb[8]}*({m.truth.a_w[3]}-{m.vehicle.gravity_w[3]}))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "sensor y specific force = -body y of R_wb^T (a_w - g_w)"
+
+[[check]]
+expr = "{m.acceleration[3]} + ({m.truth.R_wb[3]}*({m.truth.a_w[1]}-{m.vehicle.gravity_w[1]}) + {m.truth.R_wb[6]}*({m.truth.a_w[2]}-{m.vehicle.gravity_w[2]}) + {m.truth.R_wb[9]}*({m.truth.a_w[3]}-{m.vehicle.gravity_w[3]}))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "sensor z specific force = -body z of R_wb^T (a_w - g_w)"
+
+[[check]]
+expr = "abs({m.gyro[1]} - {m.truth.omega_b[1]}) + abs({m.gyro[2]} + {m.truth.omega_b[2]}) + abs({m.gyro[3]} + {m.truth.omega_b[3]})"
+at = "all"
+near = 0.0
+tol = 1e-15
+why = "gyro = R_bs^T omega_b = {wx, -wy, -wz}"
+
+[[check]]
+variable = "m.truth.*"
+at = "all"
+finite = true
+why = "truth record (composed from vehicle.truth) is populated"
+
+# --- equilibrium -------------------------------------------------------------
+
+[[check]]
+variable = "m.motors[[]*].omega"
+at = "all"
+near = 606.4234288020211
+tol = 1e-9
+why = "motors start at and hold the hover speed sqrt(m g/(4 kT))"
+
+[[check]]
+variable = "m.escs[[]*].normalizedCommand"
+at = "all"
+near = 0.6064234288020212
+tol = 1e-12
+why = "ESC command omega_start/omegaMax"
+
+[[check]]
+variable = "m.rotors[[]*].force_r[[]3]"
+at = "all"
+near = 3.67749375
+tol = 1e-9
+why = "each rotor carries m g/4"
+
+[[check]]
+variable = "m.rotors[[]*].loadTorque"
+at = "all"
+near = 0.055162406250000
+tol = 1e-12
+why = "blade drag kQ w_h^2"
+
+[[check]]
+variable = "m.vehicle.force_b[3]"
+at = "all"
+near = -14.709975
+tol = 1e-9
+why = "total thrust balances the weight (body -z up)"
+
+[[check]]
+variable = "m.vehicle.moment_b[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "arm moments and alternating yaw reactions cancel"
+
+[[check]]
+variable = "m.truth.a_w[[]*]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no acceleration"
+
+[[check]]
+variable = "m.truth.p_w[3]"
+at = "all"
+near = -1.0
+tol = 1e-9
+why = "altitude holds at p_start"
+
+[[check]]
+variable = "m.truth.p_w[[][12]]"
+at = "all"
+near = 0.0
+tol = 1e-9
+why = "no horizontal drift"
+
+[[check]]
+variable = "m.vehicle.gear.gap[[]*]"
+at = "all"
+near = 0.9
+tol = 1e-9
+why = "legs 0.1 m below the CG, 0.9 m above the ground: no contact"
+
+[[check]]
+variable = "m.vehicle.gear.normalForce[[]*]"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no contact force"
+
+# --- attitude ----------------------------------------------------------------
+
+[[check]]
+expr = "abs({m.truth.q_wb[1]} - sqrt(0.5)) + abs({m.truth.q_wb[2]}) + abs({m.truth.q_wb[3]}) + abs({m.truth.q_wb[4]} - sqrt(0.5))"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "attitude holds q_start (East-facing, 90 deg about Down)"
+
+[[check]]
+expr = "abs({m.truth.R_wb[1]}) + abs({m.truth.R_wb[2]} + 1) + abs({m.truth.R_wb[3]}) + abs({m.truth.R_wb[4]} - 1) + abs({m.truth.R_wb[5]}) + abs({m.truth.R_wb[6]}) + abs({m.truth.R_wb[7]}) + abs({m.truth.R_wb[8]}) + abs({m.truth.R_wb[9]} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "R_wb from q_start: body x -> East, body y -> South; rows {0,-1,0; 1,0,0; 0,0,1}"

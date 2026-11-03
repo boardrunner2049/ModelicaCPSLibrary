@@ -1,0 +1,33 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# world.toml overrides the sea-level defaults (288.15 K, 101325 Pa, 1.225 kg/m3) with
+# the ISA 1000 m state: T = 288.15 - 6.5 = 281.65 K, p = 101325 (281.65/288.15)^5.25588
+# = 89874.5625 Pa, rho = p/(287.053 T) = 1.111642 kg/m3. These are parameter-propagation
+# checks: the model is `output = parameter`, so a default value here would mean the
+# override was lost (binding folded at compile time).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.temperature"
+at = "all"
+near = 281.65
+tol = 1e-9
+why = "temperature0 override (ISA 1000 m) reaches the output, not the 288.15 K default, and is constant"
+
+[[check]]
+variable = "m.pressure"
+at = "all"
+near = 89874.5625
+tol = 1e-6
+why = "pressure0 override (ISA 1000 m) reaches the output, not the 101325 Pa default, and is constant"
+
+[[check]]
+variable = "m.density"
+at = "all"
+near = 1.111642
+tol = 1e-12
+why = "density0 override reaches the output, not the 1.225 kg/m3 default, and is constant (the model does not derive density from p and T)"

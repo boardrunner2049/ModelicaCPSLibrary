@@ -1,0 +1,30 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# world.toml: wind0 = (3, 4, -0.5) m/s NED (5 m/s horizontal toward 53 deg, 0.5 m/s updraft).
+# The declared default is calm; a zero here would mean the override was folded away.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.wind[1]"
+at = "all"
+near = 3.0
+tol = 1e-12
+why = "North air velocity 3 m/s = 5 m/s * cos(53.13 deg), constant"
+
+[[check]]
+variable = "m.wind[2]"
+at = "all"
+near = 4.0
+tol = 1e-12
+why = "East air velocity 4 m/s: horizontal speed sqrt(3^2+4^2) = 5 m/s, constant"
+
+[[check]]
+variable = "m.wind[3]"
+at = "all"
+near = -0.5
+tol = 1e-12
+why = "updraft: rising air has a negative NED Down velocity"

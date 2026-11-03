@@ -1,0 +1,178 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Parameters (world.toml): r_b = (0.10,-0.05,0.02) m,
+# R_bs = Rx(90)*Rz(90) = [0 -1 0; 0 0 -1; 1 0 0] (v_b = R_bs*v_s), so the sensor reads
+# s = R_bs'*b = (b_z, -b_x, -b_y). R_bs is NOT symmetric: with R_bs instead of R_bs'
+# (missing transpose / column-major flattening) the reading would be (-b_y, -b_z, b_x),
+# e.g. at rest (0, +9.79, 0.1) instead of (-9.76, -0.02, 0.1) -- every mount check below
+# distinguishes the two.
+# accelBias = (0.05,-0.02,0.10) m/s2, gyroBias = (0.001,-0.002,0.003) rad/s, g = 9.80665.
+# The sensor is algebraic and inputs are a zero-order hold, so the row at T shows
+# the inputs applied at T - 1 ms; expectations are the closed-form IMU equation at
+# that held time (recomputed independently; the FMU also matches a native `rumoca sim`
+# of the same profile). The t = 0 row is the state before the first inputs act.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- level and still: the accelerometer measures -gravity (specific force), not zero
+[[check]]
+variable = "m.specificForce_b[3]"
+at = "0.5"
+near = -9.80665
+tol = 1e-9
+why = "at rest in NED/FRD the specific force is -g along body z (up)"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "0.5"
+near = -9.75665
+tol = 1e-9
+why = "sensor x = body z: specific force -g on sensor x plus 0.05 bias (a transposed mount would put +g on sensor y)"
+
+[[check]]
+variable = "m.acceleration[2]"
+at = "0.5"
+near = -0.02
+tol = 1e-9
+why = "sensor y = -body x: no horizontal specific force at rest, only the bias"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "0.5"
+near = 0.10
+tol = 1e-9
+why = "sensor z = -body y: no lateral specific force at rest, only the bias"
+
+# --- static 30 deg right roll: gravity appears on body y and is routed to sensor z
+[[check]]
+variable = "m.specificForce_b[2]"
+at = "1.5"
+near = -4.903325
+tol = 1e-6
+why = "right-wing-down roll: specific force on body y is -g*sin(30deg)"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "1.5"
+near = 5.003325
+tol = 1e-6
+why = "sensor z = -body y = +g sin30, + 0.10 bias"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "1.5"
+near = -8.442808
+tol = 1e-6
+why = "sensor x = body z = -g cos30, + 0.05 bias"
+
+# --- yaw at 2 rad/s with 1.5 m/s2 North acceleration; lever-arm centripetal -w^2*(rx,ry,0)
+[[check]]
+variable = "m.acceleration[2]"
+at = "2.5"
+near = -0.432976
+tol = 1e-6
+why = "sensor y = -body x = -(1.5*cos(psi) - 4*0.10) - 0.02 with psi = 2*0.499 rad"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "2.5"
+near = 1.160583
+tol = 1e-6
+why = "sensor z = -body y = -(-1.5*sin(psi) + 4*0.05) + 0.10: North acceleration rotates into body -y as the nose yaws right"
+
+[[check]]
+variable = "m.acceleration[2]"
+at = "3.5"
+near = 1.864562
+tol = 1e-6
+why = "psi = 2.998 rad (nose ~South): North acceleration on body -x, i.e. +sensor y"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "3.0"
+near = -9.75665
+tol = 1e-9
+why = "rotation about the gravity axis leaves the vertical specific force (sensor x) unchanged"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "3.0"
+near = 2.001
+tol = 1e-9
+why = "yaw rate +2 rad/s about FRD z is sensed on sensor x (mount puts body z there), + 0.001 bias"
+
+# --- yaw spin-up alpha = 3 rad/s2: tangential term alpha x r_b = (0.15, 0.30, 0)
+[[check]]
+variable = "m.acceleration[2]"
+at = "4.5"
+near = 1.052901
+tol = 1e-6
+why = "-( -w^2*rx + alpha*(-ry) ) - 0.02 with w = 3.497 rad/s, alpha = 3 rad/s2"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "4.5"
+near = -0.81145
+tol = 1e-6
+why = "-( -w^2*ry + alpha*rx ) + 0.10 with w = 3.497 rad/s, alpha = 3 rad/s2"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "5.0"
+near = 4.998
+tol = 1e-9
+why = "rate ramps 2 -> 4.997 rad/s at 3 rad/s2 on sensor x, + 0.001 bias"
+
+# --- roll at 1 rad/s about body x
+[[check]]
+variable = "m.gyro[2]"
+at = "5.5"
+near = -1.002
+tol = 1e-9
+why = "roll rate about body x appears negated on sensor y (= -body x), - 0.002 bias (transposed mount: +1.003 on sensor z)"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "6.0"
+near = 8.296709
+tol = 1e-6
+why = "-(-g*sin(0.999) - w^2*ry) + 0.10: gravity on body y after 0.999 rad roll, x-axis centripetal term, routed to sensor z"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "6.0"
+near = -5.276805
+tol = 1e-6
+why = "(-g*cos(0.999) - w^2*rz) + 0.05: gravity and centripetal on body z, routed to sensor x"
+
+# --- whole-run bounds
+[[check]]
+variable = "m.acceleration[1]"
+at = "min"
+near = -9.77665
+tol = 1e-5
+why = "largest vertical specific force just after the roll starts: -g - w^2*rz (centripetal adds along body z) + 0.05 bias"
+
+[[check]]
+variable = "m.specificForce_b[3]"
+at = "all"
+from = 0.001
+range = [-9.827, 0.0]
+why = "body z specific force never points Down: the body is never inverted"
+
+[[check]]
+variable = "m.gyro[3]"
+at = "all"
+near = 0.003
+tol = 1e-12
+why = "no pitch rate is ever commanded: sensor z (= -body y) reads only its bias"
+
+[[check]]
+expr = "norm({m.acceleration[1]} - 0.05, {m.acceleration[2]} + 0.02, {m.acceleration[3]} - 0.10) - norm({m.specificForce_b[1]}, {m.specificForce_b[2]}, {m.specificForce_b[3]})"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "the mount is a rotation: the bias-corrected accelerometer reading has the length of the body specific force at every sample"

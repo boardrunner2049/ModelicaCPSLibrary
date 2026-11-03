@@ -1,0 +1,156 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Biases (world.toml): pressure +12.5 Pa, temperature -0.4 K, altitude +2 m, climb rate none.
+# Ambient inputs follow the ISA troposphere for the commanded height h:
+#   T = 288.15 - 0.0065 h, p = 101325 (T/288.15)^5.25588.
+# Inputs are held over each 10 ms step, so the row at T reflects h(T - 10 ms).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- on the ground: sea-level standard atmosphere plus biases
+[[check]]
+variable = "m.pressure"
+at = "0.5"
+near = 101337.5
+tol = 1e-6
+why = "ISA sea-level 101325 Pa + 12.5 Pa bias"
+
+[[check]]
+variable = "m.temperature"
+at = "0.5"
+near = 287.75
+tol = 1e-9
+why = "ISA sea-level 288.15 K - 0.4 K bias"
+
+[[check]]
+variable = "m.altitude"
+at = "0.5"
+near = 2.0
+tol = 1e-12
+why = "on the ground the barometer reads only its 2 m altitude bias"
+
+# --- mid-climb (h = 49.9 m held)
+[[check]]
+variable = "m.altitude"
+at = "6.0"
+near = 51.9
+tol = 1e-9
+why = "geometric altitude 10 m/s * 4.99 s + 2 m bias, Up-positive"
+
+[[check]]
+variable = "m.pressure"
+at = "6.0"
+near = 100739.478
+tol = 1e-3
+why = "ISA pressure at 49.9 m + bias; ~12 Pa/m below sea level (rho*g = 12.01 Pa/m)"
+
+[[check]]
+variable = "m.climbRate"
+at = "6.0"
+near = 10.0
+tol = 1e-12
+why = "climb rate passes through unbiased and positive while climbing"
+
+# --- hover at 100 m: hydrostatic drop of ~1195 Pa from the ground value
+[[check]]
+variable = "m.pressure"
+at = "12.0"
+near = 100141.938
+tol = 1e-3
+why = "ISA pressure at 100 m + 12.5 Pa: 1195.6 Pa below the ground reading (~ rho*g*100 m)"
+
+[[check]]
+variable = "m.temperature"
+at = "12.0"
+near = 287.1
+tol = 1e-9
+why = "lapse rate 6.5 K/km: 0.65 K colder at 100 m, minus 0.4 K bias"
+
+[[check]]
+variable = "m.climbRate"
+at = "12.0"
+near = 0.0
+tol = 1e-12
+why = "hover: no vertical rate"
+
+# --- descent
+[[check]]
+variable = "m.climbRate"
+at = "15.5"
+near = -8.0
+tol = 1e-12
+why = "descending in NED is a negative Up-positive climb rate"
+
+# --- final hover at 60 m
+[[check]]
+variable = "m.pressure"
+at = "end"
+near = 100618.784
+tol = 1e-3
+why = "ISA pressure at 60 m + bias: between the ground and 100 m readings"
+
+[[check]]
+variable = "m.altitude"
+at = "end"
+near = 62.0
+tol = 1e-9
+why = "100 m - 8 m/s * 5 s + 2 m bias"
+
+# --- cross-channel physics (bias-free differences; expr references are per-time rows)
+[[check]]
+expr = "{m.pressure@0.5} - {m.pressure@12.0}"
+near = 1195.562
+tol = 1e-3
+why = "hydrostatic drop over the 100 m climb (biases cancel): ISA closed form 1195.56 Pa = mean rho 1.2191 kg/m3 * g * 100 m"
+
+[[check]]
+expr = "({m.altitude@10.0} - {m.altitude@2.0}) / 8.0"
+near = 10.0
+tol = 1e-9
+why = "climbRate is the time derivative of the Up-positive altitude: the altitude slope over the climb equals the reported +10 m/s (same sign convention)"
+
+[[check]]
+expr = "({m.altitude@17.0} - {m.altitude@14.0}) / 3.0 - {m.climbRate@15.5}"
+near = 0.0
+tol = 1e-9
+why = "during the descent the altitude slope (-8 m/s) equals the reported climb rate"
+
+[[check]]
+expr = "({m.temperature@0.5} - {m.temperature@12.0}) / ({m.altitude@12.0} - {m.altitude@0.5})"
+near = 0.0065
+tol = 1e-12
+why = "temperature channel and altitude channel agree on the ISA lapse rate 6.5 K/km (biases cancel)"
+
+# --- whole-run extremes (from 0.01 s: the t = 0 row is the state before the first inputs act)
+[[check]]
+variable = "m.altitude"
+at = "max"
+near = 102.0
+tol = 1e-9
+why = "highest reading is the 100 m hover plus bias"
+
+[[check]]
+variable = "m.pressure"
+at = "max"
+from = 0.01
+near = 101337.5
+tol = 1e-6
+why = "highest pressure is on the ground: pressure never rises above sea level during flight"
+
+[[check]]
+variable = "m.pressure"
+at = "min"
+from = 0.01
+near = 100141.938
+tol = 1e-3
+why = "lowest pressure is at the highest point (100 m): pressure is monotone in height"
+
+[[check]]
+variable = "m.climbRate"
+at = "all"
+from = 0.01
+range = [-8.0, 10.0]
+why = "climb rate stays within the commanded -8..10 m/s"

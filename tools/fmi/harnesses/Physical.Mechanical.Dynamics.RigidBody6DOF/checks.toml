@@ -1,0 +1,229 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Closed forms (phases in harness.c) evaluated in Python from the same
+# parameters: R0 = R(q_start/|q_start|), v_w0 = R0 v_b0, g = 9.80665 m/s^2.
+# The inputs switch exactly at the phase boundaries (zero-order hold over
+# each 1 ms step), so the states at the boundaries are exact closed forms.
+# I = [0.1 0.02 0; 0.02 0.2 0; 0 0 0.3], m = 2 kg.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "norm({m.q_wb[1]} - 0.96125628387669, {m.q_wb[2]} - 0.16533875799493103, {m.q_wb[3]} + 0.0672042655833245, {m.q_wb[4]} - 0.2100786483669295)"
+at = "0"
+near = 0.0
+tol = 1e-14
+why = "q_start = 2 x a unit quaternion is normalized at initialization"
+
+[[check]]
+expr = "norm({m.euler[1]} - 0.3, {m.euler[2]} + 0.2, {m.euler[3]} - 0.4)"
+at = "0"
+near = 0.0
+tol = 1e-12
+why = "display Euler angles recover the ZYX roll 0.3 / pitch -0.2 / yaw 0.4 the start quaternion was built from"
+
+[[check]]
+expr = "{m.q_wb[1]}**2 + {m.q_wb[2]}**2 + {m.q_wb[3]}**2 + {m.q_wb[4]}**2 - 1"
+at = "all"
+range = [-1e-10, 1e-10]
+why = "the attitude quaternion stays unit-norm throughout (all phases incl. the tumble)"
+
+[[check]]
+expr = "max(abs({m.R_wb[1]}*{m.R_wb[1]} + {m.R_wb[4]}*{m.R_wb[4]} + {m.R_wb[7]}*{m.R_wb[7]} - 1), abs({m.R_wb[1]}*{m.R_wb[2]} + {m.R_wb[4]}*{m.R_wb[5]} + {m.R_wb[7]}*{m.R_wb[8]}), abs({m.R_wb[1]}*({m.R_wb[5]}*{m.R_wb[9]} - {m.R_wb[6]}*{m.R_wb[8]}) - {m.R_wb[2]}*({m.R_wb[4]}*{m.R_wb[9]} - {m.R_wb[6]}*{m.R_wb[7]}) + {m.R_wb[3]}*({m.R_wb[4]}*{m.R_wb[8]} - {m.R_wb[5]}*{m.R_wb[7]}) - 1))"
+at = "all"
+range = [0.0, 1e-10]
+why = "R_wb is a proper rotation (unit, orthogonal columns, det +1)"
+
+[[check]]
+expr = "norm({m.v_w[1]} - ({m.R_wb[1]}*{m.v_b[1]} + {m.R_wb[2]}*{m.v_b[2]} + {m.R_wb[3]}*{m.v_b[3]}), {m.v_w[2]} - ({m.R_wb[4]}*{m.v_b[1]} + {m.R_wb[5]}*{m.v_b[2]} + {m.R_wb[6]}*{m.v_b[3]}), {m.v_w[3]} - ({m.R_wb[7]}*{m.v_b[1]} + {m.R_wb[8]}*{m.v_b[2]} + {m.R_wb[9]}*{m.v_b[3]}))"
+at = "all"
+range = [0.0, 1e-12]
+why = "v_w = R_wb v_b (body-to-world, not the transpose)"
+
+[[check]]
+expr = "norm({m.specificForce_b[1]} - {m.force_b[1]}/2, {m.specificForce_b[2]} - {m.force_b[2]}/2, {m.specificForce_b[3]} - {m.force_b[3]}/2)"
+at = "all"
+range = [0.0, 1e-15]
+why = "the accelerometer reads F/m and excludes gravity (zero in free fall)"
+
+[[check]]
+expr = "norm({m.alpha_b[1]} - (0.2*({m.moment_b[1]} - ({m.omega_b[2]}*(0.3*{m.omega_b[3]}) - {m.omega_b[3]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}))) - 0.02*({m.moment_b[2]} - ({m.omega_b[3]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) - {m.omega_b[1]}*(0.3*{m.omega_b[3]}))))/0.0196, {m.alpha_b[2]} - (-0.02*({m.moment_b[1]} - ({m.omega_b[2]}*(0.3*{m.omega_b[3]}) - {m.omega_b[3]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}))) + 0.1*({m.moment_b[2]} - ({m.omega_b[3]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) - {m.omega_b[1]}*(0.3*{m.omega_b[3]}))))/0.0196, {m.alpha_b[3]} - ({m.moment_b[3]} - ({m.omega_b[1]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}) - {m.omega_b[2]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]})))/0.3)"
+at = "all"
+range = [0.0, 1e-9]
+why = "Euler's equation alpha = I^-1 (M - w x I w) with the product of inertia: the x-y block inverts to [0.2 -0.02; -0.02 0.1]/0.0196 (det 0.0196), z is principal"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (1.404557862446553), {m.p_w[2]} - (2.7511951820884963), {m.p_w[3]} - (-49.538720078780294))"
+at = "0.5"
+near = 0.0
+tol = 1e-9
+why = "position, ballistic: p0 + R0 v_b0 t + g t^2/2"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.8091157248931058), {m.v_w[2]} - (1.502390364176993), {m.v_w[3]} - (3.3742223424394204))"
+at = "0.5"
+near = 0.0
+tol = 1e-10
+why = "world velocity, ballistic: p0 + R0 v_b0 t + g t^2/2"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (1.8091157248931058), {m.p_w[2]} - (3.5023903641769927), {m.p_w[3]} - (-46.625777657560576))"
+at = "1.0"
+near = 0.0
+tol = 1e-9
+why = "position, end of the ballistic arc"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.8091157248931058), {m.v_w[2]} - (1.502390364176993), {m.v_w[3]} - (8.27754734243942))"
+at = "1.0"
+near = 0.0
+tol = 1e-10
+why = "world velocity, end of the ballistic arc"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (2.2136735873396587), {m.p_w[2]} - (4.253585546265489), {m.p_w[3]} - (-42.487003986340866))"
+at = "1.5"
+near = 0.0
+tol = 1e-9
+why = "position, constant world velocity while spinning up about body z"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.8091157248931058), {m.v_w[2]} - (1.502390364176993), {m.v_w[3]} - (8.27754734243942))"
+at = "1.5"
+near = 0.0
+tol = 1e-10
+why = "world velocity, constant world velocity while spinning up about body z"
+
+[[check]]
+expr = "norm({m.R_wb[1]} - (0.8425337960494086), {m.R_wb[2]} - (-0.5353212119342958), {m.R_wb[3]} - (-0.05973275958609335), {m.R_wb[4]} - (0.48553183685258633), {m.R_wb[5]} - (0.8027901971637029), {m.R_wb[6]} - (-0.3461022027384635), {m.R_wb[7]} - (0.23322872446833556), {m.R_wb[8]} - (0.26260064621218987), {m.R_wb[9]} - (0.9362933635841992))"
+at = "1.5"
+near = 0.0
+tol = 1e-10
+why = "attitude R0 Rz(psi), psi = (t-1)^2/2: the spin about the principal z axis stays about it"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (2.6182314497862116), {m.p_w[2]} - (5.004780728353985), {m.p_w[3]} - (-38.34823031512116))"
+at = "2.0"
+near = 0.0
+tol = 1e-9
+why = "position, spin-up done: still the ballistic end velocity"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.8091157248931058), {m.v_w[2]} - (1.502390364176993), {m.v_w[3]} - (8.27754734243942))"
+at = "2.0"
+near = 0.0
+tol = 1e-10
+why = "world velocity, spin-up done: still the ballistic end velocity"
+
+[[check]]
+expr = "norm({m.R_wb[1]} - (0.5879106647741076), {m.R_wb[2]} - (-0.8067174521956848), {m.R_wb[3]} - (-0.05973275958609335), {m.R_wb[4]} - (0.7458310707130542), {m.R_wb[5]} - (0.5691654234215242), {m.R_wb[6]} - (-0.3461022027384635), {m.R_wb[7]} - (0.31320450859444254), {m.R_wb[8]} - (0.15892662805301158), {m.R_wb[9]} - (0.9362933635841992))"
+at = "2.0"
+near = 0.0
+tol = 1e-10
+why = "attitude R0 Rz(psi), psi = (t-1)^2/2: the spin about the principal z axis stays about it"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (3.0781620525742226), {m.p_w[2]} - (5.858988911413743), {m.p_w[3]} - (-34.16784512058129))"
+at = "2.5"
+near = 0.0
+tol = 1e-9
+why = "position, body-x thrust rotating with the spin: closed-form integral"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.9922188282274659), {m.v_w[2]} - (1.9296365999571925), {m.v_w[3]} - (8.447160973319226))"
+at = "2.5"
+near = 0.0
+tol = 1e-10
+why = "world velocity, body-x thrust rotating with the spin: closed-form integral"
+
+[[check]]
+expr = "norm({m.R_wb[1]} - (0.12917919833480684), {m.R_wb[2]} - (-0.9898205555300449), {m.R_wb[3]} - (-0.05973275958609335), {m.R_wb[4]} - (0.9274007814525552), {m.R_wb[5]} - (0.14191918764132452), {m.R_wb[6]} - (-0.3461022027384635), {m.R_wb[7]} - (0.3510562993007911), {m.R_wb[8]} - (-0.010687002826795034), {m.R_wb[9]} - (0.9362933635841992))"
+at = "2.5"
+near = 0.0
+tol = 1e-10
+why = "attitude R0 Rz(psi), psi = 0.5 + (t-2): the spin about the principal z axis stays about it"
+
+[[check]]
+expr = "norm({m.p_w[1]} - (3.569720228396639), {m.p_w[2]} - (6.940257150006076), {m.p_w[3]} - (-29.901509100456124))"
+at = "3.0"
+near = 0.0
+tol = 1e-9
+why = "position, end of the rotating-thrust phase"
+
+[[check]]
+expr = "norm({m.v_w[1]} - (0.9329793383693537), {m.v_w[2]} - (2.391629602476693), {m.v_w[3]} - (8.614158053184779))"
+at = "3.0"
+near = 0.0
+tol = 1e-10
+why = "world velocity, end of the rotating-thrust phase"
+
+[[check]]
+expr = "norm({m.R_wb[1]} - (-0.36117984113889884), {m.R_wb[2]} - (-0.9305810656719326), {m.R_wb[3]} - (-0.05973275958609335), {m.R_wb[4]} - (0.88191043665948), {m.R_wb[5]} - (-0.32007381487817604), {m.R_wb[6]} - (-0.3461022027384635), {m.R_wb[7]} - (0.3029572644218408), {m.R_wb[8]} - (-0.1776840826923485), {m.R_wb[9]} - (0.9362933635841992))"
+at = "3.0"
+near = 0.0
+tol = 1e-10
+why = "attitude R0 Rz(psi), psi = 0.5 + (t-2): the spin about the principal z axis stays about it"
+
+[[check]]
+expr = "norm({m.a_w[1]}, {m.a_w[2]}, {m.a_w[3]} - 9.80665)"
+from = 0.001
+to = 1.0
+at = "all"
+range = [0.0, 1e-12]
+why = "ballistic phase (gravity input visible from the 1 ms row): inertial acceleration is exactly gravity"
+
+[[check]]
+expr = "norm({m.R_wb[1]} - 0.9027010963754599, {m.R_wb[5]} - 0.8570601132100353, {m.R_wb[9]} - 0.9362933635841992, {m.omega_b[1]}, {m.omega_b[2]}, {m.omega_b[3]})"
+from = 0.0
+to = 1.0
+at = "all"
+range = [0.0, 1e-12]
+why = "no moment, no start rate: attitude frozen during the ballistic arc"
+
+[[check]]
+expr = "norm({m.omega_b[1]}, {m.omega_b[2]}, {m.omega_b[3]} - 1)"
+at = "2.0"
+near = 0.0
+tol = 1e-12
+why = "0.3 N m about the principal z axis for 1 s: omega_z = 0.3/0.3 * 1 s, no coupling into x/y"
+
+[[check]]
+expr = "norm({m.omega_b[1]}, {m.omega_b[2]}, {m.omega_b[3]} - 1)"
+from = 2.0
+to = 3.0
+at = "all"
+range = [0.0, 1e-12]
+why = "spin about a principal axis is a steady rotation (no moment)"
+
+[[check]]
+expr = "norm({m.v_w[1]} - {m.v_w[1]@3.1}, {m.v_w[2]} - {m.v_w[2]@3.1}, {m.v_w[3]} - {m.v_w[3]@3.1})"
+from = 3.1
+to = 5.0
+at = "all"
+range = [0.0, 1e-10]
+why = "force-free tumble: world velocity constant even though v_b rotates"
+
+[[check]]
+expr = "norm({m.R_wb[1]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) + {m.R_wb[2]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}) + {m.R_wb[3]}*0.3*{m.omega_b[3]} - ({m.R_wb[1]@3.1}*(0.1*{m.omega_b[1]@3.1} + 0.02*{m.omega_b[2]@3.1}) + {m.R_wb[2]@3.1}*(0.02*{m.omega_b[1]@3.1} + 0.2*{m.omega_b[2]@3.1}) + {m.R_wb[3]@3.1}*0.3*{m.omega_b[3]@3.1}), {m.R_wb[4]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) + {m.R_wb[5]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}) + {m.R_wb[6]}*0.3*{m.omega_b[3]} - ({m.R_wb[4]@3.1}*(0.1*{m.omega_b[1]@3.1} + 0.02*{m.omega_b[2]@3.1}) + {m.R_wb[5]@3.1}*(0.02*{m.omega_b[1]@3.1} + 0.2*{m.omega_b[2]@3.1}) + {m.R_wb[6]@3.1}*0.3*{m.omega_b[3]@3.1}), {m.R_wb[7]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) + {m.R_wb[8]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}) + {m.R_wb[9]}*0.3*{m.omega_b[3]} - ({m.R_wb[7]@3.1}*(0.1*{m.omega_b[1]@3.1} + 0.02*{m.omega_b[2]@3.1}) + {m.R_wb[8]@3.1}*(0.02*{m.omega_b[1]@3.1} + 0.2*{m.omega_b[2]@3.1}) + {m.R_wb[9]@3.1}*0.3*{m.omega_b[3]@3.1}))"
+from = 3.1
+to = 5.0
+at = "all"
+range = [0.0, 1e-9]
+why = "torque-free tumble with a product of inertia: world angular momentum R I omega is conserved"
+
+[[check]]
+expr = "0.5*({m.omega_b[1]}*(0.1*{m.omega_b[1]} + 0.02*{m.omega_b[2]}) + {m.omega_b[2]}*(0.02*{m.omega_b[1]} + 0.2*{m.omega_b[2]}) + 0.3*{m.omega_b[3]}**2) - 0.15052804794110491"
+from = 3.1
+to = 5.0
+at = "all"
+range = [-1e-9, 1e-9]
+why = "torque-free tumble: rotational kinetic energy conserved (0.150528 J after the pulse)"
+
+[[check]]
+expr = "norm({m.omega_b[1]}, {m.omega_b[2]})"
+at = "4.0"
+range = [0.01, 1.0]
+why = "the tumble is real: the pulse tipped the spin off the principal axis"

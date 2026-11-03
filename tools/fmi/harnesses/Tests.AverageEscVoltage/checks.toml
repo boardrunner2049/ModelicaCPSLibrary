@@ -1,0 +1,217 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Commands {-0.5,0,0.25,1,2} -> modulation {0,0,0.25,1,1}; supply 16/8/0 V
+# switching at the model's time events 0.1 s and 0.2 s (the row at the event
+# time already shows the new level). Native rumoca sim agrees exactly.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.esc[1].modulation"
+at = "all"
+near = 0
+tol = 1e-15
+why = "command -0.5 clamped to [0,1] gives 0"
+
+[[check]]
+variable = "m.commands.normalizedCommand[1]"
+at = "all"
+near = 0
+tol = 1e-12
+why = "PWM 500 us on [1000, 2000] us: (500-1000)/(2000-1000) = -0.5, clamped to 0"
+
+[[check]]
+variable = "m.esc[1].equivalentVoltage"
+at = "0.05"
+near = 0
+tol = 1e-12
+why = "0 x 16 V supply"
+
+[[check]]
+variable = "m.esc[1].equivalentVoltage"
+at = "0.15"
+near = 0
+tol = 1e-12
+why = "0 x 8 V supply"
+
+[[check]]
+variable = "m.esc[1].equivalentVoltage"
+at = "0.25"
+near = 0
+tol = 1e-12
+why = "0 x 0 V supply"
+
+[[check]]
+variable = "m.esc[2].modulation"
+at = "all"
+near = 0
+tol = 1e-15
+why = "command 0 clamped to [0,1] gives 0"
+
+[[check]]
+variable = "m.commands.normalizedCommand[2]"
+at = "all"
+near = 0
+tol = 1e-12
+why = "PWM 1100 us on [1100, 1900] us: (1100-1100)/(1900-1100) = 0, clamped to 0"
+
+[[check]]
+variable = "m.esc[2].equivalentVoltage"
+at = "0.05"
+near = 0
+tol = 1e-12
+why = "0 x 16 V supply"
+
+[[check]]
+variable = "m.esc[2].equivalentVoltage"
+at = "0.15"
+near = 0
+tol = 1e-12
+why = "0 x 8 V supply"
+
+[[check]]
+variable = "m.esc[2].equivalentVoltage"
+at = "0.25"
+near = 0
+tol = 1e-12
+why = "0 x 0 V supply"
+
+[[check]]
+variable = "m.esc[3].modulation"
+at = "all"
+near = 0.25
+tol = 1e-15
+why = "command 0.25 clamped to [0,1] gives 0.25"
+
+[[check]]
+variable = "m.commands.normalizedCommand[3]"
+at = "all"
+near = 0.25
+tol = 1e-12
+why = "PWM 1350 us on [1200, 1800] us: (1350-1200)/(1800-1200) = 0.25, clamped to 0.25"
+
+[[check]]
+variable = "m.esc[3].equivalentVoltage"
+at = "0.05"
+near = 4.0
+tol = 1e-12
+why = "0.25 x 16 V supply"
+
+[[check]]
+variable = "m.esc[3].equivalentVoltage"
+at = "0.15"
+near = 2.0
+tol = 1e-12
+why = "0.25 x 8 V supply"
+
+[[check]]
+variable = "m.esc[3].equivalentVoltage"
+at = "0.25"
+near = 0.0
+tol = 1e-12
+why = "0.25 x 0 V supply"
+
+[[check]]
+variable = "m.esc[4].modulation"
+at = "all"
+near = 1
+tol = 1e-15
+why = "command 1 clamped to [0,1] gives 1"
+
+[[check]]
+variable = "m.commands.normalizedCommand[4]"
+at = "all"
+near = 1
+tol = 1e-12
+why = "PWM 1700 us on [1300, 1700] us: (1700-1300)/(1700-1300) = 1, clamped to 1"
+
+[[check]]
+variable = "m.esc[4].equivalentVoltage"
+at = "0.05"
+near = 16
+tol = 1e-12
+why = "1 x 16 V supply"
+
+[[check]]
+variable = "m.esc[4].equivalentVoltage"
+at = "0.15"
+near = 8
+tol = 1e-12
+why = "1 x 8 V supply"
+
+[[check]]
+variable = "m.esc[4].equivalentVoltage"
+at = "0.25"
+near = 0
+tol = 1e-12
+why = "1 x 0 V supply"
+
+[[check]]
+variable = "m.esc[5].modulation"
+at = "all"
+near = 1
+tol = 1e-15
+why = "command 2 clamped to [0,1] gives 1"
+
+[[check]]
+variable = "m.commands.normalizedCommand[5]"
+at = "all"
+near = 1
+tol = 1e-12
+why = "PWM 1800 us on [1400, 1600] us: (1800-1400)/(1600-1400) = 2, clamped to 1"
+
+[[check]]
+variable = "m.esc[5].equivalentVoltage"
+at = "0.05"
+near = 16
+tol = 1e-12
+why = "1 x 16 V supply"
+
+[[check]]
+variable = "m.esc[5].equivalentVoltage"
+at = "0.15"
+near = 8
+tol = 1e-12
+why = "1 x 8 V supply"
+
+[[check]]
+variable = "m.esc[5].equivalentVoltage"
+at = "0.25"
+near = 0
+tol = 1e-12
+why = "1 x 0 V supply"
+
+[[check]]
+expr = "{m.esc[3].equivalentVoltage@0.099} - 4.0"
+near = 0.0
+tol = 1e-12
+why = "16 V supply holds up to the 0.1 s event"
+
+[[check]]
+expr = "{m.esc[3].equivalentVoltage@0.1} - 2.0"
+near = 0.0
+tol = 1e-12
+why = "8 V supply from the 0.1 s time event on"
+
+[[check]]
+expr = "abs({m.esc[1].equivalentVoltage}) + abs({m.esc[2].equivalentVoltage})"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "negative and zero commands never produce a (negative) voltage"
+
+[[check]]
+expr = "{m.esc[5].equivalentVoltage} - {m.supply}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "over-range command 2 saturates at exactly the supply voltage"
+
+[[check]]
+variable = "m.esc[[]*].equivalentVoltage"
+at = "all"
+range = [0.0, 16.0]
+why = "unipolar output bounded by the supply"

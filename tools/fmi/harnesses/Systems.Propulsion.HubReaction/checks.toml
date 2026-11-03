@@ -1,0 +1,89 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Note: variables are fnmatch globs, so a literal "[" is written "[[]".
+# J + JLoad = 3e-4 kg.m2. Yaw input M3(t) = -0.005 + 0.01 t; spin acceleration
+# 0 / +1000 (0.2-0.5 s) / -2000 (0.5-0.8 s) / 0 rad/s2.
+# z: moment = M3 - spinSign*3e-4*acc. Tolerances cover the 1 ms input hold
+# (a trace row at t shows outputs for the input held over the step ending at t;
+# the t = 0 row precedes the first input, so 'all' checks avoid exact values).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.momentPositive_r[[]3]"
+at = "0.1"
+near = -0.004
+tol = 1e-4
+why = "no spin acceleration: yaw moment is the aerodynamic one, M3(0.1) = -0.004"
+
+[[check]]
+variable = "m.momentPositive_r[[]3]"
+at = "0.3"
+near = -0.302
+tol = 1e-4
+why = "spin-up of a +1 rotor: reaction -3e-4*1000 = -0.3 N.m added to M3 = -0.002"
+
+[[check]]
+variable = "m.momentNegative_r[[]3]"
+at = "0.3"
+near = 0.298
+tol = 1e-4
+why = "opposite spin sense reacts the other way: -0.002 + 0.3"
+
+[[check]]
+variable = "m.momentPositive_r[[]3]"
+at = "0.6"
+near = 0.601
+tol = 1e-4
+why = "braking (-2000 rad/s2) reverses the reaction: 0.001 + 0.6"
+
+[[check]]
+variable = "m.momentNegative_r[[]3]"
+at = "0.6"
+near = -0.599
+tol = 1e-4
+why = "braking a -1 rotor: 0.001 - 0.6"
+
+[[check]]
+variable = "m.moment*_r[[]3]"
+at = "0.9"
+near = 0.004
+tol = 1e-4
+why = "constant spin speed: both senses give the pure aerodynamic yaw moment M3(0.9) = 0.004"
+
+[[check]]
+variable = "m.moment*_r[[]2]"
+at = "0.3"
+near = -0.02
+tol = 1e-12
+why = "spin reaction is purely axial: pitch moment passes through unchanged during spin-up"
+
+[[check]]
+variable = "m.moment*_r[[]2]"
+at = "0.6"
+near = -0.02
+tol = 1e-12
+why = "pitch moment unchanged during braking"
+
+[[check]]
+variable = "m.moment*_r[[]1]"
+at = "0.25"
+near = 0.01
+tol = 1e-5
+why = "roll moment passes through unchanged: 0.01*sin(2*pi*0.25)"
+
+[[check]]
+variable = "m.moment*_r[[]1]"
+at = "min"
+near = -0.01
+tol = 1e-5
+why = "roll moment unaffected through the acceleration steps (sine trough -0.01)"
+
+[[check]]
+variable = "m.momentPositive_r[[]3]"
+at = "all"
+range = [-0.30301, 0.60301]
+why = "yaw moment bounded by M3 - 0.3 (M3 >= -0.003 during spin-up) and M3 + 0.6 (M3 <= 0.003 during braking); no spurious spikes at the acceleration steps"

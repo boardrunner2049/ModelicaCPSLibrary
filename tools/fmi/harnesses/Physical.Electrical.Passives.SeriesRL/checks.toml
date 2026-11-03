@@ -1,0 +1,136 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Series pair: rl (R1 = 2 Ohm, L1 = 10 mH, i_start = -1 A fixed) and
+# rl2 (R2 = 1 Ohm, L2 = 20 mH, fixedCurrentStart = false, start guess 0.7 A).
+# Loop: Rt = 3 Ohm, Lt = 30 mH, tau = Lt/Rt = 10 ms, i(0) = -1 A (from rl).
+# Each segment: i(t) = V/Rt + (i0 - V/Rt)*exp(-(t - t0)/tau).
+#   [0, 20) ms     V = 0:   i(10 ms) = -exp(-1), i(20 ms) = -exp(-2)
+#   [20, 120) ms   V = +10: target 3.33333 A, i(30 ms) = 2.057281
+#   [120, 220) ms  V = -5:  target -1.66667 A, zero crossing at 130.986 ms
+#   [220, 300) ms  V = 0:   free decay, i(230 ms) = -0.613049, i(300 ms) = -5.590e-4
+# Voltage split: di/dt = (V - Rt*i)/Lt, so rl.v = R1*i + L1*di/dt = i + V/3
+# (depends on the current because L1/R1 = 5 ms != L2/R2 = 20 ms).
+# Closed forms agree with native `rumoca sim` (rtol 1e-10) to < 1e-9 A.
+# Voltage-dependent quantities are not sampled exactly at switching instants
+# (the trace row at a switch still shows the previous input).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.rl.i"
+at = "0"
+near = -1.0
+tol = 1e-12
+why = "signed initial current i_start = -1 A is honoured"
+
+[[check]]
+variable = "m.rl2.i"
+at = "0"
+near = -1.0
+tol = 1e-12
+why = "fixedCurrentStart = false: rl2's initial current comes from the series network (-1 A), not from its inconsistent start guess 0.7 A"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.01"
+near = -0.367879
+tol = 1e-5
+why = "unforced decay of the initial current: -exp(-1) after one tau = (L1+L2)/(R1+R2)"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.03"
+near = 2.057281
+tol = 1e-5
+why = "one tau after the +10 V step at 20 ms: 10/3 - (10/3 + exp(-2))*exp(-1)"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.1199"
+near = 3.333174
+tol = 1e-5
+why = "~10 tau after the +10 V step the current has settled at V/(R1+R2) = 3.3333 A"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.1309"
+near = 0.014363
+tol = 1e-5
+why = "reversal toward -1.667 A crosses zero at 120 ms + tau*ln((3.333176 + 1.666667)/1.666667) = 130.986 ms: just positive before"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.1311"
+near = -0.018924
+tol = 1e-5
+why = "and just negative after the zero crossing (both current signs supported)"
+
+[[check]]
+variable = "m.rl.i"
+at = "0.23"
+near = -0.613049
+tol = 1e-5
+why = "free decay at 0 V: -1.666440*exp(-1) one tau after 220 ms"
+
+[[check]]
+variable = "m.rl.i"
+at = "end"
+near = -5.590e-4
+tol = 1e-6
+why = "8 tau of free decay: -1.666440*exp(-8)"
+
+[[check]]
+variable = "m.rl.i"
+at = "all"
+range = [-1.666667, 3.333334]
+why = "a first-order lag never overshoots: current stays within [min V/Rt, max V/Rt] = [-5/3, 10/3] A (and i_start = -1 lies inside)"
+
+[[check]]
+expr = "{m.rl.v} - ({m.rl.i} + {m.voltage}/3)"
+at = "all"
+range = [-1e-6, 1e-6]
+why = "each piece obeys v = R*i + L*di/dt: with di/dt = (V - 3i)/30 mH, rl takes 2i + (1/3)(V - 3i) = i + V/3 at every step"
+
+[[check]]
+variable = "m.rl2.v"
+at = "0.1199"
+near = 3.333493
+tol = 1e-5
+why = "nearly settled: rl2 drops R2*i + L2*di/dt = 2V/3 - i = 3.333493 V (R2*i = 3.333174 plus 0.3 mV of residual inductive voltage); the split tends to 2:1 by resistance, not by inductance"
+
+[[check]]
+variable = "m.rl.copperLoss"
+at = "0.1199"
+near = 22.2201
+tol = 1e-3
+why = "reported copper loss R1*i^2 = 2*3.333174^2"
+
+[[check]]
+expr = "{m.rl.copperLoss} + {m.rl2.copperLoss} - {m.voltage}*{m.rl.i}"
+at = "0.1199"
+near = 0.0
+tol = 2e-3
+why = "at steady state the source power V*i (33.33 W) is entirely the two reported copper losses"
+
+[[check]]
+variable = "m.rl.magneticEnergy"
+at = "0.1199"
+near = 0.0555503
+tol = 1e-6
+why = "stored energy L1*i^2/2 at the settled 3.3332 A"
+
+[[check]]
+variable = "m.rl2.magneticEnergy"
+at = "0.1199"
+near = 0.1111005
+tol = 1e-6
+why = "stored energy L2*i^2/2: twice rl's, as L2 = 2*L1"
+
+[[check]]
+variable = "m.energyError"
+at = "all"
+range = [-1e-4, 1e-4]
+why = "energy balance: integral(V*i) = integral of both reported copper losses + change of L*i^2/2 (source energy 3.57 J; native error 6e-9 J)"

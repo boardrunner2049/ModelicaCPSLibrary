@@ -1,0 +1,103 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# omega' = (Kv V - omega)/tau, Kv = 62.5 rad/(s.V), tau = 0.03 s,
+# omega_start = 50 rad/s (world.toml override). Reference values are the exact
+# solution for the zero-order-held input: per 1 ms step
+#   w <- Kv V + (w - Kv V) exp(-h/tau)
+# (the FMU trace matches it to 6e-9 rad/s over the whole run).
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.omega"
+at = "0"
+near = 50.0
+tol = 1e-12
+why = "initial speed is the omega_start parameter override"
+
+[[check]]
+variable = "m.omega"
+at = "0.1"
+near = 1.78369967
+tol = 1e-6
+why = "zero voltage: exponential coast-down 50 exp(-0.1/0.03)"
+
+[[check]]
+variable = "m.omega"
+at = "0.13"
+near = 632.776745
+tol = 1e-4
+why = "one tau after the 16 V step: 1000 + (1.784 - 1000) exp(-1)"
+
+[[check]]
+variable = "m.omega"
+at = "0.4"
+near = 999.954681
+tol = 1e-4
+why = "10 tau after the step: Kv x 16 V = 1000 rad/s steady state approached"
+
+[[check]]
+variable = "m.omega"
+at = "0.5"
+near = 735.303215
+tol = 1e-4
+why = "midway down the 16 -> 4 V ramp; first-order lag behind Kv V(t) (exact ZOH solution)"
+
+[[check]]
+variable = "m.omega"
+at = "0.6"
+near = 364.239788
+tol = 1e-4
+why = "end of ramp: speed lags the 250 rad/s target by about Kv |dV/dt| tau = 112 rad/s"
+
+[[check]]
+variable = "m.omega"
+at = "0.8"
+near = 250.145385
+tol = 1e-4
+why = "4 V steady state Kv V = 250 rad/s"
+
+[[check]]
+variable = "m.omega"
+at = "0.83"
+near = 1040.204183
+tol = 1e-4
+why = "24 V step drives toward 1500 rad/s: the surrogate has no speed cap"
+
+[[check]]
+variable = "m.omega"
+at = "0.9"
+near = 1455.412695
+tol = 1e-4
+why = "exceeds the nominal 16 V speed (1000 rad/s): load-independent and uncapped"
+
+[[check]]
+variable = "m.omega"
+at = "0.93"
+near = 535.416409
+tol = 1e-4
+why = "zero-voltage coast: 1455.41 exp(-1)"
+
+[[check]]
+variable = "m.omega"
+at = "end"
+near = 0.0023571817
+tol = 1e-7
+why = "coast-down after 0.4 s = 13.3 tau, never reverses"
+
+[[check]]
+variable = "m.omega"
+at = "all"
+range = [0.0, 1500.0]
+why = "nonnegative voltage never produces reverse rotation; bounded by Kv x 24 V"
+
+[[check]]
+expr = "{m.omega} - 62.5 * {m.equivalentVoltage}"
+at = "all"
+from = 0.101
+to = 0.4
+range = [-1000.0, 0.0]
+why = "during the step the speed approaches Kv V from below without overshoot"

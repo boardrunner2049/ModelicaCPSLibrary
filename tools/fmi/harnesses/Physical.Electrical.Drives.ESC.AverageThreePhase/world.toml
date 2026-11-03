@@ -1,0 +1,45 @@
+# Written by hand: the FMU cannot be exported yet (SixStep's when initial()
+# is refused: "the C profile cannot execute an initial event yet"). Aliases
+# follow tools/new_harness.py; regenerate with --refresh once export works.
+[World]
+start = 0
+stop = 62000000
+step = 10000
+time_unit = "ns"
+
+[Models.m]
+path = "out/model.fmu"
+
+[Models.m.Parameters]
+"i0" = 5.0
+
+[World.Inputs]
+esccommand = "m.escCommand"
+electricalangle = "m.electricalAngle"
+emf_1 = "m.emf[1]"
+emf_2 = "m.emf[2]"
+emf_3 = "m.emf[3]"
+
+[World.Outputs]
+phasecurrent_1 = "m.phaseCurrent[1]"
+phasecurrent_2 = "m.phaseCurrent[2]"
+phasecurrent_3 = "m.phaseCurrent[3]"
+dccurrent = "m.dcCurrent"
+electricalpower = "m.electricalPower"
+motorpower = "m.motorPower"
+losspower = "m.lossPower"
+coast = "m.coast"
+recirculating = "m.recirculating"
+sector = "m.sector"
+starvoltage = "m.starVoltage"
+
+[Trace]
+every_step = true
+models = ["m"]
+output = "out/trace.csv"
+
+[Logging]
+output = "out/runtime.log"
+
+[Frontend]
+enabled = false

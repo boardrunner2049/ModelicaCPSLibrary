@@ -1,0 +1,477 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+#
+# Closed test: two Examples.QuadGroundCycle vehicles side by side, a quad
+# (1.5 kg, 4 rotors) and a HexaX (2.2 kg, 6 rotors), both on the same four
+# compliant legs 0.10 m below the CG (k = 3000 N/m, c = 150 N.s/m each, so
+# 12000 N/m in total), feet starting 2 cm above level ground. Open-loop
+# thrust command 1.3 m g on [2, 2.7) s, then cutoff and a second landing.
+# The scenario is the run itself (6 s, the model's StopTime, on its 2 ms grid).
+#
+# "ref" = independent 1-D reference per vehicle (scipy LSODA, rtol 1e-12,
+# integrated piecewise across the command switches):
+#   z'' = g - nR kT w^2/m - 4 max(0, k pen + c z')/m  (pen = z + 0.1 >= 0),
+#   w' = (w_c(t) - w)/tau, w_c = sqrt(1.3 m g/(nR kT)), tau = 0.03 s,
+# valid because the motion stays purely vertical (checked below). The FMU
+# agrees with ref to 7e-10 m in altitude and 3e-7 m/s in velocity, and with a
+# native `bin/rumoca sim` run (rtol 1e-10) to 3.3e-9 m / 1.2e-6 m/s with
+# identical contact counts (largest differences at
+# the touchdown kinks). Reference events: touchdown 0.0638 s (free fall
+# sqrt(2*0.02/g)), all leg forces clip to 0 at 2.0626 s while still
+# compressed (damper unloading), lift-off 2.0914 s (quad) / 2.0941 s (hexa),
+# apex 0.849 / 0.854 m, second touchdown 3.2935 / 3.2955 s.
+# The model's own asserts (static compression mg/(4k), normal load = m g,
+# accelerometer -g, release at 2.5 s, re-landing by 5.5 s, dissipation <= 0,
+# no tensile force) are restated below.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+# --- quad: m = 1.5 kg, 4 rotors; static compression m g/(4k) = 0.00122583 m ---
+[[check]]
+variable = "m.quad.contactCount"
+at = "0.062"
+near = 0.0
+tol = 0
+why = "feet 2 cm above the plane: still falling free before 0.0638 s"
+
+[[check]]
+variable = "m.quad.contactCount"
+at = "0.066"
+near = 4.0
+tol = 0
+why = "all four feet touch down together at sqrt(2*0.02/g) = 0.0638 s"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "0.05"
+near = 0.1077416874999999
+tol = 1e-08
+why = "ref altitude (free fall)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "0.1"
+near = 0.09856321420040139
+tol = 1e-08
+why = "ref altitude (overdamped settling)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "1.0"
+near = 0.09877416874882164
+tol = 1e-08
+why = "ref altitude (overdamped settling)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "1.5"
+near = 0.09877416875
+tol = 1e-06
+why = "model assert: settled at static compression 0.1 - m g/(4k)"
+
+[[check]]
+variable = "m.quad.verticalVelocity"
+from = 0
+at = "1.5"
+near = 0.0
+tol = 1e-05
+why = "model assert: settled before motor start-up"
+
+[[check]]
+variable = "m.quad.normalLoad"
+at = "1.5"
+near = 14.709975
+tol = 0.0001
+why = "model assert: the ground carries the whole weight exactly once"
+
+[[check]]
+expr = "{m.quad.vehicle.gear.normalForce[1]} - 3.67749375"
+from = 1.0
+to = 2.0
+at = "all"
+range = [-1e-06, 1e-06]
+why = "each leg carries m g/4 on the support (symmetric legs)"
+
+[[check]]
+variable = "m.quad.acceleration_frd[3]"
+at = "1.5"
+near = -9.80665
+tol = 0.0001
+why = "model assert: a supported FRD accelerometer reads -g"
+
+[[check]]
+variable = "m.quad.normalLoad"
+at = "2.07"
+near = 0.0
+tol = 0
+why = "ref: thrust lifts the body faster than the legs extend; k pen + c v_n < 0 from 2.0626 s, clipped to zero (no pull)"
+
+[[check]]
+variable = "m.quad.contactCount"
+at = "2.07"
+near = 4.0
+tol = 0
+why = "the feet are still geometrically compressed although the force is zero"
+
+[[check]]
+variable = "m.quad.contactCount"
+at = "2.1"
+near = 0.0
+tol = 0
+why = "lift-off at 2.0914 s (ref)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "2.3"
+near = 0.16647092863161073
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.quad.verticalVelocity"
+at = "2.3"
+near = -0.6203605241883908
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "2.5"
+near = 0.34937702858298253
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.quad.verticalVelocity"
+at = "2.5"
+near = -1.2087248415219674
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "2.7"
+near = 0.6499618893741487
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.quad.verticalVelocity"
+at = "2.7"
+near = -1.7971237973834895
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "3.0"
+near = 0.8023002359622523
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.quad.verticalVelocity"
+at = "3.0"
+near = 0.9536415280384108
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+expr = "{m.quad.altitude} - 0.15 if {m.quad.verticalVelocity} < 0 else -1"
+at = "2.5"
+range = [0.0, 1.0]
+why = "model assert: climbing (Down velocity negative) above 0.15 m at 2.5 s"
+
+[[check]]
+expr = "{m.quad.contactCount} + abs({m.quad.normalLoad})"
+at = "2.5"
+near = 0.0
+tol = 1e-12
+why = "model assert: all contacts released in flight"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "max"
+near = 0.84866557643129
+tol = 1e-08
+why = "ref apex (sampled on the 2 ms grid near 2.903 s)"
+
+[[check]]
+variable = "m.quad.contactCount"
+at = "3.292"
+near = 0.0
+tol = 0
+why = "still airborne just before the second touchdown at 3.2935 s"
+
+[[check]]
+variable = "m.quad.contactCount"
+at = "3.298"
+near = 4.0
+tol = 0
+why = "second touchdown on all four feet"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "3.5"
+near = 0.09865389638321352
+tol = 1e-08
+why = "ref altitude, overdamped second settling"
+
+[[check]]
+variable = "m.quad.altitude"
+at = "5.5"
+near = 0.09877416875
+tol = 1e-06
+why = "model assert: back to the same static compression"
+
+[[check]]
+expr = "abs({m.quad.verticalVelocity}) + abs({m.quad.contactCount} - 4)"
+at = "5.5"
+near = 0.0
+tol = 1e-05
+why = "model assert: landed on four feet and settled"
+
+[[check]]
+expr = "min({m.quad.vehicle.gear.normalForce[1]}, {m.quad.vehicle.gear.normalForce[2]}, {m.quad.vehicle.gear.normalForce[3]}, {m.quad.vehicle.gear.normalForce[4]})"
+at = "all"
+range = [0.0, 600.0]
+why = "model assert: contact never pulls; peak leg load at the 0.84 m drop is ~555-575 N (ref)"
+
+[[check]]
+expr = "norm({m.quad.vehicle.body.p_w[1]}, {m.quad.vehicle.body.p_w[2]}, {m.quad.vehicle.body.omega_b[1]}, {m.quad.vehicle.body.omega_b[2]}, {m.quad.vehicle.body.omega_b[3]})"
+at = "all"
+range = [0.0, 1e-09]
+why = "symmetric legs and rotors: the motion stays purely vertical with no rotation (premise of the 1-D ref)"
+
+# --- hexa: m = 2.2 kg, 6 rotors; static compression m g/(4k) = 0.00179789 m ---
+[[check]]
+variable = "m.hexa.contactCount"
+at = "0.062"
+near = 0.0
+tol = 0
+why = "feet 2 cm above the plane: still falling free before 0.0638 s"
+
+[[check]]
+variable = "m.hexa.contactCount"
+at = "0.066"
+near = 4.0
+tol = 0
+why = "all four feet touch down together at sqrt(2*0.02/g) = 0.0638 s"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "0.05"
+near = 0.1077416874999999
+tol = 1e-08
+why = "ref altitude (free fall)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "0.1"
+near = 0.0978542354492622
+tol = 1e-08
+why = "ref altitude (overdamped settling)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "1.0"
+near = 0.09820211416555069
+tol = 1e-08
+why = "ref altitude (overdamped settling)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "1.5"
+near = 0.09820211416666667
+tol = 1e-06
+why = "model assert: settled at static compression 0.1 - m g/(4k)"
+
+[[check]]
+variable = "m.hexa.verticalVelocity"
+from = 0
+at = "1.5"
+near = 0.0
+tol = 1e-05
+why = "model assert: settled before motor start-up"
+
+[[check]]
+variable = "m.hexa.normalLoad"
+at = "1.5"
+near = 21.57463
+tol = 0.0001
+why = "model assert: the ground carries the whole weight exactly once"
+
+[[check]]
+expr = "{m.hexa.vehicle.gear.normalForce[1]} - 5.3936575"
+from = 1.0
+to = 2.0
+at = "all"
+range = [-1e-06, 1e-06]
+why = "each leg carries m g/4 on the support (symmetric legs)"
+
+[[check]]
+variable = "m.hexa.acceleration_frd[3]"
+at = "1.5"
+near = -9.80665
+tol = 0.0001
+why = "model assert: a supported FRD accelerometer reads -g"
+
+[[check]]
+variable = "m.hexa.normalLoad"
+at = "2.07"
+near = 0.0
+tol = 0
+why = "ref: thrust lifts the body faster than the legs extend; k pen + c v_n < 0 from 2.0626 s, clipped to zero (no pull)"
+
+[[check]]
+variable = "m.hexa.contactCount"
+at = "2.07"
+near = 4.0
+tol = 0
+why = "the feet are still geometrically compressed although the force is zero"
+
+[[check]]
+variable = "m.hexa.contactCount"
+at = "2.1"
+near = 0.0
+tol = 0
+why = "lift-off at 2.0941 s (ref)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "2.3"
+near = 0.16773668230656186
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.hexa.verticalVelocity"
+at = "2.3"
+near = -0.6271086991746464
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "2.5"
+near = 0.3519924172552023
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.hexa.verticalVelocity"
+at = "2.5"
+near = -1.2154730165084635
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "2.7"
+near = 0.6539269130440873
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.hexa.verticalVelocity"
+at = "2.7"
+near = -1.803871972369935
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "3.0"
+near = 0.8082897121275493
+tol = 1e-08
+why = "ref altitude in flight (thrust on until 2.7 s, then ballistic)"
+
+[[check]]
+variable = "m.hexa.verticalVelocity"
+at = "3.0"
+near = 0.9468933530539864
+tol = 1e-07
+why = "ref vertical velocity (Down positive)"
+
+[[check]]
+expr = "{m.hexa.altitude} - 0.15 if {m.hexa.verticalVelocity} < 0 else -1"
+at = "2.5"
+range = [0.0, 1.0]
+why = "model assert: climbing (Down velocity negative) above 0.15 m at 2.5 s"
+
+[[check]]
+expr = "{m.hexa.contactCount} + abs({m.hexa.normalLoad})"
+at = "2.5"
+near = 0.0
+tol = 1e-12
+why = "model assert: all contacts released in flight"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "max"
+near = 0.8540024343352712
+tol = 1e-08
+why = "ref apex (sampled on the 2 ms grid near 2.903 s)"
+
+[[check]]
+variable = "m.hexa.contactCount"
+at = "3.292"
+near = 0.0
+tol = 0
+why = "still airborne just before the second touchdown at 3.2955 s"
+
+[[check]]
+variable = "m.hexa.contactCount"
+at = "3.298"
+near = 4.0
+tol = 0
+why = "second touchdown on all four feet"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "3.5"
+near = 0.09802787179010136
+tol = 1e-08
+why = "ref altitude, overdamped second settling"
+
+[[check]]
+variable = "m.hexa.altitude"
+at = "5.5"
+near = 0.09820211416666667
+tol = 1e-06
+why = "model assert: back to the same static compression"
+
+[[check]]
+expr = "abs({m.hexa.verticalVelocity}) + abs({m.hexa.contactCount} - 4)"
+at = "5.5"
+near = 0.0
+tol = 1e-05
+why = "model assert: landed on four feet and settled"
+
+[[check]]
+expr = "min({m.hexa.vehicle.gear.normalForce[1]}, {m.hexa.vehicle.gear.normalForce[2]}, {m.hexa.vehicle.gear.normalForce[3]}, {m.hexa.vehicle.gear.normalForce[4]})"
+at = "all"
+range = [0.0, 600.0]
+why = "model assert: contact never pulls; peak leg load at the 0.84 m drop is ~555-575 N (ref)"
+
+[[check]]
+expr = "norm({m.hexa.vehicle.body.p_w[1]}, {m.hexa.vehicle.body.p_w[2]}, {m.hexa.vehicle.body.omega_b[1]}, {m.hexa.vehicle.body.omega_b[2]}, {m.hexa.vehicle.body.omega_b[3]})"
+at = "all"
+range = [0.0, 1e-09]
+why = "symmetric legs and rotors: the motion stays purely vertical with no rotation (premise of the 1-D ref)"
+
+[[check]]
+variable = "m.dissipation"
+at = "all"
+range = [-1e10, 1e-7]
+why = "model assert: the damper part of the quad's leg forces only removes energy (power of F - k pen along the tip velocity <= 0)"
+
+[[check]]
+expr = "{m.quad.altitude} - {m.hexa.altitude} - 2.2*9.80665/12000 + 1.5*9.80665/12000"
+at = "1.5"
+near = 0.0
+tol = 1e-8
+why = "the heavier hexa sits lower by exactly (2.2-1.5) g/(4k): legs are shared hardware, not scaled with rotor count"
