@@ -21,8 +21,11 @@ initial equation
   assert(currentThreshold > 0,"SixStep requires positive currentThreshold");
 equation
   modulation = noEvent(min(1,max(0,command)));
-  // Evaluate exact zero at command events; do not retain an on-state through relation hysteresis.
-  enabled = noEvent(command > 0);
+  // ceil/integer are event-generating (MLS 3.7.2), so enabled is a discrete-time expression
+  // (MLS 3.8.5); they are re-evaluated exactly at every event, without relation hysteresis.
+  // With c = min(1,max(-1,command)), ceil(c) is 1 exactly when command > 0, else 0 or -1;
+  // the clamp keeps the Integer bounded and a crossing of zero from either side visible.
+  enabled = integer(ceil(min(1,max(-1,command)))) > 0;
   sector = 1+integer(floor(mod(electricalAngle+Modelica.Constants.pi/6,
     2*Modelica.Constants.pi)/(Modelica.Constants.pi/3)));
   lowPhase = lowTable[sector];
