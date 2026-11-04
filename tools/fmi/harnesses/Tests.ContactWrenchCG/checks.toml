@@ -6,14 +6,8 @@
 # = (-0.03W, -0.04W, 0) about the CG, cancelled by the external moment.
 # The rows include t = 0: the initialized state must already be in equilibrium.
 #
-# KNOWN FAILURES (suspected Rumoca bugs, reported):
-#  B: the FMU refuses fmi3ExitInitializationMode because at that point every
-#     `contact = gap <= 0` is still false (contact forces 0) and the model's
-#     first assert fires. diag/ (make -C diag run) runs these same checks on an
-#     assert-free copy: every 'all' check then fails only in its t = 0 row
-#     (passes with from = 0.001); native `rumoca sim` passes from t = 0.
-#  A: the chassis inertia gets products of inertia about the chassis origin
-#     (last check below).
+# The chassis inertia must carry products of inertia about the combined CG
+# (last check below); fixed in Rumoca a4dd197b.
 # The configuration is symmetric by necessity: the model's equation-section
 # asserts pin the gear force/moment and zero motion at every instant, so any
 # asymmetric perturbation (moment, start pose) aborts the model. Asymmetric

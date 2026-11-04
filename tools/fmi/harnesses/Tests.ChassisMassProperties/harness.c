@@ -13,14 +13,9 @@
  * pass-through, core-only pass-through), so a failure is located per value
  * rather than as one assertion message.
  *
- * Current status: the FMU refuses fmi3ExitInitializationMode because its own
- * assertion "Incorrect rotated/parallel-axis full inertia tensor" fires (as it
- * does under native `rumoca sim`): Rumoca computes the products of inertia
- * about the origin instead of the combined CG (suspected compiler bug,
- * see the harness report). diag/ builds an assert-free copy of the model
- * (diag/NoAssert.mo; nothing but the assert statements removed) and runs this
- * harness and checks.toml on it: 7/12 pass and the 5 failures are exactly the
- * products of inertia of the three assemblies (bug A). */
+ * The model's own "Incorrect rotated/parallel-axis full inertia tensor"
+ * assertion fired under a Rumoca defect (products of inertia about the origin
+ * instead of the combined CG) fixed as of a4dd197b. */
 #include "fire_harness.h"
 
 static const fh_output_t outputs[] = {

@@ -8,13 +8,9 @@
 # m/s (body); gravity and rotor wrenches are zero and the gear is 1 m above
 # ground, so the motion is torque- and force-free.
 #
-# KNOWN FAILURE (suspected Rumoca bug, reported): the FMU stops in
-# fmi3ExitInitializationMode on the model's own "Payload full inertia mismatch"
-# assertion (native `rumoca sim` too): I_xz comes out about the chassis origin
-# (0.045) instead of the combined CG (0.03). The conservation checks below use
-# the FMU's own inertia columns, so they test the dynamics independently.
-# diag/ (make -C diag run) evaluates these checks on an assert-free copy of the
-# model: everything passes except the two bug-A inertia checks.
+# The model's own "Payload full inertia mismatch" assertion needs I_xz about
+# the combined CG (0.03), not the chassis origin (0.045): a Rumoca lowering
+# defect fixed in a4dd197b.
 # Coverage limit: the model's literal asserts fix the payload at y = 0, so a
 # y-sign error in the CG rebase cannot show here (overriding payloads[1].r_C
 # would trip those asserts); the literal rotor/leg checks do catch an x/y

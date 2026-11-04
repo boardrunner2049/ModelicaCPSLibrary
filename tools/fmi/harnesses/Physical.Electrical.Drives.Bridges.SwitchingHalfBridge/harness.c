@@ -22,13 +22,10 @@
  * exponential periodic-steady-state solution and a native 'rumoca sim' of
  * the same wrapper with sampled BooleanPulse gates (they agree to 4e-4 A).
  *
- * KNOWN FAILURE (suspected FMU bug, see the harness report): Boolean inputs
- * set in Step Mode never reach the discrete equations that read them
- * (m.leg.highGate / m.leg.lowGate stay false), so the leg never switches
- * and the t = 0 row shows both switches closed (off = false while
- * control = false). The floating phase before switching also reads
- * 2.0058 V against E + R*i = 2.0002 V with nonzero loadL.v in a DC state.
- * The checks pass against the native reference. */
+ * The Boolean gate inputs and the leakage-held floating phase voltage were
+ * Rumoca FMU defects when this harness was written; both are fixed as of
+ * Rumoca a4dd197b (event iteration on input changes, stiff Co-Simulation
+ * substeps). */
 #include "fire_harness.h"
 
 #include <math.h>

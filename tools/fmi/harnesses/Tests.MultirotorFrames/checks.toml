@@ -8,13 +8,11 @@
 #     = (0,-0.016,-0.192) + (-0.024,0,0) + (0.028,0.052,0) + (0,0,0.006)
 #     = {0.004, 0.036, -0.186}.
 # Window 0-1 s: free tumble before the (gravity-free) drift brings the landing
-# gear down at 3.63 s, where the model's own equality asserts stop holding.
+# gear down at about 3.44 s, where the model's own equality asserts stop holding.
 #
-# KNOWN FAILURE (suspected Rumoca bug, reported): chassis.inertia comes out
-# with products of inertia -m r_j r_k of the aggregate's own r_C (about the
-# chassis origin) instead of passing diag(0.02,0.02,0.04) through, so the
-# initial angular acceleration is off too. Euler's equation is checked with
-# the FMU's own inertia and passes, isolating the fault to the mass properties.
+# chassis.inertia must pass the aggregate's diag(0.02,0.02,0.04) through
+# unchanged (a Rumoca defect added -m r_j r_k about the chassis origin; fixed
+# in a4dd197b).
 
 [[check]]
 variable = "m.*"

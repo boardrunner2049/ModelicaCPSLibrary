@@ -15,19 +15,12 @@
  * once, equal leg loads W/4 and compressions W/(4k), and no drift of
  * position, velocity or attitude rate.
  *
- * Current status: fmi3ExitInitializationMode fails on the model's first
- * assert. The FMU's state at the end of initialization has every leg's
- * `contact = gap <= 0` false although gap = -1.63 mm, so all contact forces
- * are 0 there; from the first step on the values are right, and native
- * `rumoca sim` passes. Suspected Rumoca FMI bug: event-generating relations
- * are not evaluated before the initialization-time assertion check (minimal
- * repro in the report). diag/ runs this harness and checks.toml on an
- * assert-free copy of the model (diag/NoAssert.mo): the 'all' checks fail
- * only in their t = 0 row (bug B) and the inertia check fails (bug A: the
- * aggregate inertia gains products about the chassis origin, invisible to
- * the static wrench checks because omega = 0). Per-leg lever arms and
- * moments are checked individually because the equal loads make the sums
- * permutation-invariant; the model's asserts forbid asymmetric loading. */
+ * Two Rumoca defects blocked this harness when it was written, both fixed
+ * as of a4dd197b: initialization-time contact relations, and products of
+ * inertia about the chassis origin instead of the combined CG. Per-leg lever
+ * arms and moments are checked individually because the equal loads make the
+ * sums permutation-invariant; the model's asserts forbid asymmetric
+ * loading. */
 #include "fire_harness.h"
 
 int main(void) {

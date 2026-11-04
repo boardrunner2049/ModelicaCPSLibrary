@@ -22,15 +22,10 @@
  * 'rumoca sim' run of the same wrapper (scenario as time functions) and the
  * initialized leakage divider (phase at Vdc/3 with every device off).
  *
- * KNOWN FAILURE (suspected FMU bug, see the harness report): Boolean inputs
- * set in Step Mode do not reach the discrete equations that read them
- * (m.leg.highSelected / m.leg.lowGate stay at their old values until an
- * internal state event happens to re-run the event iteration, here the
- * diode commutation at 36 ms), and the t = 0 row has lowSwitch.off = false
- * with control = false. Separately, with every device off at constant E
- * the FMU phase voltage sits 2-15 mV below E while loadL.v is nonzero and
- * loadL.i is flat (inconsistent trace); the DC check keeps a 1 mV
- * tolerance. Every failing check passes against native. */
+ * The Boolean gate inputs and the leakage-held floating phase voltage were
+ * Rumoca FMU defects when this harness was written; both are fixed as of
+ * Rumoca a4dd197b (event iteration on input changes, stiff Co-Simulation
+ * substeps). */
 #include "fire_harness.h"
 
 static double duty(double t) {

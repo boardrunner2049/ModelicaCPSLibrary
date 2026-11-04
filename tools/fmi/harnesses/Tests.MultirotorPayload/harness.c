@@ -17,12 +17,8 @@
  * momentum (using the FMU's own inertia, so a dynamics error shows
  * independently of the mass-property computation).
  *
- * Current status: initialization fails on the model's own "Payload full
- * inertia mismatch" assertion (also under native `rumoca sim`): the product
- * of inertia I_xz is computed about the chassis origin (suspected Rumoca
- * bug, see the report). diag/ runs this harness and checks.toml on an
- * assert-free copy of the model (diag/NoAssert.mo): 15/17 pass, failing only
- * the two checks that depend on the bug-A inertia. */
+ * The model's own "Payload full inertia mismatch" assertion fired under a
+ * Rumoca defect (I_xz about the chassis origin) fixed as of a4dd197b. */
 #include "fire_harness.h"
 
 int main(void) {
