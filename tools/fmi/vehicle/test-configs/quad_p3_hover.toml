@@ -1,0 +1,46 @@
+# Harness test vehicle (not a library example): configs/quad_p3.toml with one
+# pole pair and a 0.25 mH phase inductance instead of 7 and 1 mH. With 7 pole
+# pairs and 1 mH the winding reactance at hover speed (p w L ~ 4 ohm against
+# R = 0.2 ohm) limits six-step drive to ~371 rad/s at full duty, a third of
+# the weight in thrust, so configs/quad_p3.toml cannot take off. Here
+# p w L ~ 0.15 ohm at hover.
+# P3/R0: known-position six-step commutation, forward command + coast.
+schema_version = 3
+model_name = "HarnessQuadP3Hover"
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+[models]
+esc = "average_three_phase"
+motor = "three_phase_pm"
+rotor = "quadratic_blade"
+[motor]
+RPhase = 0.2
+LPhase = 0.00025
+ke = 0.01
+polePairs = 1
+trapezoidal = true
+J = 0.0001
+b = 0.0
+theta0 = 0.0
+omega_start = 0.0
+[esc]
+Ron = 0.005
+Rdiode = 0.005
+Vdiode = 0.5
+Goff = 1e-5
+currentThreshold = 0.001
+[rotor]
+J = 0.0001
+kT = 0.00001
+kQ = 0.00000015
+[power]
+dcVoltage = 16.0
+sourceResistance = 0.02
+dcLinkCapacitance = 0.002
+[initial]
+p_start = [0.0, 0.0, -0.12]
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0

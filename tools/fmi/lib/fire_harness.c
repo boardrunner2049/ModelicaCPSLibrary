@@ -128,6 +128,10 @@ static int run_loop(const fh_scenario_t *sc) {
       return 0;
     /* Inputs hold over [now, now + step): a zero-order hold at the
      * communication points, as a co-simulation master applies them. */
+    if (sc->control && sc->control(t, sc->control_context)) {
+      fprintf(stderr, "controller failed at t=%g s\n", t);
+      return 1;
+    }
     if (apply_inputs(sc, t))
       return 1;
   }

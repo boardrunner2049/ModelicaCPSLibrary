@@ -1,0 +1,37 @@
+# Harness test vehicle (not a library example): OctoX preset, P0, aggregate mass.
+# Exercises the generic harness on eight rotors and a non-identity actuator map.
+schema_version = 3
+model_name = "HarnessOcto"
+
+[geometry]
+preset = "OctoX"
+actuatorIndex = [2, 1, 4, 3, 6, 5, 8, 7]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 3.0
+inertia = [[0.08, 0.0, 0.0], [0.0, 0.08, 0.0], [0.0, 0.0, 0.14]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 4000.0
+damping = 200.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"

@@ -1,0 +1,31 @@
+# Harness test vehicle (not a library example): CoaxialX8 preset (four arms, an
+# upper and a lower counter-rotating rotor on each), P1 voltage-driven motors.
+schema_version = 3
+model_name = "HarnessCoaxial"
+
+[geometry]
+preset = "CoaxialX8"
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 2.5
+inertia = [[0.04, 0.0, 0.0], [0.0, 0.04, 0.0], [0.0, 0.0, 0.07]]
+
+[motor]
+Kv = 62.5
+tauOmega = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[power]
+dcVoltage = 16.0
+
+[initial]
+p_start = [0.0, 0.0, -0.12]
+
+[models]
+esc = "average_voltage"
+motor = "first_order_voltage_to_speed"
+rotor = "quadratic_blade"

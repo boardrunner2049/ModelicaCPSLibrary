@@ -87,10 +87,13 @@ def model_file(model: str) -> Path:
     raise KeyError(f"unknown library model {model}")
 
 
-def compile_command(source: Path, model: str, *extra: str, binary: Path = RUMOCA) -> list[str]:
-    """Compile `model` declared in `source` with this library and the MSL on the source path."""
+def compile_command(source: Path, model: str, *extra: str, binary: Path = RUMOCA,
+                    library_root: Path = LIBRARY_ROOT) -> list[str]:
+    """Compile `model` declared in `source` with this library and the MSL on the source path.
+    `library_root` replaces this checkout as the ModelicaCPSLibrary source root (for example
+    the staged library copy that fire-compose writes beside an emitted vehicle model)."""
     libs = modelica_libs()
-    roots = [libs / "Modelica", libs / "ModelicaServices", libs / "Complex.mo", LIBRARY_ROOT]
+    roots = [libs / "Modelica", libs / "ModelicaServices", libs / "Complex.mo", library_root]
     command = [str(binary), "compile", str(source), "--model", model]
     for root in roots:
         command += ["--source-root", str(root)]

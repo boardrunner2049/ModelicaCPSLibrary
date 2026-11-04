@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Compile a FIRE model (or a harness wrapper model) into a runnable FMI 3 FMU.
 
-usage: make_fmu.py MODEL OUT.fmu [--wrapper FILE.mo --wrapper-model NAME]
+usage: make_fmu.py MODEL OUT.fmu [--wrapper FILE.mo --wrapper-model NAME] [--library-root DIR]
 
 MODEL is the FIRE class without the ModelicaCPSLibrary. prefix. With
 --wrapper, NAME (declared in FILE.mo) is compiled instead, with the FIRE
-library on the source path.
+library on the source path. --library-root puts DIR on the source path in
+place of this checkout (a fire-compose emitted model compiles against its
+staged sources/ModelicaCPSLibrary copy).
 """
 import argparse, os, subprocess, sys, tempfile
 from pathlib import Path
@@ -20,13 +22,15 @@ def main() -> int:
     parser.add_argument("out", type=Path)
     parser.add_argument("--wrapper", type=Path)
     parser.add_argument("--wrapper-model")
+    parser.add_argument("--library-root", type=Path, default=fire_compile.LIBRARY_ROOT)
     args = parser.parse_args()
     if args.wrapper:
         source, model = args.wrapper.resolve(), args.wrapper_model
     else:
         source, model = fire_compile.model_file(args.model), fire_compile.PREFIX + args.model
     with tempfile.TemporaryDirectory() as tmp:
-        command = fire_compile.compile_command(source, model, "--target", "fmi3")
+        command = fire_compile.compile_command(source, model, "--target", "fmi3",
+                                               library_root=args.library_root.resolve())
         env = dict(os.environ, RAYON_NUM_THREADS="1")
         result = subprocess.run(command, cwd=tmp, env=env, capture_output=True, text=True)
         diagnostics = "\n".join(line for line in result.stderr.splitlines() if "warning[" not in line)

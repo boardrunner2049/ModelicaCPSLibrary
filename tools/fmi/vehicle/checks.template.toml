@@ -1,0 +1,170 @@
+# Generic vehicle checks: a template that tools/vehicle.py fills per vehicle and
+# mission into out/<config>/checks.toml (evaluated by tools/check_trace.py over
+# the truth record in out/<config>/out/trace.csv; the controller never sees it).
+#
+# ${name} placeholders are filled from the vehicle description, the mission and
+# [tolerances]. Tolerances may be numbers or expressions over the vehicle
+# quantities mass [kg], arm [m] (largest rotor distance from the CG),
+# n_rotors and hover_command (mean). After substitution, the fields near, tol,
+# rtol, range, from and to become numbers.
+#
+# Sections:
+#   [[vehicle]]               once per vehicle
+#   [[reach]] [[hold]] [[landed]]
+#                             once per mission phase that lists the check;
+#                             ${t_start} ${t_end} ${t_check} (reach_by_s or the
+#                             end) ${t_settle} (start + settle_s), the target
+#                             ${north} ${east} ${up} [m from home] and
+#                             ${yaw_rad} [rad from the heading at arming]
+#   [[hold_channel]]          per hold phase and used PWM channel ${ch}
+#   [[hold_rotor]]            per hold phase and rotor ${rotor} (${hover_omega})
+#   [[landed_leg]]            per landed phase and landing leg ${leg}
+# Positions are relative to the CG at arming time ${t_arm}. The truth heading
+# is atan2(R_wb[2,1], R_wb[1,1]); R_wb is traced row-major (R_wb[4] = [2,1]).
+
+[tolerances]
+waypoint_m = "0.10 + 0.2*arm"   # horizontal position error at a reach check
+altitude_m = 0.10               # altitude error at a reach check
+hover_m = 0.05                  # altitude error while holding
+hold_m = "0.05 + 0.1*arm"       # horizontal error while holding
+heading_deg = 3.0
+tilt_deg = 30.0                 # never exceeded (the controller commands <= 25)
+hold_tilt_deg = 3.0             # while holding
+command_min = 0.02              # no rotor command saturates while holding
+command_max = 0.95
+hover_speed_rtol = 0.05         # hover rotor speed vs. the allocation of m g
+landed_speed = 0.05             # m/s
+landed_height_m = 0.03          # back at home height
+
+[[vehicle]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every traced value stays finite through the mission"
+
+[[vehicle]]
+expr = "{m.truth.R_wb[9]}"
+at = "all"
+range = ["${cos_tilt}", 1.0]
+why = "tilt (angle between body z and down) stays below ${tilt_deg} deg throughout"
+
+[[vehicle]]
+variable = "m.plant.chassis.mass"
+at = "end"
+near = "${mass}"
+rtol = 1e-9
+why = "vehicle description mass matches the FMU"
+
+[[vehicle]]
+expr = "norm({m.plant.chassis.inertia[1]} - ${I1}, {m.plant.chassis.inertia[5]} - ${I5}, {m.plant.chassis.inertia[9]} - ${I9}, {m.plant.chassis.inertia[2]} - ${I2}, {m.plant.chassis.inertia[3]} - ${I3}, {m.plant.chassis.inertia[6]} - ${I6})"
+at = "end"
+near = 0.0
+tol = 1e-9
+why = "vehicle description inertia about the CG matches the FMU"
+
+[[vehicle]]
+expr = "norm({m.plant.chassis.cg_C[1]} - ${cg_x}, {m.plant.chassis.cg_C[2]} - ${cg_y}, {m.plant.chassis.cg_C[3]} - ${cg_z})"
+at = "end"
+near = 0.0
+tol = 1e-9
+why = "vehicle description CG matches the FMU (rotor positions are taken relative to it)"
+
+[[vehicle]]
+expr = "norm({m.truth.v_w[1]@${t_arm}}, {m.truth.v_w[2]@${t_arm}}, {m.truth.v_w[3]@${t_arm}})"
+at = "end"
+range = [0.0, 0.01]
+why = "the vehicle is at rest (settled on its gear) when it arms at t = ${t_arm} s"
+
+[[reach]]
+expr = "norm({m.truth.p_w[1]} - {m.truth.p_w[1]@${t_arm}} - ${north}, {m.truth.p_w[2]} - {m.truth.p_w[2]@${t_arm}} - ${east})"
+at = "${t_check}"
+range = [0.0, "${waypoint_m}"]
+why = "${phase}: horizontal position ${north} N ${east} E reached by t = ${t_check} s"
+
+[[reach]]
+expr = "{m.truth.p_w[3]@${t_arm}} - {m.truth.p_w[3]} - ${up}"
+at = "${t_check}"
+near = 0.0
+tol = "${altitude_m}"
+why = "${phase}: altitude ${up} m above home reached by t = ${t_check} s"
+
+[[reach]]
+expr = "atan2(sin(atan2({m.truth.R_wb[4]}, {m.truth.R_wb[1]}) - atan2({m.truth.R_wb[4]@${t_arm}}, {m.truth.R_wb[1]@${t_arm}}) - ${yaw_rad}), cos(atan2({m.truth.R_wb[4]}, {m.truth.R_wb[1]}) - atan2({m.truth.R_wb[4]@${t_arm}}, {m.truth.R_wb[1]@${t_arm}}) - ${yaw_rad}))"
+at = "${t_check}"
+near = 0.0
+tol = "${heading_rad}"
+why = "${phase}: heading ${yaw_deg} deg from the initial heading by t = ${t_check} s"
+
+[[hold]]
+expr = "abs({m.truth.p_w[3]@${t_arm}} - {m.truth.p_w[3]} - ${up})"
+at = "max"
+from = "${t_settle}"
+to = "${t_end}"
+range = [0.0, "${hover_m}"]
+why = "${phase}: altitude error while holding ${up} m"
+
+[[hold]]
+expr = "norm({m.truth.p_w[1]} - {m.truth.p_w[1]@${t_arm}} - ${north}, {m.truth.p_w[2]} - {m.truth.p_w[2]@${t_arm}} - ${east})"
+at = "max"
+from = "${t_settle}"
+to = "${t_end}"
+range = [0.0, "${hold_m}"]
+why = "${phase}: horizontal error while holding"
+
+[[hold]]
+expr = "{m.truth.R_wb[9]}"
+at = "min"
+from = "${t_settle}"
+to = "${t_end}"
+range = ["${cos_hold_tilt}", 1.0]
+why = "${phase}: level within ${hold_tilt_deg} deg while holding"
+
+[[hold_channel]]
+variable = "m.commands.normalizedCommand[${ch}]"
+at = "all"
+from = "${t_settle}"
+to = "${t_end}"
+range = ["${command_min}", "${command_max}"]
+why = "${phase}: PWM channel ${ch} not saturated while holding"
+
+[[hold_rotor]]
+variable = "m.rotorSpeed[${rotor}]"
+at = "mean"
+from = "${t_settle}"
+to = "${t_end}"
+near = "${hover_omega}"
+rtol = "${hover_speed_rtol}"
+why = "${phase}: rotor ${rotor} turns at its hover speed sqrt(T/kT) of the m g allocation"
+
+[[landed]]
+expr = "norm({m.truth.v_w[1]}, {m.truth.v_w[2]}, {m.truth.v_w[3]})"
+at = "end"
+range = [0.0, "${landed_speed}"]
+why = "${phase}: at rest after landing"
+
+[[landed]]
+expr = "{m.truth.p_w[3]@${t_arm}} - {m.truth.p_w[3]}"
+at = "end"
+near = 0.0
+tol = "${landed_height_m}"
+why = "${phase}: back on the ground at home height"
+
+[[landed]]
+expr = "norm({m.truth.p_w[1]} - {m.truth.p_w[1]@${t_arm}}, {m.truth.p_w[2]} - {m.truth.p_w[2]@${t_arm}})"
+at = "end"
+range = [0.0, "${waypoint_m}"]
+why = "${phase}: landed back at home"
+
+[[landed]]
+variable = "m.commands.normalizedCommand[[]*]"
+at = "end"
+near = 0.0
+tol = 0.0
+why = "${phase}: disarmed: every channel at zero command"
+
+[[landed_leg]]
+variable = "m.plant.gear.contact[${leg}]"
+at = "end"
+near = 1.0
+tol = 0.0
+why = "${phase}: landing leg ${leg} in ground contact"

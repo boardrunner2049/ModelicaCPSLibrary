@@ -1,0 +1,87 @@
+# Default mission of the generic vehicle harness (tools/vehicle.py turns it
+# into the MISSION table of vehicle_config.h and into the per-phase checks).
+#
+# Positions are [north, east, up] in metres relative to the point where the
+# vehicle arms (home: its CG at rest on the ground); yaw_deg is the heading
+# relative to the heading at arming, clockwise. A phase without target/yaw_deg
+# keeps the previous one's.
+#
+# kind = "idle"  disarmed, every PWM channel at pwm_min
+#        "fly"   armed, fly to target and hold it (the first one arms)
+#        "land"  descend at land_speed, disarm on touchdown
+# checks (see checks.template.toml):
+#   "reach"   at reach_by_s after the phase start (default: its end) the
+#             vehicle is at the target position and heading
+#   "hold"    from settle_s after the phase start to its end it stays at the
+#             target, level, with no rotor command saturated
+#   "landed"  at the end every leg is in contact, the vehicle is at rest at home
+#             height and disarmed
+
+name = "takeoff-square-land"
+step_s = 0.002         # controller period = world communication step
+speed_h = 1.0          # reference limits
+speed_v = 0.6
+accel = 1.0
+yaw_rate_deg = 30.0
+land_speed = 0.4
+tilt_limit_deg = 25.0  # commanded tilt limit
+
+[[phase]]
+name = "ground"
+kind = "idle"
+duration = 1.0
+
+[[phase]]
+name = "takeoff"
+kind = "fly"
+duration = 7.0
+target = [0.0, 0.0, 2.0]
+yaw_deg = 0.0
+checks = ["reach"]
+reach_by_s = 6.0
+
+[[phase]]
+name = "hover"
+kind = "fly"
+duration = 5.0
+checks = ["hold", "reach"]
+settle_s = 1.0
+
+[[phase]]
+name = "north"
+kind = "fly"
+duration = 8.0
+target = [3.0, 0.0, 2.0]
+checks = ["reach"]
+
+[[phase]]
+name = "yaw"
+kind = "fly"
+duration = 6.0
+yaw_deg = 90.0
+checks = ["reach"]
+
+[[phase]]
+name = "back"
+kind = "fly"
+duration = 8.0
+target = [0.0, 0.0, 2.0]
+checks = ["reach"]
+
+[[phase]]
+name = "descend"
+kind = "fly"
+duration = 6.0
+target = [0.0, 0.0, 0.5]
+checks = ["reach"]
+
+[[phase]]
+name = "land"
+kind = "land"
+duration = 6.0
+
+[[phase]]
+name = "disarmed"
+kind = "idle"
+duration = 2.0
+checks = ["landed"]

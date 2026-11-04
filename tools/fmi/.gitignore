@@ -5,3 +5,4 @@ results/
 sweep*/
 harnesses/*/out/
 __pycache__/
+vehicle/out/

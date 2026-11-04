@@ -6,6 +6,12 @@
 #                           (for components that cannot stand alone)
 #   EXPECT_REFUSAL          the model must be refused at export with a message
 #                           containing this text (deliberately invalid models)
+#   LIBRARY_SOURCES         ModelicaCPSLibrary source root to compile against
+#                           instead of this checkout (the staged copy beside a
+#                           fire-compose emitted model, compiled as WRAPPER)
+#   FMU_DEPS                extra prerequisites of out/model.fmu
+#   HARNESS_SOURCES         harness C sources (default harness.c); EXTRA_INCLUDES
+#                           adds -I directories, HARNESS_DEPS extra prerequisites
 #
 # Targets: all (build), run (simulate + checks), view (trace observer), clean.
 #
@@ -24,7 +30,9 @@ FMU := $(OUT)/model.fmu
 HARNESS := $(OUT)/harness
 GENERATED := $(OUT)/.generated
 WORLD_LIB := $(WORLD_ROOT)/build/libworld_model.so
-CFLAGS := -std=c17 -O2 -Wall -Wextra -Wpedantic -I$(WORLD_ROOT)/include -I$(FIRE_FMI)/lib -I$(OUT)
+HARNESS_SOURCES ?= harness.c
+CFLAGS := -std=c17 -O2 -Wall -Wextra -Wpedantic -I$(WORLD_ROOT)/include -I$(FIRE_FMI)/lib -I$(OUT) \
+  $(addprefix -I,$(EXTRA_INCLUDES))
 
 .PHONY: all run view clean
 
@@ -37,9 +45,10 @@ clean:
 else
 all: $(HARNESS)
 
-$(FMU): $(WRAPPER) $(wildcard $(FIRE_FMI)/bin/rumoca)
+$(FMU): $(WRAPPER) $(FMU_DEPS) $(wildcard $(FIRE_FMI)/bin/rumoca)
 	@mkdir -p $(OUT)
-	$(PYTHON) $(FIRE_FMI)/tools/make_fmu.py $(MODEL) $@ $(if $(WRAPPER),--wrapper $(WRAPPER) --wrapper-model $(WRAPPER_MODEL))
+	$(PYTHON) $(FIRE_FMI)/tools/make_fmu.py $(MODEL) $@ $(if $(WRAPPER),--wrapper $(WRAPPER) --wrapper-model $(WRAPPER_MODEL)) \
+	  $(if $(LIBRARY_SOURCES),--library-root $(LIBRARY_SOURCES))
 
 $(GENERATED): world.toml $(FMU)
 	$(PYTHON) $(WORLD_ROOT)/tools/wm_generate.py world.toml
@@ -47,8 +56,8 @@ $(GENERATED): world.toml $(FMU)
 
 $(OUT)/world_bindings.c $(OUT)/world_bindings.h: $(GENERATED)
 
-$(HARNESS): harness.c $(FIRE_FMI)/lib/fire_harness.c $(FIRE_FMI)/lib/fire_harness.h $(GENERATED)
-	$(CC) $(CFLAGS) -o $@ harness.c $(FIRE_FMI)/lib/fire_harness.c $(OUT)/world_bindings.c \
+$(HARNESS): $(HARNESS_SOURCES) $(HARNESS_DEPS) $(FIRE_FMI)/lib/fire_harness.c $(FIRE_FMI)/lib/fire_harness.h $(GENERATED)
+	$(CC) $(CFLAGS) -o $@ $(HARNESS_SOURCES) $(FIRE_FMI)/lib/fire_harness.c $(OUT)/world_bindings.c \
 	  -L$(dir $(WORLD_LIB)) -lworld_model -lm -Wl,-rpath,$(dir $(WORLD_LIB))
 
 run: $(HARNESS)

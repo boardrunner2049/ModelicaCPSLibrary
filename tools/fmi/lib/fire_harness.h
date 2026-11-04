@@ -77,6 +77,13 @@ typedef struct {
   size_t input_count;
   const fh_output_t *outputs;
   size_t output_count;
+  /* Optional closed loop: called at every communication point t (after the
+   * outputs are sampled, before the inputs for [t, t + step) are applied) with
+   * `control_context`. It may read world outputs and write world inputs through
+   * the generated accessors; inputs it writes hold over the step like the
+   * signals above. A nonzero return ends the run as a runtime failure. */
+  int (*control)(double t, void *control_context);
+  void *control_context;
 } fh_scenario_t;
 
 #define FH_COUNT(array) (sizeof(array) / sizeof((array)[0]))
