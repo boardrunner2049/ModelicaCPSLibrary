@@ -1,18 +1,11 @@
 # Acceptance checks over out/trace.csv (see tools/check_trace.py).
-# KNOWN FAILURE (Rumoca 6058a2bb): FMU initialization fails (fmi3ExitInitializationMode) because
-# of the parallelRay instance (ray (1, 0, 0) against the ground plane, n.d = 0); no trace row is
-# written and the harness ends run-failed. Range.Sensor computes
+# The parallelRay instance (ray (1, 0, 0) against the ground plane, n.d = 0) failed FMU
+# initialization with Rumoca before 13724e65: Range.Sensor computes
 #   geometricRange = if parallelRay then 0 else (h - n.p)/denominator
-# with parallelRay an event-generating relation. Rumoca's FMU evaluates that equation during
-# initialization with the relation still at its pre value (false), so it divides by n.d = 0 and the
-# infinite range fails the initialization; a reduced model shows that any guard built from the same
-# relation fails the same way, while noEvent(if abs(n.d) <= tol then ... else .../n.d) initializes
-# (parallelRay = true, range 0). At run time the same frozen-relation window exists whenever an
-# input makes a ray parallel (the update before the event): Systems.Sensing.Range.SampledSensor
-# avoids that case for this reason. A defect of Rumoca (relations should be evaluated directly at
-# initialization) and a fragility of the library (a division guarded only by an event-generating
-# relation); a library fix is a noEvent-guarded safe denominator.
-# The checks below restate the model's asserts as closed forms for when it runs.
+# and the event-generating relation parallelRay was still at its start value (false) during the
+# initialization solve. Rumoca now evaluates relations from their operands at initialization and
+# after input writes. A noEvent-guarded safe denominator would make the library robust either way.
+# The checks below restate the model's asserts as closed forms.
 
 
 [[check]]

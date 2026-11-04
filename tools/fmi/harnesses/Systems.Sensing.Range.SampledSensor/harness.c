@@ -12,12 +12,9 @@
  *   t > 3.83 s       range < 1 m           -> TooClose (3)
  * Default 20 ms epochs from 0, latency 0; a sample on a communication point
  * acquires the inputs held over the 5 ms step before it. signalQuality 0.8.
- * Not exercised: a ray parallel to the plane. Range.Sensor divides by n.d in
- * the branch its event-generating parallelRay relation deselects; while that
- * relation is still frozen (initialization with Rumoca 6058a2bb, or the input
- * update before the event) n.d = 0 gives an infinite range and the FMU fails
- * (a ray switched to (1, 0, 0) at t = 2 s stops the run). Tests.RangePhysics
- * is the harness that covers it (KNOWN FAILURE). */
+ * Not exercised: a ray parallel to the plane (Tests.RangePhysics covers it).
+ * Before Rumoca 13724e65 the parallelRay relation stayed frozen after an input
+ * write, so switching the ray to (1, 0, 0) mid-run divided by n.d = 0. */
 #include "fire_harness.h"
 
 static double down(double t) { return -10.0 + 2.4 * t; }

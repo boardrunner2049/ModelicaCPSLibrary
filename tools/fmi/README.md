@@ -204,11 +204,10 @@ permuted channels), `coaxial.toml` (CoaxialX8, P1) and `quad_p3_hover.toml`
 below). Config file names must be unique across directories (the build
 directories are named after them).
 
-## Status (2026-11-04, Rumoca rumoca-bitcode-v1 465d8763)
+## Status (2026-11-04, Rumoca rumoca-bitcode-v1 708e9f32)
 
-100 harnesses: 99 pass (4 of them are deliberately invalid chassis
-configurations whose export must be refused); `Tests.RangePhysics` is a
-KNOWN FAILURE (below; run_all reports it run-failed).
+All 100 harnesses pass (4 of them are deliberately invalid chassis
+configurations whose export must be refused).
 
 `python3 sweep.py` exports 106 of the library's 129 models. Of the other 23:
 - 13 are components that cannot stand alone (parameters without values,
@@ -241,14 +240,11 @@ Known failures and Rumoca defects found by these harnesses:
   its own "Independent RNG streams collapsed" assertion; and an FMI override
   of a tunable parameter that sets a `sample()` clock did not move the time
   events.
-- `Tests.RangePhysics` fails initialization on its parallel ray:
-  `Range.Sensor` divides by n.d in the branch that the event-generating
-  `parallelRay` relation deselects, and the FMU evaluates it at
-  initialization with the relation at its pre value (false), giving an
-  infinite range. Any guard built from the same relation fails alike; a
-  `noEvent` guard initializes. The same frozen-relation window exists at run
-  time when an input makes a ray parallel, so the library would be robust
-  with a `noEvent`-guarded safe denominator.
+- Fixed in Rumoca 13724e65: `Tests.RangePhysics` failed initialization on
+  its parallel ray. `Range.Sensor` divides by n.d in the branch that the
+  event-generating `parallelRay` relation deselects, and the FMU evaluated it
+  with the relation at its start value (false). A `noEvent`-guarded safe
+  denominator would make the library robust either way.
 - `ElectromechanicalSensor` (and `Tests.ImuElectromechanical`) fail in the
   first step with a 1 ms communication step ("Comb overlap exceeded": the
   1 kHz drive mode diverges inside the FMU's integration of the step); 0.5 ms
