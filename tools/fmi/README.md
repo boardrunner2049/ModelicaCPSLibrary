@@ -204,12 +204,11 @@ permuted channels), `coaxial.toml` (CoaxialX8, P1) and `quad_p3_hover.toml`
 below). Config file names must be unique across directories (the build
 directories are named after them).
 
-## Status (2026-11-04, Rumoca rumoca-bitcode-v1 6058a2bb)
+## Status (2026-11-04, Rumoca rumoca-bitcode-v1 465d8763)
 
-100 harnesses: 98 pass (4 of them are deliberately invalid chassis
-configurations whose export must be refused); 2 are KNOWN FAILURES
-(`Tests.GnssStatistical`, `Tests.RangePhysics`, below; run_all reports them
-run-failed).
+100 harnesses: 99 pass (4 of them are deliberately invalid chassis
+configurations whose export must be refused); `Tests.RangePhysics` is a
+KNOWN FAILURE (below; run_all reports it run-failed).
 
 `python3 sweep.py` exports 106 of the library's 129 models. Of the other 23:
 - 13 are components that cannot stand alone (parameters without values,
@@ -219,8 +218,8 @@ run-failed).
   `Tests.GnssObservables`, `Tests.GnssEphemeris`, `Examples.GnssRange`) hit
   Rumoca gaps in the PVT solver function (`solvePvt`) or an external-function
   call (LAPACK) in a when-clause; no harness.
-- `Tests.ImuDigitalErrors`: a `when sample` body is still checked against
-  synchronous clock ownership (`[ED020]`); no harness.
+- `Tests.ImuDigitalErrors` exports and runs with Rumoca 465d8763 (after this
+  sweep); no harness yet.
 - `Tests.ThreePhaseAveraging` needs runtime events.
 
 Sensor harnesses (sampled GNSS, range and multi-fidelity IMU models): every
@@ -236,15 +235,12 @@ mm/s2 and 0.5 mrad/s; the MEMS physics of ElectromechanicalSensor adds 1.2
 mm/s2 and a -0.07 % gyro scale error).
 
 Known failures and Rumoca defects found by these harnesses:
-- `Tests.GnssStatistical` stops at t = 0.001 s on its own "Independent RNG
-  streams collapsed" assertion (Rumoca's native simulator too). Not a seed or
-  stream problem: the streams draw different normals from t = 0. Rumoca orders
-  the two when-clauses activated by the same `sample()` (GNSS
-  `StatisticalSensor`'s draw and its `SampledDelivery`'s acquisition) wrongly,
-  so every delivered G1 error is the previous epoch's draw, zero at t = 0 for
-  every stream. The exact-law checks of `Systems.Sensing.GNSS.StatisticalSensor`
-  are marked `known` for it. (`Range.SampledSensor` has the same structure
-  and is not affected.)
+- Fixed in Rumoca 465d8763: two when-clauses activated by the same `sample()`
+  (GNSS `StatisticalSensor`'s draw and its `SampledDelivery`'s acquisition)
+  ran in the wrong order, so `Tests.GnssStatistical` stopped at t = 0.001 s on
+  its own "Independent RNG streams collapsed" assertion; and an FMI override
+  of a tunable parameter that sets a `sample()` clock did not move the time
+  events.
 - `Tests.RangePhysics` fails initialization on its parallel ray:
   `Range.Sensor` divides by n.d in the branch that the event-generating
   `parallelRay` relation deselects, and the FMU evaluates it at
@@ -253,13 +249,6 @@ Known failures and Rumoca defects found by these harnesses:
   `noEvent` guard initializes. The same frozen-relation window exists at run
   time when an input makes a ray parallel, so the library would be robust
   with a `noEvent`-guarded safe denominator.
-- An FMI override of a tunable parameter that sets a `sample()` clock
-  (IMU `p.samplePeriod`, `p.adcDecimation`; GNSS/range/`SampledDelivery`
-  `samplePeriod`, `startTime`) reaches the equations (`tickPeriod`, the
-  reported `sampleTime`) but not the time events, which keep the compiled
-  value. The sensor harnesses leave these at their defaults; clocks and
-  latencies other than the defaults are compiled in (`Tests.*`, the
-  fidelity comparison wrapper).
 - `ElectromechanicalSensor` (and `Tests.ImuElectromechanical`) fail in the
   first step with a 1 ms communication step ("Comb overlap exceeded": the
   1 kHz drive mode diverges inside the FMU's integration of the step); 0.5 ms

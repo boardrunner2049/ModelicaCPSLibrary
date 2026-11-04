@@ -1,17 +1,8 @@
 # Acceptance checks over out/trace.csv (see tools/check_trace.py).
-# KNOWN FAILURE (Rumoca 6058a2bb): the run stops in its first step at t = 0.001 s on the model's
-# own assert "Independent RNG streams collapsed" (Rumoca's native simulator too), so only the
-# t = 0 row exists and the harness ends run-failed. Cause, from this FMU's trace: at every epoch
-# the SampledDelivery inside StatisticalSensor stores its acquisition before the sensor's own
-# when-clause on the same sample() has drawn that epoch's normals, so the delivered error is the
-# previous epoch's draw -- zero at the first epoch (t = 0) for every stream. repeatA and
-# independent both deliver 0 at t = 0, and the 0.001 s assert sees two identical streams. The
-# model is consistent Modelica (one sorted equation system per event instant; the IMU sensors,
-# which do everything in one when-clause, and Range.SampledSensor are not affected): a compiler
-# defect in ordering two when-clauses activated by the same sample(). Seeds/streams are not at
-# fault: rngState and normal differ per stream from t = 0 (see the Systems.Sensing.GNSS.
-# StatisticalSensor harness, whose exact-law checks are marked `known` for the same defect).
-# The checks below restate the model's asserts as closed forms for when it runs.
+# Two when-clauses fire on the same sample() here (the GNSS StatisticalSensor's draw and its
+# SampledDelivery's acquisition); with Rumoca before 465d8763 they ran in the wrong order and
+# the model's own "Independent RNG streams collapsed" assert stopped the run at t = 0.001 s.
+# The checks below restate the model's asserts as closed forms.
 
 
 [[check]]

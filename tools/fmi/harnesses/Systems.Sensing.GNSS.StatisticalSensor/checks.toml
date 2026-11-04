@@ -440,7 +440,6 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "North: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
 
 [[check]]
@@ -450,7 +449,6 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "East: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
 
 [[check]]
@@ -460,7 +458,6 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "Down: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
 
 [[check]]
@@ -470,7 +467,6 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "v North: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
 
 [[check]]
@@ -480,7 +476,6 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "v East: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
 
 [[check]]
@@ -490,5 +485,4 @@ from = 0.2
 to = 10.199
 near = 0.0
 tol = 1e-09
-known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
 why = "v Down: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
