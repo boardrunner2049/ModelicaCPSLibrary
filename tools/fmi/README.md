@@ -61,19 +61,15 @@ Inputs are applied as a zero-order hold at each communication point, as a
 co-simulation master does. Array variables are addressed per element
 (`m.R_wb[3]`, 1-based, row-major).
 
-## Status (2026-11-03, Rumoca rumoca-bitcode-v1 b4f5af20)
+## Status (2026-11-03, Rumoca rumoca-bitcode-v1 a4dd197b)
 
-84 harnesses; 68 pass (4 of them are deliberately invalid chassis
-configurations whose export must be refused). Known failures:
+All 84 harnesses pass (4 of them are deliberately invalid chassis
+configurations whose export must be refused).
 
-| harness | cause |
-|---|---|
-| SPI: ByteMaster, ByteSlave, Adapters.VirtualIO.SpiTransfer, Examples.SpiTransfer, Tests.SpiDisruption, Tests.SpiSignals | Rumoca: `pre(x) = x` initial equations of the reworked SPI models are not supported by the FMI C profile yet (harnesses were validated on the previous SPI models) |
-| Bridges.AverageHalfBridge, Bridges.SwitchingHalfBridge | FMU floating-phase voltage is 2-15 mV off the exact value with all devices off |
-| ESC.AverageThreePhase | algebraic projection does not converge at t = 0 |
-| Motors.ThreePhasePM, LockedThreePhase.LockedMotor | Rumoca: residual-equation projection is not in the FMI C profile |
-| Chassis.ChassisAssembly, Tests.ChassisMassProperties, Tests.ContactWrenchCG, Tests.MultirotorPayload, Tests.MultirotorFrames | Rumoca computes combined products of inertia about the origin instead of the combined CG; the models' own asserts then fire |
-
-Models without a harness either do not export yet (clocks, residual
-equations, delay/terminal events, `periodStart = time`) or were added after
-the harnesses were written (the GNSS and multi-fidelity IMU sensors).
+`python3 sweep.py` exports 79 of the library's 129 models. Of the rest:
+- 12 are components that cannot stand alone; their harnesses go through a `Wrapper.mo`.
+- 4 are the invalid chassis configurations above.
+- The others need features the FMI C profile does not have yet (clocks,
+  delay and terminal events, `periodStart = time` in PWM, residual rows at
+  initialization) or have no harness yet: the GNSS and multi-fidelity IMU
+  sensor models added after the harnesses were written.
