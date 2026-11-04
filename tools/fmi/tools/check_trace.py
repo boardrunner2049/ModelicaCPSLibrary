@@ -14,7 +14,8 @@ Series (one of):
                               sample at or before it), so differences between
                               times need no absolute value: "{m.v@2} - {m.v@1}".
                               Available: abs sqrt exp log sin cos tan atan2 hypot
-                              min max pi, and norm(a, b, ...) = Euclidean norm.
+                              round floor min max pi, norm(a, b, ...) = Euclidean
+                              norm, and t (the row's time in s).
 
 Where (`at`): "end" (default), "all", "max", "min", "mean", or a time in s.
 `from` / `to` (seconds) restrict all/max/min/mean to a window. The trace row at
@@ -24,6 +25,11 @@ held from t takes effect in the row at t + step.
 Condition: `finite = true`, `range = [lo, hi]`, or `near = value` with `tol`
 (absolute) or `rtol` (relative). Exit status 0 when every check passes.
 Boolean trace cells read as 1 (true) and 0 (false).
+
+`known = "reason"` marks a check that states the model's contract but fails
+because of a known defect (named in the reason, with where it is tracked): a
+failure prints KNOWN and does not fail the harness; a pass prints FIXED, so the
+marker can be removed.
 """
 import csv, fnmatch, math, re, sys, tomllib
 from pathlib import Path
@@ -32,13 +38,25 @@ CELL = {"true": 1.0, "false": 0.0, "": math.nan, "nan": math.nan}
 PLACEHOLDER = re.compile(r"\{([^{}@]+)(?:@([^{}]+))?\}")
 FUNCTIONS = {name: getattr(math, name) for name in
              ("sqrt", "exp", "log", "sin", "cos", "tan", "atan2", "hypot")}
-FUNCTIONS.update(abs=abs, min=min, max=max, pi=math.pi, norm=lambda *xs: math.sqrt(sum(x * x for x in xs)))
+FUNCTIONS.update(abs=abs, min=min, max=max, round=round, floor=math.floor, pi=math.pi, norm=lambda *xs: math.sqrt(sum(x * x for x in xs)))
+
+
+def join_subscripts(cells: list[str]) -> list[str]:
+    """Header names as written: world does not quote them, so a scalarized
+    multi-index element such as m.x.history[1,2] arrives split at its comma."""
+    names: list[str] = []
+    for cell in cells:
+        if names and names[-1].count("[") > names[-1].count("]"):
+            names[-1] += "," + cell
+        else:
+            names.append(cell)
+    return names
 
 
 def load(trace: Path):
     with trace.open() as source:
         rows = list(csv.reader(source))
-    header, data = rows[0], rows[1:]
+    header, data = join_subscripts(rows[0]), rows[1:]
     times = [int(r[0]) * 1e-9 for r in data]
     columns = {name: [CELL[r[i]] if r[i] in CELL else float(r[i]) for r in data]
                for i, name in enumerate(header) if i}
@@ -71,7 +89,7 @@ def expression_series(text: str, times, columns):
     for row in range(len(times)):
         operands = [columns[c][row if at is None else at] for c, at in names]
         try:
-            values.append(float(eval(code, {"__builtins__": {}}, {**FUNCTIONS, "_v": operands})))
+            values.append(float(eval(code, {"__builtins__": {}}, {**FUNCTIONS, "_v": operands, "t": times[row]})))
         except (ArithmeticError, ValueError):
             values.append(math.nan)
     return values
@@ -134,18 +152,26 @@ def main() -> int:
         sys.exit(__doc__)
     checks = tomllib.loads(Path(sys.argv[1]).read_text()).get("check", [])
     times, columns = load(Path(sys.argv[2]))
-    failed = 0
+    failed = known = 0
     for check in checks:
         failures = evaluate(check, times, columns)
         subject = check.get("expr", check.get("variable"))
         label = f"{subject} @ {check.get('at', 'end')}: {check.get('why', '')}".rstrip(": ")
-        print(("FAIL " if failures else "pass ") + label)
+        if "known" in check:
+            print(("KNOWN " if failures else "FIXED ") + label)
+            print(("     known defect: " if failures else "     no longer fails; drop `known`: ") + check["known"])
+        else:
+            print(("FAIL " if failures else "pass ") + label)
         for failure in failures[:5]:
             print("     " + failure)
         if len(failures) > 5:
             print(f"     ... {len(failures) - 5} more")
-        failed += bool(failures)
-    print(f"checks: {len(checks) - failed}/{len(checks)} passed")
+        if "known" in check:
+            known += bool(failures)
+        else:
+            failed += bool(failures)
+    note = f" ({known} known failure{'s' * (known != 1)})" if known else ""
+    print(f"checks: {len(checks) - failed - known}/{len(checks)} passed{note}")
     return 1 if failed else 0
 
 

@@ -55,7 +55,7 @@ def write_log(results: Path, name: str, log: str) -> list[str]:
     logs = results / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     (logs / f"{name}.log").write_text(log)
-    return [line for line in log.splitlines() if line.startswith(("FAIL", "checks:", "== ", "pass"))]
+    return [line for line in log.splitlines() if line.startswith(("FAIL", "KNOWN", "FIXED", "checks:", "== ", "pass"))]
 
 
 def one(directory: Path) -> dict:
