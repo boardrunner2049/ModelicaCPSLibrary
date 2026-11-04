@@ -1,0 +1,477 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.IMU.StatisticalSensor, motion of lib/imu_motion.h (level 1 s, then roll 0.5 rad/s).
+# Delivered sample k (latency 0, 1 ms period) is acquired at sampleTime = (k-1)*1 ms:
+#   y_j = (1 + scale_j)*truth_j(sampleTime) + bias_j + biasState_j + noiseStd_j*n_j
+# truth = (0, -g sin(phi), -g cos(phi), W, 0, 0) with phi = 0.5*max(0, sampleTime - 1), W = 0.5 rad/s
+# while rolling. The residual r_j = y_j - (1 + scale_j)*truth_j - bias_j - biasState_j is the white
+# noise: its mean over ~1000 samples is within 5 sigma/sqrt(N) of 0 and its mean square within
+# 15 % (about 3 standard errors) of noiseStd^2; |r| stays below 5 noiseStd. biasState (tau = 1000 s)
+# stays within 4 biasStd and barely moves over 3 s. The first row (t = 0) is the initialized state:
+# the t = 0 sample acquires the inputs' start values (R_wb = 0), so value checks start at 10 ms.
+# Inputs are a zero-order hold over 0.4 ms communication steps, and a sample on a communication
+# point acquires the inputs held over the step before it (the left limit), so the roll-rate step at
+# t = 1 first shows in the 1.001 s sample: windows exclude that epoch. Attitude lag <= 0.4 ms
+# (0.2 mrad, 2 mm/s2), well inside the noise.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.001*({m.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "sample epochs on the 1 ms grid: sampleTime = (sequence - 1) * samplePeriod, no drift over 3000 samples"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "latency 0: delivered at the acquisition epoch"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+range = [-1e-09, 0.001]
+why = "outputs are fresh: the delivered sample is less than one period old at every communication point"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "every sample is valid (no latency to fill)"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 3001.0
+tol = 0.0
+why = "3001 samples in 3 s (t = 0 included): one per period"
+
+[[check]]
+variable = "m.sequence"
+at = 1.5
+near = 1501.0
+tol = 0.0
+why = "1501 samples by t = 1.5 s"
+
+[[check]]
+expr = "{m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.008333
+why = "accel x, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel x, stationary: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.008333
+why = "accel x, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel x, rolling: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.25, 0.25]
+why = "accel x, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.acceleration[1]} - (0 + 0.1) - {m.biasState[1]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.25, 0.25]
+why = "accel x, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[1]"
+at = "all"
+range = [-0.08, 0.08]
+why = "accel x: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[1]@3} - {m.biasState[1]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.008
+why = "accel x: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "{m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.008333
+why = "accel y, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel y, stationary: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.008333
+why = "accel y, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel y, rolling: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.25, 0.25]
+why = "accel y, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.sampleTime} - 1)) - 0.05) - {m.biasState[2]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.25, 0.25]
+why = "accel y, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[2]"
+at = "all"
+range = [-0.08, 0.08]
+why = "accel y: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[2]@3} - {m.biasState[2]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.008
+why = "accel y: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "{m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.008333
+why = "accel z, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel z, stationary: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.008333
+why = "accel z, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0025000000000000005
+rtol = 0.15
+why = "accel z, rolling: residual mean square = noiseStd^2 = 0.0025"
+
+[[check]]
+expr = "{m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.25, 0.25]
+why = "accel z, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.acceleration[3]} - (1.005*-9.80665*cos(0.5*max(0, {m.sampleTime} - 1)) + 0.2) - {m.biasState[3]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.25, 0.25]
+why = "accel z, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[3]"
+at = "all"
+range = [-0.08, 0.08]
+why = "accel z: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[3]@3} - {m.biasState[3]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.008
+why = "accel z: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "{m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.0005
+why = "gyro x, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 9e-06
+rtol = 0.15
+why = "gyro x, stationary: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.0005
+why = "gyro x, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 9e-06
+rtol = 0.15
+why = "gyro x, rolling: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.015, 0.015]
+why = "gyro x, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.gyro[1]} - (1.01*0.5*({m.sampleTime} >= 1) + 0.01) - {m.biasState[4]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.015, 0.015]
+why = "gyro x, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[4]"
+at = "all"
+range = [-0.004, 0.004]
+why = "gyro x: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[4]@3} - {m.biasState[4]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.0004
+why = "gyro x: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "{m.gyro[2]} - (0 - 0.02) - {m.biasState[5]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.0005
+why = "gyro y, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[2]} - (0 - 0.02) - {m.biasState[5]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 9e-06
+rtol = 0.15
+why = "gyro y, stationary: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[2]} - (0 - 0.02) - {m.biasState[5]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.0005
+why = "gyro y, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[2]} - (0 - 0.02) - {m.biasState[5]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 9e-06
+rtol = 0.15
+why = "gyro y, rolling: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[2]} - (0 - 0.02) - {m.biasState[5]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.015, 0.015]
+why = "gyro y, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.gyro[2]} - (0 - 0.02) - {m.biasState[5]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.015, 0.015]
+why = "gyro y, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[5]"
+at = "all"
+range = [-0.004, 0.004]
+why = "gyro y: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[5]@3} - {m.biasState[5]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.0004
+why = "gyro y: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "{m.gyro[3]} - (0 + 0.005) - {m.biasState[6]}"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 0.0
+tol = 0.0005
+why = "gyro z, stationary: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[3]} - (0 + 0.005) - {m.biasState[6]})**2"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 9e-06
+rtol = 0.15
+why = "gyro z, stationary: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[3]} - (0 + 0.005) - {m.biasState[6]}"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.0
+tol = 0.0005
+why = "gyro z, rolling: residual mean ~ 0 (noise is zero-mean)"
+
+[[check]]
+expr = "({m.gyro[3]} - (0 + 0.005) - {m.biasState[6]})**2"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 9e-06
+rtol = 0.15
+why = "gyro z, rolling: residual mean square = noiseStd^2 = 9e-06"
+
+[[check]]
+expr = "{m.gyro[3]} - (0 + 0.005) - {m.biasState[6]}"
+at = "all"
+from = 0.01
+to = 0.99
+range = [-0.015, 0.015]
+why = "gyro z, stationary: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+expr = "{m.gyro[3]} - (0 + 0.005) - {m.biasState[6]}"
+at = "all"
+from = 1.01
+to = 3.0
+range = [-0.015, 0.015]
+why = "gyro z, rolling: |residual| < 5 noiseStd at every sample"
+
+[[check]]
+variable = "m.biasState[6]"
+at = "all"
+range = [-0.004, 0.004]
+why = "gyro z: Gauss-Markov bias within 4 biasStd"
+
+[[check]]
+expr = "{m.biasState[6]@3} - {m.biasState[6]@0.01}"
+at = "end"
+near = 0.0
+tol = 0.0004
+why = "gyro z: tau = 1000 s bias drifts < 0.4 biasStd in 3 s"
+
+[[check]]
+expr = "norm({m.acceleration[1]}, {m.acceleration[2]}, {m.acceleration[3]})"
+at = "mean"
+from = 0.01
+to = 0.99
+near = 9.855683249999998
+tol = 0.3
+why = "stationary accelerometer reads gravity: |a| = 1.005 g within bias + noise"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "mean"
+from = 1.01
+to = 3.0
+near = 0.515
+tol = 0.01
+why = "rolling: gyro x reads the applied 0.5 rad/s (with its +1 % scale and bias) within 0.01 rad/s"
+
+[[check]]
+expr = "atan2(-({m.acceleration[2]} + 0.05), -({m.acceleration[3]} - 0.2)/1.005) - 0.5*max(0, {m.sampleTime} - 1)"
+at = "all"
+from = 1.01
+range = [-0.03, 0.03]
+why = "rolling: the sensed gravity direction turns with the roll angle: -atan2(a_y, -a_z) tracks phi(sampleTime) within 0.02 rad"

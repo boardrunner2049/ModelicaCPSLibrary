@@ -1,0 +1,135 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# KNOWN FAILURE (Rumoca 6058a2bb): the run stops in its first step at t = 0.001 s on the model's
+# own assert "Independent RNG streams collapsed" (Rumoca's native simulator too), so only the
+# t = 0 row exists and the harness ends run-failed. Cause, from this FMU's trace: at every epoch
+# the SampledDelivery inside StatisticalSensor stores its acquisition before the sensor's own
+# when-clause on the same sample() has drawn that epoch's normals, so the delivered error is the
+# previous epoch's draw -- zero at the first epoch (t = 0) for every stream. repeatA and
+# independent both deliver 0 at t = 0, and the 0.001 s assert sees two identical streams. The
+# model is consistent Modelica (one sorted equation system per event instant; the IMU sensors,
+# which do everything in one when-clause, and Range.SampledSensor are not affected): a compiler
+# defect in ordering two when-clauses activated by the same sample(). Seeds/streams are not at
+# fault: rngState and normal differ per stream from t = 0 (see the Systems.Sensing.GNSS.
+# StatisticalSensor harness, whose exact-law checks are marked `known` for the same defect).
+# The checks below restate the model's asserts as closed forms for when it runs.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.sequence}"
+at = 0.15
+near = 0.0
+tol = 0.0
+why = "G1 queue starts empty (latency 2): not valid, sequence 0 at 0.15 s"
+
+[[check]]
+expr = "abs({m.ideal.position[1]} - 1.15) + abs({m.ideal.position[2]} - 2.3) + abs({m.ideal.position[3]} - 3.45)"
+at = 0.15
+near = 0.0
+tol = 1e-08
+why = "G0 stays continuous: position (t, 2t, 3t) + (1, 2, 3) at 0.15 s"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.sequence} + abs({m.delayed.sampleTime})"
+at = 0.25
+near = 2.0
+tol = 1e-12
+why = "first G1 epoch delivered at 0.2 s: valid, sequence 1, acquired at 0"
+
+[[check]]
+expr = "abs({m.delayed.position[1]} - 1) + abs({m.delayed.position[2]} - 2) + abs({m.delayed.position[3]} - 3)"
+at = 0.25
+near = 0.0
+tol = 1e-12
+why = "PVT shares the acquisition time: position (0, 0, 0) + bias"
+
+[[check]]
+expr = "abs({m.delayed.velocity[1]} - 1.1) + abs({m.delayed.velocity[2]} - 2.2) + abs({m.delayed.velocity[3]} - 3.3)"
+at = 0.25
+near = 0.0
+tol = 1e-12
+why = "PVT shares the acquisition time: velocity (1, 2, 3) + bias"
+
+[[check]]
+variable = "m.delayed.deliveryTime"
+at = 0.25
+near = 0.2
+tol = 1e-12
+why = "latency does not change the acquisition time: delivered at 0.2 s"
+
+[[check]]
+expr = "abs({m.suite.gnss.position[1]}) + abs({m.suite.gnss.position[2]} - 1) + abs({m.suite.gnss.position[3]} + 10)"
+at = 0.25
+near = 0.0
+tol = 1e-12
+why = "antenna lever arm r = (1, 0, 0) yawed 90 deg: position (0, 1, -10)"
+
+[[check]]
+expr = "abs({m.suite.gnss.velocity[1]} + 1) + abs({m.suite.gnss.velocity[2]} - 2) + abs({m.suite.gnss.velocity[3]} - 3)"
+at = 0.25
+near = 0.0
+tol = 1e-12
+why = "lever arm velocity v + R (omega x r) = (1, 2, 3) + R (0, 2, 0) = (1, 2, 3) + (-2, 0, 0) = (-1, 2, 3)"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.fixType} + abs({m.delayed.sequence} - 3)"
+at = 0.45
+near = 0.0
+tol = 0.0
+why = "fix loss is delayed with the PVT: invalid, fixType 0, sequence 3 at 0.45 s"
+
+[[check]]
+expr = "abs({m.delayed.position[1]}) + abs({m.delayed.position[2]}) + abs({m.delayed.position[3]})"
+at = 0.45
+near = 0.0
+tol = 1e-12
+why = "invalid PVT payload is zero, not a stale fix"
+
+[[check]]
+expr = "{m.delayed.valid} + abs({m.delayed.sequence} - 5) + abs({m.delayed.sampleTime} - 0.4)"
+at = 0.65
+near = 1.0
+tol = 1e-12
+why = "fix reacquired: valid, sequence 5, acquired at 0.4 s (at 0.65 s)"
+
+[[check]]
+expr = "abs({m.repeatA.position[1]} - {m.repeatB.position[1]}) + abs({m.repeatA.velocity[1]} - {m.repeatB.velocity[1]})"
+at = "all"
+near = 0.0
+tol = 1e-14
+why = "seed replay is exact: repeatA == repeatB"
+
+[[check]]
+expr = "abs({m.repeatA.position[1]} - {m.independent.position[1]})"
+at = "mean"
+from = 0.001
+range = [0.3, 3.0]
+why = "independent stream differs from repeatA (mean |North difference| over the run)"
+
+[[check]]
+variable = "m.repeatA.covariance[2]"
+at = "all"
+from = 0.001
+near = 0.5
+tol = 1e-12
+why = "full PVT covariance keeps its correlation: C[1,2] = 0.5"
+
+[[check]]
+variable = "m.repeatA.covariance[4]"
+at = "all"
+from = 0.001
+near = 0.2
+tol = 1e-12
+why = "full PVT covariance keeps its correlation: C[1,4] = 0.2"
+
+[[check]]
+variable = "m.repeatA.sequence"
+at = "end"
+near = 2001.0
+tol = 0.0
+why = "4 s run: 2001 epochs of the 2 ms streams"

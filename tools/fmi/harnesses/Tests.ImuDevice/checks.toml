@@ -1,0 +1,153 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Tests.ImuDevice: DeviceSensor analog response, temperature, ADC and IIR, 4 ms output clock that
+# decimates 1 ms ADC ticks. Closed forms (the model's asserts plus the response over the whole run):
+#   analog: a_w steps 0 -> 10 at 10 ms through tau = 10 ms: the sample acquired at s reads
+#     10 (1 - exp(-(s - 0.01)/0.01)) (6.3212 at s = 20 ms);
+#   digital: the same through a 2 ms IIR at the 1 ms ADC rate: 5.622437 at s = 20 ms;
+#   adc: (12.34, -0.37) with fullScale 10, LSB 0.25 -> (10, -0.25) (clipping, nearest code);
+#   thermal: 1 m/s2/K at 5 K above reference -> 5.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.analog.sampleTime} - 0.004*({m.analog.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "analog: output clock 4 ms: sampleTime = (sequence - 1) * 4 ms (decimating 1 ms ADC ticks)"
+
+[[check]]
+variable = "m.analog.sequence"
+at = "end"
+near = 13.0
+tol = 0.0
+why = "analog: 13 output samples in 50 ms (t = 0 included)"
+
+[[check]]
+expr = "{m.digital.sampleTime} - 0.004*({m.digital.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "digital: output clock 4 ms: sampleTime = (sequence - 1) * 4 ms (decimating 1 ms ADC ticks)"
+
+[[check]]
+variable = "m.digital.sequence"
+at = "end"
+near = 13.0
+tol = 0.0
+why = "digital: 13 output samples in 50 ms (t = 0 included)"
+
+[[check]]
+expr = "{m.adc.sampleTime} - 0.004*({m.adc.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "adc: output clock 4 ms: sampleTime = (sequence - 1) * 4 ms (decimating 1 ms ADC ticks)"
+
+[[check]]
+variable = "m.adc.sequence"
+at = "end"
+near = 13.0
+tol = 0.0
+why = "adc: 13 output samples in 50 ms (t = 0 included)"
+
+[[check]]
+expr = "{m.thermal.sampleTime} - 0.004*({m.thermal.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "thermal: output clock 4 ms: sampleTime = (sequence - 1) * 4 ms (decimating 1 ms ADC ticks)"
+
+[[check]]
+variable = "m.thermal.sequence"
+at = "end"
+near = 13.0
+tol = 0.0
+why = "thermal: 13 output samples in 50 ms (t = 0 included)"
+
+[[check]]
+variable = "m.analog.sampleTime"
+at = 0.0201
+near = 0.02
+tol = 1e-10
+why = "output clock decimates: sampleTime 20 ms at t = 20.1 ms"
+
+[[check]]
+variable = "m.analog.sampleTime"
+at = 0.023
+near = 0.02
+tol = 1e-10
+why = "sampled output holds between output ticks: still the 20 ms sample at 23 ms"
+
+[[check]]
+variable = "m.analog.acceleration[1]"
+at = 0.0201
+near = 6.321205588285577
+tol = 1e-05
+why = "analog bandwidth: 10 (1 - e^-1) at 20 ms"
+
+[[check]]
+expr = "{m.analog.acceleration[1]} - 10*(1 - exp(-({m.analog.sampleTime} - 0.01)/0.01))"
+at = "all"
+from = 0.012
+near = 0.0
+tol = 1e-05
+why = "analog bandwidth at every sample after the step: 10 (1 - exp(-(sampleTime - 0.01)/0.01))"
+
+[[check]]
+variable = "m.analog.acceleration[1]"
+at = "all"
+to = 0.0119
+near = 0.0
+tol = 1e-12
+why = "analog: zero before the step"
+
+[[check]]
+variable = "m.digital.acceleration[1]"
+at = 0.0201
+near = 5.622437161
+tol = 1e-05
+why = "digital IIR runs at the ADC rate before decimation (closed form at 20 ms)"
+
+[[check]]
+expr = "{m.analog.acceleration[1]} - {m.digital.acceleration[1]}"
+at = "all"
+from = 0.012
+range = [0.0, 2.0]
+why = "digital IIR lags the analog response (extra 2 ms filter)"
+
+[[check]]
+variable = "m.adc.acceleration[1]"
+at = "all"
+from = 0.0001
+near = 10.0
+tol = 1e-12
+why = "ADC saturation at fullScale 10"
+
+[[check]]
+variable = "m.adc.acceleration[2]"
+at = "all"
+from = 0.0001
+near = -0.25
+tol = 1e-12
+why = "ADC nearest-code rounding: -0.37 -> -0.25 (LSB 0.25)"
+
+[[check]]
+variable = "m.thermal.acceleration[1]"
+at = "all"
+from = 0.0001
+near = 5.0
+tol = 1e-09
+why = "device temperature coefficient applied: 1 m/s2/K * 5 K"
+
+[[check]]
+variable = "m.*.biasState*"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no errors configured: the Gauss-Markov states stay zero"

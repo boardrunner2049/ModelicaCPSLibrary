@@ -1,0 +1,381 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Tests.ImuStatistical: StatisticalSensor epochs, delivery queue, calibration and RNG streams.
+# The model's own asserts (restated here as closed forms, so a silent pass of a when-clause assert
+# cannot hide a wrong value) plus the queue law at every row and the noise statistics:
+#   delayed: 10 ms period, latency 2, a_w = (t, 0, 0), accelBias 0.1 -> sample k acquired at
+#     (k-1)*10 ms, delivered at (k+1)*10 ms, value sampleTime + 0.1;
+#   calibrated: a = (1, 2, 3), omega = (4, 5, 6), scale_x 0.1, M[1,2] 0.2, G = I, bias_x 0.3 ->
+#     acceleration (1.1 + 0.4 + 0.3, 2, 3) = (1.8, 2, 3), gyro omega + G a = (5, 7, 9);
+#   repeatA/repeatB: same seed and stream -> identical; independent: other stream -> different;
+#     per-sample noise 0.2 and a 20 ms Gauss-Markov bias of std 0.1 on a zero truth.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.sequence} + abs({m.delayed.sampleTime} + 1)"
+at = "all"
+to = 0.0199
+near = 0.0
+tol = 1e-12
+why = "delayed: nothing delivered before the queue fills (t < 20 ms): invalid, sequence 0, sampleTime -1"
+
+[[check]]
+expr = "{m.delayed.sequence} + 10*{m.delayed.valid} + abs({m.delayed.sampleTime})"
+at = 0.025
+near = 11.0
+tol = 1e-12
+why = "delayed: first delivery at 20 ms is sample 1, acquired at 0"
+
+[[check]]
+variable = "m.delayed.acceleration[1]"
+at = 0.025
+near = 0.1
+tol = 1e-10
+why = "delayed: delivery queue retains the acquisition value (a_w(0) + bias = 0.1)"
+
+[[check]]
+expr = "abs({m.delayed.sampleTime} - 0.01) + abs({m.delayed.deliveryTime} - 0.03)"
+at = 0.036
+near = 0.0
+tol = 1e-12
+why = "delayed: acquisition and delivery epochs stay distinct (0.01 vs 0.03 at t = 0.036)"
+
+[[check]]
+variable = "m.delayed.acceleration[1]"
+at = 0.036
+near = 0.11
+tol = 1e-10
+why = "delayed: the output holds between deliveries (0.11 at t = 0.036)"
+
+[[check]]
+expr = "{m.delayed.sampleTime} - 0.01*({m.delayed.sequence} - 1)"
+at = "all"
+from = 0.02
+near = 0.0
+tol = 1e-12
+why = "delayed: sampleTime = (sequence - 1) * 10 ms at every row"
+
+[[check]]
+expr = "{m.delayed.deliveryTime} - {m.delayed.sampleTime}"
+at = "all"
+from = 0.02
+near = 0.02
+tol = 1e-12
+why = "delayed: latency 2 -> delivered 20 ms after acquisition"
+
+[[check]]
+expr = "{m.delayed.acceleration[1]} - {m.delayed.sampleTime} - 0.1"
+at = "all"
+from = 0.02
+near = 0.0
+tol = 1e-10
+why = "delayed: delivered value is the truth at its acquisition epoch (a_w = time), not at delivery"
+
+[[check]]
+variable = "m.delayed.sequence"
+at = "end"
+near = 99.0
+tol = 0.0
+why = "delayed: 99 samples delivered by 1 s (101 acquired, 2 in the queue)"
+
+[[check]]
+variable = "m.calibrated.acceleration[1]"
+at = "all"
+near = 1.8
+tol = 1e-12
+why = "calibrated: scale + cross-axis + bias: acceleration x = 1.8"
+
+[[check]]
+expr = "abs({m.calibrated.acceleration[2]} - 2) + abs({m.calibrated.acceleration[3]} - 3)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "calibrated: acceleration y, z unaffected (2, 3)"
+
+[[check]]
+expr = "abs({m.calibrated.gyro[1]} - 5) + abs({m.calibrated.gyro[2]} - 7) + abs({m.calibrated.gyro[3]} - 9)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "calibrated: gyro g-sensitivity G = I: gyro = omega + a = (5, 7, 9)"
+
+[[check]]
+expr = "{m.repeatA.acceleration[1]} - {m.repeatB.acceleration[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on acceleration[1]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "{m.repeatA.acceleration[2]} - {m.repeatB.acceleration[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on acceleration[2]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "{m.repeatA.acceleration[3]} - {m.repeatB.acceleration[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on acceleration[3]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "{m.repeatA.gyro[1]} - {m.repeatB.gyro[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on gyro[1]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "{m.repeatA.gyro[2]} - {m.repeatB.gyro[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on gyro[2]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "{m.repeatA.gyro[3]} - {m.repeatB.gyro[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "repeatA == repeatB on gyro[3]: identical seed and stream replay exactly"
+
+[[check]]
+expr = "abs({m.independent.acceleration[1]} - {m.repeatA.acceleration[1]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on acceleration[1] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "abs({m.independent.acceleration[2]} - {m.repeatA.acceleration[2]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on acceleration[2] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "abs({m.independent.acceleration[3]} - {m.repeatA.acceleration[3]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on acceleration[3] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "abs({m.independent.gyro[1]} - {m.repeatA.gyro[1]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on gyro[1] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "abs({m.independent.gyro[2]} - {m.repeatA.gyro[2]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on gyro[2] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "abs({m.independent.gyro[3]} - {m.repeatA.gyro[3]})"
+at = "mean"
+from = 0.001
+range = [0.15, 0.6]
+why = "independent stream differs from repeatA on gyro[3] (mean |difference| ~ 0.25: two independent 0.22-std signals)"
+
+[[check]]
+expr = "({m.repeatA.acceleration[1]} - {m.repeatA.biasState[1]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA acceleration[1]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[1]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA acceleration[1]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.repeatA.acceleration[2]} - {m.repeatA.biasState[2]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA acceleration[2]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[2]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA acceleration[2]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.repeatA.acceleration[3]} - {m.repeatA.biasState[3]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA acceleration[3]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[3]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA acceleration[3]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.repeatA.gyro[1]} - {m.repeatA.biasState[4]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA gyro[1]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[4]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA gyro[1]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.repeatA.gyro[2]} - {m.repeatA.biasState[5]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA gyro[2]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[5]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA gyro[2]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.repeatA.gyro[3]} - {m.repeatA.biasState[6]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "repeatA gyro[3]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.repeatA.biasState[6]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "repeatA gyro[3]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.acceleration[1]} - {m.independent.biasState[1]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent acceleration[1]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[1]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent acceleration[1]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.acceleration[2]} - {m.independent.biasState[2]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent acceleration[2]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[2]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent acceleration[2]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.acceleration[3]} - {m.independent.biasState[3]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent acceleration[3]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[3]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent acceleration[3]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.gyro[1]} - {m.independent.biasState[4]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent gyro[1]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[4]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent gyro[1]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.gyro[2]} - {m.independent.biasState[5]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent gyro[2]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[5]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent gyro[2]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"
+
+[[check]]
+expr = "({m.independent.gyro[3]} - {m.independent.biasState[6]})**2"
+at = "mean"
+from = 0.001
+near = 0.04
+rtol = 0.15
+why = "independent gyro[3]: white noise (reading - biasState) has mean square noiseStd^2 = 0.04"
+
+[[check]]
+expr = "{m.independent.biasState[6]}**2"
+at = "mean"
+from = 0.001
+near = 0.01
+rtol = 0.6
+why = "independent gyro[3]: Gauss-Markov bias (tau 20 ms) has mean square biasStd^2 = 0.01 (about 25 correlation times)"

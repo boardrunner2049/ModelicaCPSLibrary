@@ -1,0 +1,722 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# The Systems.Sensing.IMU fidelity ladder under one motion (lib/imu_motion.h: level 1 s, then
+# 0.5 rad/s roll), 2 ms output period, latency 1 sample (Wrapper.mo). stat, device, errors, em and
+# acoustic share noiseStd (0.02 m/s2, 0.002 rad/s per sample/tick), a slow Gauss-Markov bias and
+# the RNG stream, so they carry identical noise and bias; digital has none.
+# Error budgets (documented by the models' structure, measured values with Rumoca 6058a2bb):
+#   errors == device == acoustic exactly (ErrorSensor = DeviceSensor + equivalentError (0);
+#     AcousticSensor = DeviceSensor + acoustic modes (pressure 0)).
+#   device - stat: the device readout only, ADC LSB/2 (0.005 m/s2, 0.0005 rad/s) plus the 0.5 ms
+#     analog lag while rolling (g W 0.5 ms = 2.5 mm/s2); measured max 6.8 mm/s2, 0.5 mrad/s.
+#   em - stat: the MEMS physics only: accelerometer 3e-3 m/s2 (measured 1.2e-3), gyro 0.2 % of
+#     rate (measured -0.07 %: 0.35 mrad/s at 0.5 rad/s) once the 3 ms demodulation filter settled.
+#   digital vs truth: deterministic, LSB/2 + 0.7 ms lag curvature (measured 5.3 mm/s2); gyro exact.
+#   stat vs truth: residual minus biasState is white noise of the configured std.
+# Windows: stationary [0.02, 0.998] s, rolling [1.05, 3] s (after the rate step at t = 1).
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.stat.sampleTime} - 0.002*({m.stat.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "stat: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.stat.deliveryTime} - {m.stat.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "stat: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.stat.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "stat: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.stat.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "stat: valid from the first delivery on"
+
+[[check]]
+variable = "m.stat.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "stat: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.digital.sampleTime} - 0.002*({m.digital.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "digital: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.digital.deliveryTime} - {m.digital.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "digital: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.digital.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "digital: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.digital.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "digital: valid from the first delivery on"
+
+[[check]]
+variable = "m.digital.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "digital: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.device.sampleTime} - 0.002*({m.device.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "device: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.device.deliveryTime} - {m.device.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "device: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.device.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "device: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.device.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "device: valid from the first delivery on"
+
+[[check]]
+variable = "m.device.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "device: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.errors.sampleTime} - 0.002*({m.errors.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "errors: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.errors.deliveryTime} - {m.errors.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "errors: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.errors.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "errors: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.errors.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "errors: valid from the first delivery on"
+
+[[check]]
+variable = "m.errors.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "errors: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.em.sampleTime} - 0.002*({m.em.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "em: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.em.deliveryTime} - {m.em.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "em: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.em.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "em: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.em.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "em: valid from the first delivery on"
+
+[[check]]
+variable = "m.em.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "em: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.acoustic.sampleTime} - 0.002*({m.acoustic.sequence} - 1)"
+at = "all"
+from = 0.002
+near = 0.0
+tol = 1e-09
+why = "acoustic: sample epochs on the 2 ms grid, sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+expr = "{m.acoustic.deliveryTime} - {m.acoustic.sampleTime}"
+at = "all"
+from = 0.002
+near = 0.002
+tol = 1e-09
+why = "acoustic: latency 1: each sample is delivered one period after its acquisition"
+
+[[check]]
+variable = "m.acoustic.sequence"
+at = "all"
+to = 0.00175
+near = 0.0
+tol = 0.0
+why = "acoustic: nothing is delivered before the first latency period (valid false, sequence 0)"
+
+[[check]]
+variable = "m.acoustic.valid"
+at = "all"
+from = 0.002
+near = 1.0
+tol = 0.0
+why = "acoustic: valid from the first delivery on"
+
+[[check]]
+variable = "m.acoustic.sequence"
+at = "end"
+near = 1500.0
+tol = 0.0
+why = "acoustic: 1500 samples delivered by 3 s (1501 acquired, one in the queue)"
+
+[[check]]
+expr = "{m.digital.sampleTime} - {m.stat.sampleTime}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "digital and stat deliver the same acquisition epoch at every point (one clock)"
+
+[[check]]
+expr = "{m.device.sampleTime} - {m.stat.sampleTime}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "device and stat deliver the same acquisition epoch at every point (one clock)"
+
+[[check]]
+expr = "{m.errors.sampleTime} - {m.stat.sampleTime}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors and stat deliver the same acquisition epoch at every point (one clock)"
+
+[[check]]
+expr = "{m.em.sampleTime} - {m.stat.sampleTime}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "em and stat deliver the same acquisition epoch at every point (one clock)"
+
+[[check]]
+expr = "{m.acoustic.sampleTime} - {m.stat.sampleTime}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic and stat deliver the same acquisition epoch at every point (one clock)"
+
+[[check]]
+variable = "m.em.gyroLocked*"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "em: all three gyro drive loops stay locked"
+
+[[check]]
+expr = "{m.errors.acceleration[1]} - {m.device.acceleration[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on accel x at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.errors.acceleration[2]} - {m.device.acceleration[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on accel y at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.errors.acceleration[3]} - {m.device.acceleration[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on accel z at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.errors.gyro[1]} - {m.device.gyro[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on gyro x at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.errors.gyro[2]} - {m.device.gyro[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on gyro y at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.errors.gyro[3]} - {m.device.gyro[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "errors == device on gyro z at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.acceleration[1]} - {m.device.acceleration[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on accel x at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.acceleration[2]} - {m.device.acceleration[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on accel y at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.acceleration[3]} - {m.device.acceleration[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on accel z at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.gyro[1]} - {m.device.gyro[1]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on gyro x at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.gyro[2]} - {m.device.gyro[2]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on gyro y at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.acoustic.gyro[3]} - {m.device.gyro[3]}"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "acoustic == device on gyro z at every point (same chain, zero injected error / pressure)"
+
+[[check]]
+expr = "{m.device.acceleration[1]} - {m.stat.acceleration[1]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.0050000010000000004, 0.0050000010000000004]
+why = "device - stat, accel x, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.acceleration[1]} - {m.stat.acceleration[1]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.008, 0.008]
+why = "device - stat, accel x, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.device.acceleration[2]} - {m.stat.acceleration[2]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.0050000010000000004, 0.0050000010000000004]
+why = "device - stat, accel y, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.acceleration[2]} - {m.stat.acceleration[2]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.008, 0.008]
+why = "device - stat, accel y, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.device.acceleration[3]} - {m.stat.acceleration[3]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.0050000010000000004, 0.0050000010000000004]
+why = "device - stat, accel z, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.acceleration[3]} - {m.stat.acceleration[3]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.008, 0.008]
+why = "device - stat, accel z, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.device.gyro[1]} - {m.stat.gyro[1]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.000500001, 0.000500001]
+why = "device - stat, gyro x, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.gyro[1]} - {m.stat.gyro[1]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.0035, 0.0035]
+why = "device - stat, gyro x, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.device.gyro[2]} - {m.stat.gyro[2]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.000500001, 0.000500001]
+why = "device - stat, gyro y, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.gyro[2]} - {m.stat.gyro[2]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.0035, 0.0035]
+why = "device - stat, gyro y, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.device.gyro[3]} - {m.stat.gyro[3]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.000500001, 0.000500001]
+why = "device - stat, gyro z, stationary: the readout adds at most LSB/2"
+
+[[check]]
+expr = "{m.device.gyro[3]} - {m.stat.gyro[3]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.0035, 0.0035]
+why = "device - stat, gyro z, rolling: LSB/2 + 0.5 ms analog lag"
+
+[[check]]
+expr = "{m.em.acceleration[1]} - {m.stat.acceleration[1]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.003, 0.003]
+why = "em - stat, accel x, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.acceleration[1]} - {m.stat.acceleration[1]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.003, 0.003]
+why = "em - stat, accel x, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.acceleration[2]} - {m.stat.acceleration[2]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.003, 0.003]
+why = "em - stat, accel y, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.acceleration[2]} - {m.stat.acceleration[2]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.003, 0.003]
+why = "em - stat, accel y, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.acceleration[3]} - {m.stat.acceleration[3]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.003, 0.003]
+why = "em - stat, accel z, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.acceleration[3]} - {m.stat.acceleration[3]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.003, 0.003]
+why = "em - stat, accel z, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[1]} - {m.stat.gyro[1]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.001, 0.001]
+why = "em - stat, gyro x, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[1]} - {m.stat.gyro[1]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.001, 0.001]
+why = "em - stat, gyro x, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[2]} - {m.stat.gyro[2]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.001, 0.001]
+why = "em - stat, gyro y, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[2]} - {m.stat.gyro[2]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.001, 0.001]
+why = "em - stat, gyro y, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[3]} - {m.stat.gyro[3]}"
+at = "all"
+from = 0.02
+to = 0.998
+range = [-0.001, 0.001]
+why = "em - stat, gyro z, stationary: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[3]} - {m.stat.gyro[3]}"
+at = "all"
+from = 1.05
+to = 3.0
+range = [-0.001, 0.001]
+why = "em - stat, gyro z, rolling: MEMS physics budget"
+
+[[check]]
+expr = "{m.em.gyro[1]} - {m.stat.gyro[1]}"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 0.0
+tol = 0.001
+why = "em gyro scale: rolling gyro x within 0.2 % of stat (same noise and bias)"
+
+[[check]]
+expr = "{m.digital.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.digital.sampleTime} - 1.0007)))"
+at = "all"
+from = 1.02
+range = [-0.0065, 0.0065]
+why = "digital, rolling: accel y within LSB/2 + curvature of the truth 0.7 ms earlier"
+
+[[check]]
+expr = "{m.digital.acceleration[3]} - (-9.80665*cos(0.5*max(0, {m.digital.sampleTime} - 1.0007)))"
+at = "all"
+from = 1.02
+range = [-0.0065, 0.0065]
+why = "digital, rolling: accel z within LSB/2 + curvature of the truth 0.7 ms earlier"
+
+[[check]]
+expr = "{m.digital.gyro[1]} - (0.5*({m.digital.sampleTime} >= 1.0))"
+at = "all"
+from = 1.02
+near = 0.0
+tol = 1e-09
+why = "digital: gyro x reads the applied rate exactly (0 then 0.5 rad/s)"
+
+[[check]]
+variable = "m.digital.acceleration[3]"
+at = "all"
+from = 0.02
+to = 0.998
+near = -9.81
+tol = 1e-09
+why = "digital: stationary accelerometer reads -g as the exact ADC code -9.81"
+
+[[check]]
+expr = "({m.stat.acceleration[1]} - (0) - {m.stat.biasState[1]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel x, stationary: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.acceleration[1]} - (0) - {m.stat.biasState[1]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel x, rolling: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.stat.sampleTime} - 1.0))) - {m.stat.biasState[2]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel y, stationary: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.acceleration[2]} - (-9.80665*sin(0.5*max(0, {m.stat.sampleTime} - 1.0))) - {m.stat.biasState[2]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel y, rolling: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.acceleration[3]} - (-9.80665*cos(0.5*max(0, {m.stat.sampleTime} - 1.0))) - {m.stat.biasState[3]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel z, stationary: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.acceleration[3]} - (-9.80665*cos(0.5*max(0, {m.stat.sampleTime} - 1.0))) - {m.stat.biasState[3]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 0.0004
+rtol = 0.2
+why = "stat - truth - biasState, accel z, rolling: mean square = noiseStd^2 = 0.0004"
+
+[[check]]
+expr = "({m.stat.gyro[1]} - (0.5*({m.stat.sampleTime} >= 1.0)) - {m.stat.biasState[4]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro x, stationary: mean square = noiseStd^2 = 4e-06"
+
+[[check]]
+expr = "({m.stat.gyro[1]} - (0.5*({m.stat.sampleTime} >= 1.0)) - {m.stat.biasState[4]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro x, rolling: mean square = noiseStd^2 = 4e-06"
+
+[[check]]
+expr = "({m.stat.gyro[2]} - (0) - {m.stat.biasState[5]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro y, stationary: mean square = noiseStd^2 = 4e-06"
+
+[[check]]
+expr = "({m.stat.gyro[2]} - (0) - {m.stat.biasState[5]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro y, rolling: mean square = noiseStd^2 = 4e-06"
+
+[[check]]
+expr = "({m.stat.gyro[3]} - (0) - {m.stat.biasState[6]})**2"
+at = "mean"
+from = 0.02
+to = 0.998
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro z, stationary: mean square = noiseStd^2 = 4e-06"
+
+[[check]]
+expr = "({m.stat.gyro[3]} - (0) - {m.stat.biasState[6]})**2"
+at = "mean"
+from = 1.05
+to = 3.0
+near = 4e-06
+rtol = 0.2
+why = "stat - truth - biasState, gyro z, rolling: mean square = noiseStd^2 = 4e-06"

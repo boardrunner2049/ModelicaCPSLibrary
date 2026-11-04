@@ -44,11 +44,12 @@ It writes `world.toml` from the FMU and a starting `harness.c`/`checks.toml`.
 |---|---|
 | `harness.mk` | build rules every harness includes |
 | `lib/fire_harness.{h,c}` | the driver: signals (constant/step/ramp/sine/pulse/function), time loop, zero-order-hold inputs, output sampling, finiteness |
+| `lib/imu_motion.h` | the rigid-body motion shared by the IMU harnesses (level and at rest, then a constant roll rate) |
 | `tools/make_fmu.py` | Rumoca `--target fmi3` for a FIRE model or wrapper, then `build_fmu.py` |
 | `tools/build_fmu.py` | compiles a source FMU into `binaries/x86_64-linux/<id>.so` |
 | `tools/fire_compile.py` | the one Rumoca command line for this library, model enumeration, machine settings |
 | `tools/new_harness.py`, `fmu_vars.py` | harness scaffolding from the FMU's model description |
-| `tools/check_trace.py` | evaluates `checks.toml` over `out/trace.csv` |
+| `tools/check_trace.py` | evaluates `checks.toml` over `out/trace.csv`; a check with `known = "reason"` states a contract a known defect breaks (reported KNOWN, or FIXED once it passes, without failing the harness) |
 | `tools/expect_refusal.py` | harness of a deliberately invalid model: export must be refused |
 | `tools/run_all.py` | batch build/run/summary |
 | `sweep.py` | export every library model with one Rumoca binary (status per model) |
@@ -67,7 +68,14 @@ that reads world outputs and writes world inputs (closed loop).
 
 Inputs are applied as a zero-order hold at each communication point, as a
 co-simulation master does. Array variables are addressed per element
-(`m.R_wb[3]`, 1-based, row-major).
+(`m.R_wb[3]`, 1-based, row-major). A time event (`sample`) that falls on a
+communication point acquires the inputs held over the step before it (the
+left limit), and one at t = 0 the inputs' start values; the sampled-sensor
+checks evaluate their truth accordingly.
+
+A harness usually covers one model. `Systems.Sensing.IMU.FidelityComparison`
+is the exception: its `Wrapper.mo` runs every IMU fidelity under one motion
+and checks them against each other.
 
 ## Vehicle harness
 
@@ -198,25 +206,64 @@ directories are named after them).
 
 ## Status (2026-11-04, Rumoca rumoca-bitcode-v1 6058a2bb)
 
-All 84 harnesses pass (4 of them are deliberately invalid chassis
-configurations whose export must be refused).
+100 harnesses: 98 pass (4 of them are deliberately invalid chassis
+configurations whose export must be refused); 2 are KNOWN FAILURES
+(`Tests.GnssStatistical`, `Tests.RangePhysics`, below; run_all reports them
+run-failed).
 
 `python3 sweep.py` exports 106 of the library's 129 models. Of the other 23:
 - 13 are components that cannot stand alone (parameters without values,
   connectors left open); their harnesses go through a `Wrapper.mo`.
 - 4 are the invalid chassis configurations above.
-- 4 GNSS models hit Rumoca gaps in the PVT solver function (`solvePvt`) or
-  an external-function call (LAPACK) in a when-clause.
+- 4 GNSS models (`Systems.Sensing.GNSS.ObservableSensor`,
+  `Tests.GnssObservables`, `Tests.GnssEphemeris`, `Examples.GnssRange`) hit
+  Rumoca gaps in the PVT solver function (`solvePvt`) or an external-function
+  call (LAPACK) in a when-clause; no harness.
 - `Tests.ImuDigitalErrors`: a `when sample` body is still checked against
-  synchronous clock ownership (`[ED020]`).
+  synchronous clock ownership (`[ED020]`); no harness.
 - `Tests.ThreePhaseAveraging` needs runtime events.
 
-Exporting is not running: `Tests.GnssStatistical` stops at t = 0.001 s on its
-own "Independent RNG streams collapsed" assertion (Rumoca's native simulator
-too), and `Tests.RangePhysics` fails initialization (infinite range of a
-parallel ray).
+Sensor harnesses (sampled GNSS, range and multi-fidelity IMU models): every
+IMU fidelity (`StatisticalSensor`, `ErrorSensor`, `DigitalSensor`,
+`DeviceSensor`, `ElectromechanicalSensor`, `AcousticSensor`) is driven by the
+motion of `lib/imu_motion.h` and checked for its sample grid, the stationary
+and rolling readings against closed forms at the acquisition epoch, and its
+residual statistics against the configured noise;
+`Systems.Sensing.IMU.FidelityComparison` runs them side by side on one RNG
+stream (ErrorSensor and AcousticSensor equal DeviceSensor exactly; the device
+readout adds at most LSB/2 + analog lag to StatisticalSensor, measured 6.8
+mm/s2 and 0.5 mrad/s; the MEMS physics of ElectromechanicalSensor adds 1.2
+mm/s2 and a -0.07 % gyro scale error).
 
-The GNSS and multi-fidelity IMU sensor models have no harness yet.
+Known failures and Rumoca defects found by these harnesses:
+- `Tests.GnssStatistical` stops at t = 0.001 s on its own "Independent RNG
+  streams collapsed" assertion (Rumoca's native simulator too). Not a seed or
+  stream problem: the streams draw different normals from t = 0. Rumoca orders
+  the two when-clauses activated by the same `sample()` (GNSS
+  `StatisticalSensor`'s draw and its `SampledDelivery`'s acquisition) wrongly,
+  so every delivered G1 error is the previous epoch's draw, zero at t = 0 for
+  every stream. The exact-law checks of `Systems.Sensing.GNSS.StatisticalSensor`
+  are marked `known` for it. (`Range.SampledSensor` has the same structure
+  and is not affected.)
+- `Tests.RangePhysics` fails initialization on its parallel ray:
+  `Range.Sensor` divides by n.d in the branch that the event-generating
+  `parallelRay` relation deselects, and the FMU evaluates it at
+  initialization with the relation at its pre value (false), giving an
+  infinite range. Any guard built from the same relation fails alike; a
+  `noEvent` guard initializes. The same frozen-relation window exists at run
+  time when an input makes a ray parallel, so the library would be robust
+  with a `noEvent`-guarded safe denominator.
+- An FMI override of a tunable parameter that sets a `sample()` clock
+  (IMU `p.samplePeriod`, `p.adcDecimation`; GNSS/range/`SampledDelivery`
+  `samplePeriod`, `startTime`) reaches the equations (`tickPeriod`, the
+  reported `sampleTime`) but not the time events, which keep the compiled
+  value. The sensor harnesses leave these at their defaults; clocks and
+  latencies other than the defaults are compiled in (`Tests.*`, the
+  fidelity comparison wrapper).
+- `ElectromechanicalSensor` (and `Tests.ImuElectromechanical`) fail in the
+  first step with a 1 ms communication step ("Comb overlap exceeded": the
+  1 kHz drive mode diverges inside the FMU's integration of the step); 0.5 ms
+  and below run, the harnesses use 0.25 ms.
 
 ### Vehicle status (2026-11-03, Rumoca a4dd197b)
 

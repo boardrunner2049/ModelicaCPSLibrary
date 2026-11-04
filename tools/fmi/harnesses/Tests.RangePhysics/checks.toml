@@ -1,0 +1,114 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# KNOWN FAILURE (Rumoca 6058a2bb): FMU initialization fails (fmi3ExitInitializationMode) because
+# of the parallelRay instance (ray (1, 0, 0) against the ground plane, n.d = 0); no trace row is
+# written and the harness ends run-failed. Range.Sensor computes
+#   geometricRange = if parallelRay then 0 else (h - n.p)/denominator
+# with parallelRay an event-generating relation. Rumoca's FMU evaluates that equation during
+# initialization with the relation still at its pre value (false), so it divides by n.d = 0 and the
+# infinite range fails the initialization; a reduced model shows that any guard built from the same
+# relation fails the same way, while noEvent(if abs(n.d) <= tol then ... else .../n.d) initializes
+# (parallelRay = true, range 0). At run time the same frozen-relation window exists whenever an
+# input makes a ray parallel (the update before the event): Systems.Sensing.Range.SampledSensor
+# avoids that case for this reason. A defect of Rumoca (relations should be evaluated directly at
+# initialization) and a fragility of the library (a division guarded only by an event-generating
+# relation); a library fix is a noEvent-guarded safe denominator.
+# The checks below restate the model's asserts as closed forms for when it runs.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+variable = "m.tilted.distance"
+at = 0.15
+near = 14.705882352941176
+tol = 1e-10
+why = "tilted ray (0.6, 0, 0.8) from 10 m over a plane with normal (-0.2, 0, 1): range 10/0.68"
+
+[[check]]
+expr = "{m.scaled.distance} - {m.tilted.distance}"
+at = "all"
+near = 0.0
+tol = 1e-10
+why = "plane normal scale does not change the range"
+
+[[check]]
+expr = "{m.parallelRay.status} + 10*{m.parallelRay.valid} + abs({m.parallelRay.distance})"
+at = "all"
+near = 2.0
+tol = 0.0
+why = "parallel ray: NoReturn (2), invalid, distance 0"
+
+[[check]]
+variable = "m.behind.status"
+at = "all"
+near = 2.0
+tol = 0.0
+why = "ray pointing away: NoReturn (2)"
+
+[[check]]
+expr = "abs({m.close.status} - 3) + abs({m.far.status} - 4)"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "too close (0.1 m < minRange 0.2 m): status 3; too far (10 m > 5 m): status 4"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.status}"
+at = 0.15
+near = 0.0
+tol = 0.0
+why = "no range packet before the first delivery (latency 2, 0.1 s epochs)"
+
+[[check]]
+expr = "abs({m.biasedTooClose.status} - 3) + abs({m.biasedTooFar.status} - 4)"
+at = "all"
+from = 0.001
+near = 0.0
+tol = 0.0
+why = "corrupted ranges keep their invalid status, not clamped valid"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.sequence} + abs({m.delayed.distance} - 10.2)"
+at = 0.25
+near = 2.0
+tol = 1e-10
+why = "first delayed packet: sequence 1, round_0.1(10 + 0.12 + 0.01*10 K) = 10.2 m"
+
+[[check]]
+expr = "abs({m.delayed.sampleTime}) + abs({m.delayed.deliveryTime} - 0.2) + abs({m.delayed.quality} - 0.7)"
+at = 0.25
+near = 0.0
+tol = 1e-12
+why = "range metadata co-timed: acquired at 0, delivered at 0.2 s, quality 0.7"
+
+[[check]]
+expr = "{m.delayed.valid} + abs({m.delayed.status} - 2) + abs({m.delayed.sequence} - 3) + abs({m.delayed.distance})"
+at = 0.45
+near = 0.0
+tol = 1e-12
+why = "delayed no-return: invalid, status 2, sequence 3, distance 0 (at 0.45 s)"
+
+[[check]]
+expr = "{m.delayed.valid} + abs({m.delayed.status} - 5) + abs({m.delayed.sequence} - 6)"
+at = 0.75
+near = 0.0
+tol = 0.0
+why = "device error has its own delayed status 5 (sequence 6 at 0.75 s)"
+
+[[check]]
+expr = "{m.delayed.valid} + {m.delayed.sequence}"
+at = 0.85
+near = 8.0
+tol = 0.0
+why = "range recovers: valid, sequence 7 at 0.85 s"
+
+[[check]]
+expr = "{m.repeatA.distance} - {m.repeatB.distance}"
+at = "all"
+near = 0.0
+tol = 1e-14
+why = "seed replay: repeatA == repeatB"

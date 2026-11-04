@@ -1,0 +1,161 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.IMU.ElectromechanicalSensor (I3), motion of lib/imu_motion.h (level 1 s, roll 0.5 rad/s).
+# Physical axes with default MEMS parameters and no configured noise: the readings are the
+# truth up to the physics. Measured with Rumoca 6058a2bb: gyro scale -0.07 % (0.49965 for 0.5 rad/s;
+# the Coriolis demodulation chain), accelerometer within 5e-4 m/s2 of the truth (integration error of
+# the 2 kHz proof mass and readout), lag ~0.3 ms (proof-mass phase lag + 0.25 ms input hold).
+# Budgets below: gyro 0.2 % of rate, accelerometer 2e-3 m/s2.
+# accelForce z = 2e-8 N on [0.5, 0.7) s on the 1e-8 kg proof mass: reading -F/m = -2 m/s2 lower.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.001*({m.sequence} - 1)"
+at = "all"
+from = 1e-09
+near = 0.0
+tol = 1e-09
+why = "sample epochs on the 1 ms grid: sampleTime = (sequence - 1) * samplePeriod, no drift"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+from = 1e-09
+near = 0.0
+tol = 1e-09
+why = "latency 0: delivered 0 period(s) after acquisition"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+from = 1e-09
+range = [-1e-09, 0.001]
+why = "outputs are fresh: the delivery is less than one period old at every communication point"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+from = 1e-09
+near = 1.0
+tol = 0.0
+why = "every delivered sample is valid"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 3001.0
+tol = 0.0
+why = "3001 samples delivered by t = 3 s: one per period"
+
+[[check]]
+variable = "m.gyroLocked*"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "drive loops of all three gyros stay locked (AGC amplitude and PLL phase within 5 %, readouts unsaturated)"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+from = 0.002
+to = 0.5
+near = -9.80665
+tol = 0.002
+why = "stationary: accelerometer z reads -g within 2e-3 m/s2"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+from = 0.72
+to = 1.0
+near = -9.80665
+tol = 0.002
+why = "stationary after the injected force: accelerometer z back at -g within 2e-3 m/s2"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+from = 0.502
+to = 0.7
+near = -11.80665
+tol = 0.002
+why = "accelForce 2e-8 N on the 1e-8 kg proof mass: reading -g - 2 m/s2 (external force path)"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "accelerometer x: no specific force on x, reads 0"
+
+[[check]]
+variable = "m.acceleration[2]"
+at = "all"
+to = 1.0
+near = 0.0
+tol = 1e-09
+why = "stationary: accelerometer y reads 0"
+
+[[check]]
+variable = "m.gyro[[]*"
+at = "all"
+to = 1.0
+near = 0.0
+tol = 1e-06
+why = "stationary: gyros read 0 (no rate, no quadrature leakage)"
+
+[[check]]
+variable = "m.gyro[2]"
+at = "all"
+near = 0.0
+tol = 1e-06
+why = "gyro y, z read 0 throughout (roll about x only, independent axes)"
+
+[[check]]
+variable = "m.gyro[3]"
+at = "all"
+near = 0.0
+tol = 1e-06
+why = "gyro y, z read 0 throughout (roll about x only, independent axes)"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "all"
+from = 1.05
+near = 0.5
+tol = 0.001
+why = "rolling: gyro x reads the applied 0.5 rad/s within 0.2 % once the 3 ms demodulation filter settled"
+
+[[check]]
+expr = "{m.acceleration[2]} + 9.80665*sin(0.5*max(0, {m.sampleTime} - 1.0003))"
+at = "all"
+from = 1.002
+range = [-0.002, 0.002]
+why = "rolling: accel y = -g sin(phi) of the truth 0.3 ms earlier within 2e-3 m/s2"
+
+[[check]]
+expr = "{m.acceleration[3]} + 9.80665*cos(0.5*max(0, {m.sampleTime} - 1.0003))"
+at = "all"
+from = 1.002
+range = [-0.002, 0.002]
+why = "rolling: accel z = -g cos(phi) of the truth 0.3 ms earlier within 2e-3 m/s2"
+
+[[check]]
+expr = "norm({m.acceleration[1]}, {m.acceleration[2]}, {m.acceleration[3]})"
+at = "all"
+from = 1.002
+near = 9.80665
+tol = 0.002
+why = "rolling: the sensed specific force keeps magnitude g"
+
+[[check]]
+variable = "m.biasState*"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no stochastic errors configured: the Gauss-Markov state stays zero"

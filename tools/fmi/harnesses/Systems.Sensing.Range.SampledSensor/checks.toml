@@ -1,0 +1,257 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.Range.SampledSensor (L1): height 10 - 2.4 t over flat ground, ray (0.6, 0, 0.8),
+# slant range r = h / 0.8. 20 ms epochs (latency 0); each acquires the inputs held over the 5 ms
+# step before it, so r is evaluated at sampleTime - 5 ms below.
+# Valid packets: distance = round_1cm(r + bias 0.05 + 2 mm/K * 10 K + (0.02 + 0.002 r) n), so the
+# residual distance - r - 0.07 has mean ~ 0 and mean square (0.02 + 0.002 r)^2 + LSB^2/12, and
+# stays within 5 sigma + LSB/2. Invalid packets carry distance 0 and quality 0 with their status:
+# TooFar 4 (r > 12 m), NoReturn 2 (return lost, or ray pointing away), DeviceError 5, TooClose 3.
+# The window is applied to the true range first (the embedded L0 Sensor), then to the corrupted
+# reading: TooClose starts with the epoch whose true r < 1 m (3.84 s).
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.02*({m.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "epochs on the 20 ms grid: sampleTime = (sequence - 1) * 0.02, no drift"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "latency 0: delivered at the acquisition epoch"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+range = [-1e-09, 0.02]
+why = "the packet is fresh: less than one period old"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 201.0
+tol = 0.0
+why = "201 packets in 4 s (t = 0 included), invalid ones counted: 50 Hz update rate"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 0.02
+to = 0.139
+near = 4.0
+tol = 0.0
+why = "start: slant range 12.5 m > maxRange 12 m -> TooFar, invalid"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 1.02
+to = 1.219
+near = 2.0
+tol = 0.0
+why = "return lost on [1.0, 1.2) s -> NoReturn, invalid"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 1.52
+to = 1.619
+near = 5.0
+tol = 0.0
+why = "deviceError on [1.5, 1.6) s -> DeviceError has its own status, invalid"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 2.02
+to = 2.219
+near = 2.0
+tol = 0.0
+why = "ray pointing away from the plane on [2.0, 2.2) s -> NoReturn, invalid"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 3.84
+near = 3.0
+tol = 0.0
+why = "end: true slant range below minRange 1 m from the 3.84 s epoch -> TooClose, invalid"
+
+[[check]]
+expr = "(1 - {m.valid})*(abs({m.distance}) + abs({m.quality}))"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "invalid packets carry no distance and no quality"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 0.24
+to = 0.999
+near = 11.0
+tol = 0.0
+why = "valid packets with status Valid on [0.24, 0.999]"
+
+[[check]]
+variable = "m.quality"
+at = "all"
+from = 0.24
+to = 0.999
+near = 0.8
+tol = 1e-12
+why = "valid packets report the scenario signal quality 0.8 on [0.24, 0.999]"
+
+[[check]]
+expr = "abs({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07) - 5*(0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)"
+at = "all"
+from = 0.24
+to = 0.999
+range = [-100.0, 0.005]
+why = "slant range within 5 sigma + LSB/2 of r + bias + temperature on [0.24, 0.999]"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 1.24
+to = 1.499
+near = 11.0
+tol = 0.0
+why = "valid packets with status Valid on [1.24, 1.499]"
+
+[[check]]
+variable = "m.quality"
+at = "all"
+from = 1.24
+to = 1.499
+near = 0.8
+tol = 1e-12
+why = "valid packets report the scenario signal quality 0.8 on [1.24, 1.499]"
+
+[[check]]
+expr = "abs({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07) - 5*(0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)"
+at = "all"
+from = 1.24
+to = 1.499
+range = [-100.0, 0.005]
+why = "slant range within 5 sigma + LSB/2 of r + bias + temperature on [1.24, 1.499]"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 1.64
+to = 1.999
+near = 11.0
+tol = 0.0
+why = "valid packets with status Valid on [1.64, 1.999]"
+
+[[check]]
+variable = "m.quality"
+at = "all"
+from = 1.64
+to = 1.999
+near = 0.8
+tol = 1e-12
+why = "valid packets report the scenario signal quality 0.8 on [1.64, 1.999]"
+
+[[check]]
+expr = "abs({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07) - 5*(0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)"
+at = "all"
+from = 1.64
+to = 1.999
+range = [-100.0, 0.005]
+why = "slant range within 5 sigma + LSB/2 of r + bias + temperature on [1.64, 1.999]"
+
+[[check]]
+expr = "{m.status} + 10*{m.valid}"
+at = "all"
+from = 2.24
+to = 3.839
+near = 11.0
+tol = 0.0
+why = "valid packets with status Valid on [2.24, 3.839]"
+
+[[check]]
+variable = "m.quality"
+at = "all"
+from = 2.24
+to = 3.839
+near = 0.8
+tol = 1e-12
+why = "valid packets report the scenario signal quality 0.8 on [2.24, 3.839]"
+
+[[check]]
+expr = "abs({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07) - 5*(0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)"
+at = "all"
+from = 2.24
+to = 3.839
+range = [-100.0, 0.005]
+why = "slant range within 5 sigma + LSB/2 of r + bias + temperature on [2.24, 3.839]"
+
+[[check]]
+expr = "{m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07"
+at = "mean"
+from = 2.24
+to = 3.839
+near = 0.0
+tol = 0.01
+why = "range residual mean ~ 0 (zero-mean noise; bias and temperature offset 7 cm accounted)"
+
+[[check]]
+expr = "{m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07"
+at = "mean"
+from = 0.24
+to = 0.999
+near = 0.0
+tol = 0.01
+why = "range residual mean ~ 0 (zero-mean noise; bias and temperature offset 7 cm accounted)"
+
+[[check]]
+expr = "({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07)**2/((0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)**2 + 0.01**2/12)"
+at = "mean"
+from = 0.24
+to = 0.999
+near = 1.0
+rtol = 0.35
+why = "normalized residual (residual / sigma(r)) has mean square ~ 1: noise 2 cm + 0.2 % of range"
+
+[[check]]
+expr = "({m.distance} - (10 - 2.4*({m.sampleTime} - 0.005))/0.8 - 0.07)**2/((0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)**2 + 0.01**2/12)"
+at = "mean"
+from = 2.24
+to = 3.839
+near = 1.0
+rtol = 0.35
+why = "normalized residual has mean square ~ 1 while descending 8.9 .. 1.2 m"
+
+[[check]]
+expr = "abs({m.distance}/0.01 - round({m.distance}/0.01))"
+at = "all"
+near = 0.0
+tol = 1e-06
+why = "1 cm ADC: every valid distance is a whole number of centimetres"
+
+[[check]]
+expr = "{m.distance@3.5} - {m.distance@2}"
+at = "end"
+near = -4.5
+tol = 0.25
+why = "the range shrinks at 2.4/0.8 = 3 m/s (difference of 1.5 s, within noise)"
+
+[[check]]
+expr = "{m.valid}*({m.distance} - 0.01*floor(((10 - 2.4*({m.sampleTime} - 0.005))/0.8 + 0.07 + (0.02 + 0.002*(10 - 2.4*({m.sampleTime} - 0.005))/0.8)*{m.normal[1]})/0.01 + 0.5))"
+at = "all"
+from = 0.24
+near = 0.0
+tol = 1e-09
+why = "exact L1 law at each valid epoch (noise drawn at that epoch): distance = round_1cm(r + 0.07 + (0.02 + 0.002 r) normal of that epoch)"

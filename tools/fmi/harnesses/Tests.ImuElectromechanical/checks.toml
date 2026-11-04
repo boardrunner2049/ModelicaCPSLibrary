@@ -1,0 +1,136 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Tests.ImuElectromechanical. imu: specific force R'(a - g) = (1, -2, -9.80665) and rate
+# (0.2, -0.3, 0.1) rad/s, constant; 2 ms output period. The model asserts at 0.3 s that the gyros
+# read the rate within 3e-3 rad/s and the accelerometers the specific force within 1e-7; here
+# that holds at every sample from 0.3 s on. Measured with Rumoca 6058a2bb: gyro scale -0.07 %
+# (0.19986, -0.29979, 0.09993), accelerometers exact to 1e-9.
+# startup: VibratoryGyro from 10 % drive amplitude, mechanics at 1003 Hz, reference 1000 Hz: the
+# AGC brings the amplitude to the 0.2 um set point within 2 %, the PLL tracks 1003 Hz within
+# 0.5 Hz, and the loop reports locked by 0.9 s (the model's asserts).
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.imu.sampleTime} - 0.002*({m.imu.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "output clock 2 ms: sampleTime = (sequence - 1) * 2 ms"
+
+[[check]]
+variable = "m.imu.sequence"
+at = "end"
+near = 501.0
+tol = 0.0
+why = "501 samples in 1 s"
+
+[[check]]
+variable = "m.imu.gyroLocked*"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "imu drive loops locked throughout (default startupFraction 1)"
+
+[[check]]
+variable = "m.imu.gyro[1]"
+at = "all"
+from = 0.3
+near = 0.2
+tol = 0.003
+why = "imu gyro 1: physical rate recovered from the Coriolis displacement within 3e-3 rad/s"
+
+[[check]]
+expr = "{m.imu.gyro[1]}/0.2 - 1"
+at = "all"
+from = 0.3
+range = [-0.002, 0.002]
+why = "imu gyro 1: scale within 0.2 % of the rate (sign and demodulation phase right)"
+
+[[check]]
+variable = "m.imu.gyro[2]"
+at = "all"
+from = 0.3
+near = -0.3
+tol = 0.003
+why = "imu gyro 2: physical rate recovered from the Coriolis displacement within 3e-3 rad/s"
+
+[[check]]
+expr = "{m.imu.gyro[2]}/-0.3 - 1"
+at = "all"
+from = 0.3
+range = [-0.002, 0.002]
+why = "imu gyro 2: scale within 0.2 % of the rate (sign and demodulation phase right)"
+
+[[check]]
+variable = "m.imu.gyro[3]"
+at = "all"
+from = 0.3
+near = 0.1
+tol = 0.003
+why = "imu gyro 3: physical rate recovered from the Coriolis displacement within 3e-3 rad/s"
+
+[[check]]
+expr = "{m.imu.gyro[3]}/0.1 - 1"
+at = "all"
+from = 0.3
+range = [-0.002, 0.002]
+why = "imu gyro 3: scale within 0.2 % of the rate (sign and demodulation phase right)"
+
+[[check]]
+variable = "m.imu.acceleration[1]"
+at = "all"
+from = 0.3
+near = 1.0
+tol = 1e-07
+why = "imu accelerometer 1: proof-mass readout of the specific force within 1e-7"
+
+[[check]]
+variable = "m.imu.acceleration[2]"
+at = "all"
+from = 0.3
+near = -2.0
+tol = 1e-07
+why = "imu accelerometer 2: proof-mass readout of the specific force within 1e-7"
+
+[[check]]
+variable = "m.imu.acceleration[3]"
+at = "all"
+from = 0.3
+near = -9.80665
+tol = 1e-07
+why = "imu accelerometer 3: proof-mass readout of the specific force within 1e-7"
+
+[[check]]
+variable = "m.startup.locked"
+at = "all"
+from = 0.9
+near = 1.0
+tol = 0.0
+why = "startup gyro locked by 0.9 s"
+
+[[check]]
+variable = "m.startup.locked"
+at = 0.0
+near = 0.0
+tol = 0.0
+why = "startup gyro not yet locked at the start (10 % amplitude)"
+
+[[check]]
+expr = "{m.startup.driveControl.amplitude}/0.0000002 - 1"
+at = "all"
+from = 0.9
+range = [-0.02, 0.02]
+why = "AGC: drive amplitude within 2 % of the 0.2 um set point from 0.9 s"
+
+[[check]]
+expr = "{m.startup.driveControl.frequency}/(2*pi)"
+at = "all"
+from = 0.9
+near = 1003.0
+tol = 0.5
+why = "PLL tracks the 1003 Hz mechanical resonance within 0.5 Hz (reference 1000 Hz)"

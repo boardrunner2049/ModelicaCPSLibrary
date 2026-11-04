@@ -1,0 +1,125 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Tests.ImuAcoustic: AcousticSensor modes (100 Hz, damping 0.1, static gain 1 per Pa on accel x)
+# under a 1 Pa, 110 Hz tone, sampled every 10 ms through a 0.1 ms analog response.
+#   acoustic: linear readout, amplitude H(1.1) = 3.2880 times the analog roll-off 0.9976 = 3.2802;
+#     the 100 Hz output aliases the tone to 10 Hz, so 70 samples over [0.3, 1] s cover 7 alias
+#     cycles in 0.1-cycle phase steps: max/min within cos(pi/10) of A, mean square A^2/2 = 5.380.
+#   rectified: quadratic readout x^2 of the same mode: mean H^2/2 = 5.405 (rectified DC),
+#     never negative, peaks below H^2 = 10.81.
+#   quiet (no pressure) == device (DeviceSensor with the same readout) exactly: zero pressure
+#     recovers I2; no coupling into channels without coefficients.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.quiet.acceleration[1]} - {m.device.acceleration[1]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on acceleration[1] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "{m.quiet.acceleration[2]} - {m.device.acceleration[2]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on acceleration[2] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "{m.quiet.acceleration[3]} - {m.device.acceleration[3]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on acceleration[3] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "{m.quiet.gyro[1]} - {m.device.gyro[1]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on gyro[1] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "{m.quiet.gyro[2]} - {m.device.gyro[2]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on gyro[2] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "{m.quiet.gyro[3]} - {m.device.gyro[3]}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "quiet == device on gyro[3] at every row (zero pressure recovers I2)"
+
+[[check]]
+expr = "abs({m.acoustic.acceleration[2]}) + abs({m.acoustic.acceleration[3]}) + abs({m.acoustic.gyro[1]}) + abs({m.acoustic.gyro[2]}) + abs({m.acoustic.gyro[3]})"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "acoustic: no coupling into channels without coefficients (accel y, z, gyros read 0)"
+
+[[check]]
+variable = "m.acoustic.acceleration[1]"
+at = "max"
+from = 0.3
+range = [3.12, 3.29]
+why = "acoustic: sampled peak of the aliased tone between cos(pi/10) A and A = 3.280"
+
+[[check]]
+variable = "m.acoustic.acceleration[1]"
+at = "min"
+from = 0.3
+range = [-3.29, -3.12]
+why = "acoustic: sampled trough between -A and -cos(pi/10) A"
+
+[[check]]
+expr = "{m.acoustic.acceleration[1]}**2"
+at = "mean"
+from = 0.3
+near = 5.38
+rtol = 0.05
+why = "acoustic: mean square A^2/2 = 5.380 (linear: no DC)"
+
+[[check]]
+variable = "m.acoustic.acceleration[1]"
+at = "mean"
+from = 0.3
+near = 0.0
+tol = 0.1
+why = "acoustic: zero mean (linear coupling does not rectify)"
+
+[[check]]
+variable = "m.rectified.acceleration[1]"
+at = "mean"
+from = 0.3
+near = 5.405
+rtol = 0.05
+why = "rectified: quadratic readout gives a DC error H^2/2 = 5.405"
+
+[[check]]
+variable = "m.rectified.acceleration[1]"
+at = "all"
+from = 0.3
+range = [0.0, 10.81]
+why = "rectified: x^2 never negative and below H^2 = 10.81"
+
+[[check]]
+expr = "{m.acoustic.sampleTime} - 0.01*({m.acoustic.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "output clock 10 ms: sampleTime = (sequence - 1) * 10 ms"
+
+[[check]]
+variable = "m.acoustic.sequence"
+at = "end"
+near = 101.0
+tol = 0.0
+why = "101 samples in 1 s"

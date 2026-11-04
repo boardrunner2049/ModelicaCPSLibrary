@@ -1,0 +1,161 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.IMU.AcousticSensor (legacy I3), motion of lib/imu_motion.h (level 1 s, roll 0.5 rad/s).
+# Mode on accel x: x'' + 2 zeta w0 x' + w0^2 x = w0^2 p, read out as x (m/s2 per m), w0 = 2 pi 100 Hz,
+# zeta = 0.1. A 1 Pa, 110 Hz tone (r = 1.1) gives a steady amplitude 1/sqrt((1 - r^2)^2 + (2 zeta r)^2)
+# = 3.2880, times the 0.1 ms analog response 0.9976: A = 3.2802 m/s2 (mean square A^2/2 = 5.3797).
+# The 1 kHz output samples a 110 Hz tone at 9.1 samples per cycle, so max/min of the samples reach A.
+# Free decay after the tone: e^(-zeta w0 t), 16 ms time constant. No noise: the other channels read
+# the motion exactly, with the 0.2 ms analog + input-hold lag while rolling.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.001*({m.sequence} - 1)"
+at = "all"
+from = 1e-09
+near = 0.0
+tol = 1e-09
+why = "sample epochs on the 1 ms grid: sampleTime = (sequence - 1) * samplePeriod, no drift"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+from = 1e-09
+near = 0.0
+tol = 1e-09
+why = "latency 0: delivered 0 period(s) after acquisition"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+from = 1e-09
+range = [-1e-09, 0.001]
+why = "outputs are fresh: the delivery is less than one period old at every communication point"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+from = 1e-09
+near = 1.0
+tol = 0.0
+why = "every delivered sample is valid"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 3001.0
+tol = 0.0
+why = "3001 samples delivered by t = 3 s: one per period"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+from = 0.01
+to = 0.3
+near = 0.0
+tol = 1e-12
+why = "no acoustic error before the tone: accel x reads exactly 0"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "max"
+from = 0.4
+to = 0.8
+near = 3.2802
+tol = 0.02
+why = "tone: accel x peaks at the off-resonance amplitude A = 3.280 m/s2"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "min"
+from = 0.4
+to = 0.8
+near = -3.2802
+tol = 0.02
+why = "tone: accel x troughs at -A"
+
+[[check]]
+expr = "{m.acceleration[1]}**2"
+at = "mean"
+from = 0.4
+to = 0.8
+near = 5.3797
+rtol = 0.01
+why = "tone: accel x mean square A^2/2 = 5.380 (a sinusoid, no rectified DC with quadraticGain = 0)"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "mean"
+from = 0.4
+to = 0.8
+near = 0.0
+tol = 0.02
+why = "tone: accel x stays zero-mean"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+from = 0.9
+range = [-0.01, 0.01]
+why = "free decay after the tone: |accel x| < 0.01 m/s2 from 0.9 s (16 ms time constant)"
+
+[[check]]
+variable = "m.acceleration[2]"
+at = "all"
+from = 0.01
+to = 1.0
+near = 0.0
+tol = 1e-12
+why = "other channels are uncoupled (pressureGain 0): accel y reads 0 while stationary, during the tone too"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+from = 0.01
+to = 1.0
+near = -9.80665
+tol = 1e-09
+why = "other channels are uncoupled: accel z reads -g while stationary, during the tone too"
+
+[[check]]
+variable = "m.gyro[[]*"
+at = "all"
+from = 0.01
+to = 1.0
+near = 0.0
+tol = 1e-12
+why = "other channels are uncoupled: gyros read 0 while stationary"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "all"
+from = 1.01
+near = 0.5
+tol = 1e-06
+why = "rolling: gyro x reads the applied 0.5 rad/s"
+
+[[check]]
+expr = "{m.acceleration[2]} + 9.80665*sin(0.5*max(0, {m.sampleTime} - 1.0002))"
+at = "all"
+from = 1.01
+range = [-0.0005, 0.0005]
+why = "rolling: accel y = -g sin(phi) of the truth 0.2 ms earlier"
+
+[[check]]
+expr = "{m.acceleration[3]} + 9.80665*cos(0.5*max(0, {m.sampleTime} - 1.0002))"
+at = "all"
+from = 1.01
+range = [-0.0005, 0.0005]
+why = "rolling: accel z = -g cos(phi) of the truth 0.2 ms earlier"
+
+[[check]]
+variable = "m.biasState*"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "no stochastic errors configured: the Gauss-Markov state stays zero"

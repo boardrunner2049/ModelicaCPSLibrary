@@ -1,0 +1,494 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.GNSS.StatisticalSensor (G1), antenna on a 20 m circle climbing 1 m/s; 0.2 s epochs.
+# Contract: at epoch k the receiver acquires truth(t_k) + bias + biasFactor*latentBias_k +
+# noiseFactor*n_k (n_k = normal[7:12], drawn at t_k), reports covariance NF NF' + BF BF', and the
+# delivery queue (latency 0) hands it out at t_k with sampleTime = t_k.
+# The first epoch (t = 0) acquires the inputs' start values (zero), so value checks start at 0.2 s.
+# Each later epoch acquires the inputs held over the 10 ms communication step before it, so
+# "truth" below is the closed form at sampleTime - 0.01 s (10 m/s * 10 ms = 0.1 m otherwise).
+# Per epoch the error minus bias has std sqrt(NF NF' + BF BF') on the diagonal (sqrt 1.25 = 1.12 m
+# North): bounded by 5 sigma. Its white part (minus biasState) has mean square diag(NF NF') -- within
+# 50 % over the 39..50 epochs of a window -- and North-East correlation NF[2,1] NF[1,1] = 0.15 m2.
+# (The 60 s bias is one draw over 20 s, so the full error's mean square is not checked against
+# the covariance.)
+# Fix outage: fixAvailable false on [10, 12) s -> epochs 10.2 .. 12.0 s invalid.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.2*({m.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "epochs on the 0.2 s grid from 0: sampleTime = (sequence - 1) * 0.2, no drift"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "latency 0: delivered at the acquisition epoch"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+range = [-1e-09, 0.2]
+why = "PVT is fresh: less than one period old at every communication point"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 101.0
+tol = 0.0
+why = "101 epochs in 20 s (t = 0 included), the outage epochs counted too"
+
+[[check]]
+expr = "{m.sequence@15} - {m.sequence@5}"
+at = "end"
+near = 50.0
+tol = 0.0
+why = "update rate 5 Hz: 50 epochs between 5 and 15 s"
+
+[[check]]
+expr = "{m.valid} + {m.fixType}"
+at = "all"
+from = 0.2
+to = 10.199
+near = 4.0
+tol = 0.0
+why = "valid 3D fix on [0.2, 10.199]"
+
+[[check]]
+expr = "{m.valid} + {m.fixType}"
+at = "all"
+from = 12.2
+to = 20.0
+near = 4.0
+tol = 0.0
+why = "valid 3D fix on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.valid} + {m.fixType}"
+at = "all"
+from = 10.2
+to = 12.199
+near = 0.0
+tol = 0.0
+why = "fix outage: epochs 10.2 .. 12.0 s delivered invalid with fixType 0"
+
+[[check]]
+expr = "abs({m.position[1]}) + abs({m.position[2]}) + abs({m.position[3]}) + abs({m.velocity[1]}) + abs({m.velocity[2]}) + abs({m.velocity[3]})"
+at = "all"
+from = 10.2
+to = 12.199
+near = 0.0
+tol = 0.0
+why = "fix outage: payload is zero, not a stale fix"
+
+[[check]]
+variable = "m.covariance[[]*"
+at = "all"
+from = 10.2
+to = 12.199
+near = 0.0
+tol = 0.0
+why = "fix outage: reported covariance is zero (meaningless when invalid)"
+
+[[check]]
+variable = "m.covariance[1]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 1.25
+tol = 1e-12
+why = "reported covariance[1,1] = (NF NF' + BF BF')[1,1] = 1.25 while valid"
+
+[[check]]
+variable = "m.covariance[2]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.15
+tol = 1e-12
+why = "reported covariance[1,2] = (NF NF' + BF BF')[1,2] = 0.15 while valid"
+
+[[check]]
+variable = "m.covariance[3]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-12
+why = "reported covariance[1,3] = (NF NF' + BF BF')[1,3] = 0 while valid"
+
+[[check]]
+variable = "m.covariance[4]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-12
+why = "reported covariance[1,4] = (NF NF' + BF BF')[1,4] = 0 while valid"
+
+[[check]]
+variable = "m.covariance[7]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.15
+tol = 1e-12
+why = "reported covariance[2,1] = (NF NF' + BF BF')[2,1] = 0.15 while valid"
+
+[[check]]
+variable = "m.covariance[8]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 1.34
+tol = 1e-12
+why = "reported covariance[2,2] = (NF NF' + BF BF')[2,2] = 1.34 while valid"
+
+[[check]]
+variable = "m.covariance[15]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 5.0
+tol = 1e-12
+why = "reported covariance[3,3] = (NF NF' + BF BF')[3,3] = 5 while valid"
+
+[[check]]
+variable = "m.covariance[22]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0029
+tol = 1e-12
+why = "reported covariance[4,4] = (NF NF' + BF BF')[4,4] = 0.0029 while valid"
+
+[[check]]
+variable = "m.covariance[29]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0029
+tol = 1e-12
+why = "reported covariance[5,5] = (NF NF' + BF BF')[5,5] = 0.0029 while valid"
+
+[[check]]
+variable = "m.covariance[36]"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0116
+tol = 1e-12
+why = "reported covariance[6,6] = (NF NF' + BF BF')[6,6] = 0.0116 while valid"
+
+[[check]]
+expr = "{m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-5.5902, 5.5902]
+why = "North: error vs truth at the epoch, minus bias, within 5 sigma = 5.59"
+
+[[check]]
+expr = "{m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-5.5902, 5.5902]
+why = "North: error vs truth at the epoch, minus bias, within 5 sigma = 5.59"
+
+[[check]]
+expr = "({m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0 - {m.biasState[1]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.25
+rtol = 0.5
+why = "North: white part (error - bias - biasState) has mean square (NF NF')[1,1] = 0.25 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0 - {m.biasState[1]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 0.25
+rtol = 0.5
+why = "North: white part (error - bias - biasState) has mean square (NF NF')[1,1] = 0.25 on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-5.7879, 5.7879]
+why = "East: error vs truth at the epoch, minus bias, within 5 sigma = 5.79"
+
+[[check]]
+expr = "{m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-5.7879, 5.7879]
+why = "East: error vs truth at the epoch, minus bias, within 5 sigma = 5.79"
+
+[[check]]
+expr = "({m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5 - {m.biasState[2]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.34
+rtol = 0.5
+why = "East: white part (error - bias - biasState) has mean square (NF NF')[2,2] = 0.34 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5 - {m.biasState[2]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 0.34
+rtol = 0.5
+why = "East: white part (error - bias - biasState) has mean square (NF NF')[2,2] = 0.34 on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.position[3]} - (-10 - ({m.sampleTime} - 0.01)) - 0.3"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-11.1803, 11.1803]
+why = "Down: error vs truth at the epoch, minus bias, within 5 sigma = 11.2"
+
+[[check]]
+expr = "{m.position[3]} - (-10 - ({m.sampleTime} - 0.01)) - 0.3"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-11.1803, 11.1803]
+why = "Down: error vs truth at the epoch, minus bias, within 5 sigma = 11.2"
+
+[[check]]
+expr = "({m.position[3]} - (-10 - ({m.sampleTime} - 0.01)) - 0.3 - {m.biasState[3]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 1.0
+rtol = 0.5
+why = "Down: white part (error - bias - biasState) has mean square (NF NF')[3,3] = 1 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.position[3]} - (-10 - ({m.sampleTime} - 0.01)) - 0.3 - {m.biasState[3]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 1.0
+rtol = 0.5
+why = "Down: white part (error - bias - biasState) has mean square (NF NF')[3,3] = 1 on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.velocity[1]} - (-10*sin(0.5*({m.sampleTime} - 0.01))) - 0.05"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-0.2693, 0.2693]
+why = "v North: error vs truth at the epoch, minus bias, within 5 sigma = 0.269"
+
+[[check]]
+expr = "{m.velocity[1]} - (-10*sin(0.5*({m.sampleTime} - 0.01))) - 0.05"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-0.2693, 0.2693]
+why = "v North: error vs truth at the epoch, minus bias, within 5 sigma = 0.269"
+
+[[check]]
+expr = "({m.velocity[1]} - (-10*sin(0.5*({m.sampleTime} - 0.01))) - 0.05 - {m.biasState[4]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.0025
+rtol = 0.5
+why = "v North: white part (error - bias - biasState) has mean square (NF NF')[4,4] = 0.0025 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.velocity[1]} - (-10*sin(0.5*({m.sampleTime} - 0.01))) - 0.05 - {m.biasState[4]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 0.0025
+rtol = 0.5
+why = "v North: white part (error - bias - biasState) has mean square (NF NF')[4,4] = 0.0025 on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.velocity[2]} - (10*cos(0.5*({m.sampleTime} - 0.01))) - -0.02"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-0.2693, 0.2693]
+why = "v East: error vs truth at the epoch, minus bias, within 5 sigma = 0.269"
+
+[[check]]
+expr = "{m.velocity[2]} - (10*cos(0.5*({m.sampleTime} - 0.01))) - -0.02"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-0.2693, 0.2693]
+why = "v East: error vs truth at the epoch, minus bias, within 5 sigma = 0.269"
+
+[[check]]
+expr = "({m.velocity[2]} - (10*cos(0.5*({m.sampleTime} - 0.01))) - -0.02 - {m.biasState[5]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.0025
+rtol = 0.5
+why = "v East: white part (error - bias - biasState) has mean square (NF NF')[5,5] = 0.0025 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.velocity[2]} - (10*cos(0.5*({m.sampleTime} - 0.01))) - -0.02 - {m.biasState[5]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 0.0025
+rtol = 0.5
+why = "v East: white part (error - bias - biasState) has mean square (NF NF')[5,5] = 0.0025 on [12.2, 20.0]"
+
+[[check]]
+expr = "{m.velocity[3]} - (-1) - 0.1"
+at = "all"
+from = 0.2
+to = 10.199
+range = [-0.5385, 0.5385]
+why = "v Down: error vs truth at the epoch, minus bias, within 5 sigma = 0.539"
+
+[[check]]
+expr = "{m.velocity[3]} - (-1) - 0.1"
+at = "all"
+from = 12.2
+to = 20.0
+range = [-0.5385, 0.5385]
+why = "v Down: error vs truth at the epoch, minus bias, within 5 sigma = 0.539"
+
+[[check]]
+expr = "({m.velocity[3]} - (-1) - 0.1 - {m.biasState[6]})**2"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.01
+rtol = 0.5
+why = "v Down: white part (error - bias - biasState) has mean square (NF NF')[6,6] = 0.01 on [0.2, 10.199]"
+
+[[check]]
+expr = "({m.velocity[3]} - (-1) - 0.1 - {m.biasState[6]})**2"
+at = "mean"
+from = 12.2
+to = 20.0
+near = 0.01
+rtol = 0.5
+why = "v Down: white part (error - bias - biasState) has mean square (NF NF')[6,6] = 0.01 on [12.2, 20.0]"
+
+[[check]]
+expr = "({m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0 - {m.biasState[1]})*({m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5 - {m.biasState[2]})"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 0.15
+tol = 0.1
+why = "North-East noise correlation: mean of (eN - bN)(eE - bE) ~ NF[2,1] NF[1,1] = 0.15 m2 (0 if uncorrelated)"
+
+[[check]]
+expr = "hypot({m.position[1]} - 1.0, {m.position[2]} + 0.5)"
+at = "mean"
+from = 0.2
+to = 10.199
+near = 20.0
+tol = 0.5
+why = "the bias-corrected position lies on the 20 m circle within the noise"
+
+[[check]]
+expr = "{m.position[3]@20} - {m.position[3]@8}"
+at = "end"
+near = -12.0
+tol = 6.0
+why = "climb: Down position decreases 1 m/s (10 s apart, within 6 m of noise and bias drift)"
+
+[[check]]
+expr = "{m.velocity[3]} - {m.biasState[6]}"
+at = "mean"
+from = 0.2
+to = 10.199
+near = -0.9
+tol = 0.05
+why = "velocity is the time derivative of position: mean v Down - biasState ~ -1 m/s + 0.1 bias"
+
+[[check]]
+expr = "abs({m.biasState[1]}) + abs({m.biasState[2]}) + abs({m.biasState[3]})/2"
+at = "all"
+range = [0.0, 12.0]
+why = "biasState is biasFactor * latentBias, bounded by 4 sigma"
+
+[[check]]
+expr = "{m.position[1]} - (20*cos(0.5*({m.sampleTime} - 0.01))) - 1.0 - {m.biasState[1]} - (0.5*{m.normal[7]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "North: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
+
+[[check]]
+expr = "{m.position[2]} - (20*sin(0.5*({m.sampleTime} - 0.01))) - -0.5 - {m.biasState[2]} - (0.3*{m.normal[7]} + 0.5*{m.normal[8]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "East: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
+
+[[check]]
+expr = "{m.position[3]} - (-10 - ({m.sampleTime} - 0.01)) - 0.3 - {m.biasState[3]} - (1.0*{m.normal[9]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "Down: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
+
+[[check]]
+expr = "{m.velocity[1]} - (-10*sin(0.5*({m.sampleTime} - 0.01))) - 0.05 - {m.biasState[4]} - (0.05*{m.normal[10]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "v North: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
+
+[[check]]
+expr = "{m.velocity[2]} - (10*cos(0.5*({m.sampleTime} - 0.01))) - -0.02 - {m.biasState[5]} - (0.05*{m.normal[11]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "v East: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"
+
+[[check]]
+expr = "{m.velocity[3]} - (-1) - 0.1 - {m.biasState[6]} - (0.1*{m.normal[12]})"
+at = "all"
+from = 0.2
+to = 10.199
+near = 0.0
+tol = 1e-09
+known = "Rumoca 6058a2bb orders the two when-clauses on the same sample() wrongly: SampledDelivery stores the acquisition before StatisticalSensor's when-clause draws the epoch's normals, so every delivered error is the previous epoch's (zero at the first epoch); see README, Status"
+why = "v Down: exact G1 law at each epoch: error - bias = biasState + noiseFactor*normal[7:12] of that epoch"

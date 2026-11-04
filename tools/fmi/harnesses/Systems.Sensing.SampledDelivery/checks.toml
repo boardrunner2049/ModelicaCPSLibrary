@@ -1,0 +1,131 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.SampledDelivery, default clock (0.1 s from 0 s, latency 0), u = 1 + 2 t,
+# status 3 / valid, except status 7 / invalid acquired at 0.6 and 0.7 s.
+# Contract: every acquisition is delivered atomically (value, status, validity, epoch);
+# sampleTime = startTime + (sequence - 1) samplePeriod; sequence counts invalid packets too; the
+# outputs hold between deliveries. The t = 0 acquisition sees the inputs' start values (u = 0,
+# status 0, invalid). Each later sample acquires the inputs held over the 10 ms step before it.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.1*({m.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "sample epochs on the 0.1 s grid from startTime 0: sampleTime = (sequence - 1) * 0.1"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "latency 0: delivered at the acquisition epoch"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+range = [-1e-09, 0.1]
+why = "outputs are fresh: the delivery is less than one period old"
+
+[[check]]
+expr = "{m.sequence} + 10*{m.valid} + 100*{m.status}"
+at = 0.0
+near = 1.0
+tol = 0.0
+why = "t = 0 acquisition: inputs at their start values, delivered as sequence 1, invalid, status 0"
+
+[[check]]
+expr = "{m.y[1]} - (1 + 2*({m.sampleTime} - 0.01))"
+at = "all"
+from = 0.1
+near = 0.0
+tol = 1e-09
+why = "delivered value is the input at its acquisition (left limit of the 10 ms hold): y = 1 + 2 (sampleTime - 0.01)"
+
+[[check]]
+expr = "{m.y[1]@0.19} - {m.y[1]@0.1}"
+at = "end"
+near = 0.0
+tol = 0.0
+why = "the output holds between deliveries"
+
+[[check]]
+variable = "m.status"
+at = "all"
+from = 0.1
+to = 0.599
+near = 3.0
+tol = 0.0
+why = "valid packets carry their status 3"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+from = 0.1
+to = 0.599
+near = 1.0
+tol = 0.0
+why = "valid packets are flagged valid"
+
+[[check]]
+variable = "m.status"
+at = "all"
+from = 0.6
+to = 0.799
+near = 7.0
+tol = 0.0
+why = "the invalid acquisitions (0.6, 0.7 s) are delivered with their own status 7"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+from = 0.6
+to = 0.799
+near = 0.0
+tol = 0.0
+why = "... and flagged invalid"
+
+[[check]]
+expr = "{m.y[1]} - (1 + 2*({m.sampleTime} - 0.01))"
+at = "all"
+from = 0.6
+to = 0.799
+near = 0.0
+tol = 1e-09
+why = "... with their value and epoch (the queue is atomic, not a stale fix)"
+
+[[check]]
+expr = "{m.status} - 3*{m.valid}"
+at = "all"
+from = 0.8
+near = 0.0
+tol = 0.0
+why = "recovery: valid status 3 again from the 0.8 s acquisition"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+from = 0.8
+near = 1.0
+tol = 0.0
+why = "recovery: valid again from 0.8 s"
+
+[[check]]
+variable = "m.sequence"
+at = 0.75
+near = 8.0
+tol = 0.0
+why = "invalid packets are counted: sequence 8 at 0.75 s"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 21.0
+tol = 0.0
+why = "21 packets in 2 s (t = 0 included), one per period, no drift"

@@ -1,0 +1,185 @@
+# Acceptance checks over out/trace.csv (see tools/check_trace.py).
+# Systems.Sensing.IMU.DigitalSensor (I1), motion of lib/imu_motion.h (level 1 s, then roll 0.5 rad/s).
+# Deterministic chain per channel: analog x' = (drive - x)/2 ms, drive = ideal + equivalentError;
+# ADC = LSB-rounded, clipped to +-fullScale; IIR y_k = a y_(k-1) + (1 - a) adc_k, a = exp(-1/3);
+# delivered every 1 ms tick. Settled constants therefore come out as exact ADC codes:
+# -g = -9.80665 -> -9.81 (LSB 0.01), 0.5 rad/s -> 0.5, 50 rad/s -> fullScale 34.9066.
+# While rolling the chain lags ~5 ms (2 ms analog + 2.5 ms IIR group delay + input hold), so the
+# readings are compared with the truth 5 ms earlier, to LSB/2 plus curvature (8 mm/s2).
+# The t = 0 sample sees the inputs' start values (R_wb = 0); value checks start once settled.
+
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "every recorded value stays finite"
+
+[[check]]
+expr = "{m.sampleTime} - 0.001*({m.sequence} - 1)"
+at = "all"
+near = 0.0
+tol = 1e-09
+why = "sample epochs on the 1 ms grid: sampleTime = (sequence - 1) * samplePeriod"
+
+[[check]]
+expr = "{m.deliveryTime} - {m.sampleTime}"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "latency 0: delivered at the acquisition epoch"
+
+[[check]]
+expr = "t - {m.deliveryTime}"
+at = "all"
+range = [-1e-09, 0.001]
+why = "outputs are fresh: less than one period old at every communication point"
+
+[[check]]
+variable = "m.sequence"
+at = "end"
+near = 3001.0
+tol = 0.0
+why = "3001 samples in 3 s, all valid"
+
+[[check]]
+variable = "m.valid"
+at = "all"
+near = 1.0
+tol = 0.0
+why = "every sample is valid"
+
+[[check]]
+variable = "m.biasState*"
+at = "all"
+near = 0.0
+tol = 0.0
+why = "I1 has no stochastic errors: the Gauss-Markov state stays zero"
+
+[[check]]
+variable = "m.acceleration[3]"
+at = "all"
+from = 0.1
+to = 0.999
+near = -9.81
+tol = 1e-09
+why = "stationary: accelerometer z reads -g as the exact ADC code -9.81"
+
+[[check]]
+variable = "m.acceleration[2]"
+at = "all"
+from = 0.1
+to = 0.999
+near = 0.0
+tol = 1e-12
+why = "stationary: accelerometer y reads 0"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+from = 0.1
+to = 0.5
+near = 0.0
+tol = 1e-12
+why = "stationary: accelerometer x reads 0 before the injected error"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "all"
+from = 0.1
+to = 1.0
+near = 0.0
+tol = 1e-12
+why = "stationary: gyro x reads 0"
+
+[[check]]
+variable = "m.gyro[2]"
+at = "all"
+near = 0.0
+tol = 1e-12
+why = "gyro y reads 0 throughout (roll about x only)"
+
+[[check]]
+variable = "m.gyro[3]"
+at = "all"
+from = 0.1
+to = 0.3
+near = 0.0
+tol = 1e-12
+why = "stationary: gyro z reads 0 before the injected error"
+
+[[check]]
+variable = "m.gyro[3]"
+at = "max"
+near = 34.9066
+tol = 1e-05
+why = "equivalentError 50 rad/s on gyro z exceeds fullScale: clipped to 34.9066 rad/s (2000 deg/s), never above"
+
+[[check]]
+variable = "m.gyro[3]"
+at = 0.349
+near = 34.9066
+tol = 0.0001
+why = "clipped gyro z settles at fullScale within the 50 ms pulse"
+
+[[check]]
+variable = "m.gyro[3]"
+at = "all"
+from = 0.5
+near = 0.0
+tol = 1e-05
+why = "gyro z returns to 0 after the pulse"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+from = 0.6
+to = 0.7
+near = 0.5
+tol = 1e-09
+why = "equivalentError +0.5 m/s2 on accel x passes through the readout (exact code 0.5)"
+
+[[check]]
+variable = "m.acceleration[1]"
+at = "all"
+from = 0.85
+near = 0.0
+tol = 1e-06
+why = "accel x returns to 0 after the injected error"
+
+[[check]]
+variable = "m.gyro[1]"
+at = "all"
+from = 1.1
+near = 0.5
+tol = 1e-09
+why = "rolling: gyro x reads the applied 0.5 rad/s exactly once settled"
+
+[[check]]
+expr = "{m.acceleration[2]} + 9.80665*sin(0.5*max(0, {m.sampleTime} - 1.005))"
+at = "all"
+from = 1.1
+range = [-0.008, 0.008]
+why = "rolling: accel y = -g sin(phi) of the truth 5 ms earlier, within LSB/2 + curvature"
+
+[[check]]
+expr = "{m.acceleration[3]} + 9.80665*cos(0.5*max(0, {m.sampleTime} - 1.005))"
+at = "all"
+from = 1.1
+range = [-0.008, 0.008]
+why = "rolling: accel z = -g cos(phi) of the truth 5 ms earlier, within LSB/2 + curvature"
+
+[[check]]
+expr = "norm({m.acceleration[2]} + 9.80665*sin(0.5*max(0, {m.sampleTime} - 1.0)), {m.acceleration[3]} + 9.80665*cos(0.5*max(0, {m.sampleTime} - 1.0)))"
+at = "all"
+from = 1.1
+range = [0.0, 0.04]
+why = "rolling: uncompensated error vs the truth at sampleTime is the readout lag, < g W 6 ms + LSB"
+
+[[check]]
+expr = "norm({m.acceleration[1]}, {m.acceleration[2]}, {m.acceleration[3]})"
+at = "all"
+from = 1.1
+near = 9.80665
+tol = 0.01
+why = "rolling: the sensed specific force keeps magnitude g (the IMU frame only rotates)"
