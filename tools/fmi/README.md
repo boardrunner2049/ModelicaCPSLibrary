@@ -196,20 +196,25 @@ permuted channels), `coaxial.toml` (CoaxialX8, P1) and `quad_p3_hover.toml`
 below). Config file names must be unique across directories (the build
 directories are named after them).
 
-## Status (2026-11-03, Rumoca rumoca-bitcode-v1 a4dd197b)
+## Status (2026-11-04, Rumoca rumoca-bitcode-v1 9ce7f3bc)
 
 All 84 harnesses pass (4 of them are deliberately invalid chassis
 configurations whose export must be refused).
 
-`python3 sweep.py` exports 79 of the library's 129 models. Of the rest:
-- 12 are components that cannot stand alone; their harnesses go through a `Wrapper.mo`.
+`python3 sweep.py` exports 86 of the library's 129 models. Of the other 43:
+- 13 are components that cannot stand alone (parameters without values,
+  connectors left open); their harnesses go through a `Wrapper.mo`.
 - 4 are the invalid chassis configurations above.
-- The others need features the FMI C profile does not have yet (clocks,
-  delay and terminal events, `periodStart = time` in PWM, residual rows at
-  initialization) or have no harness yet: the GNSS and multi-fidelity IMU
-  sensor models added after the harnesses were written.
+- 21 use `when sample(...)` (IMU, GNSS and range sensors, sampled delivery,
+  PWM and the switching drives); the FMI C profile does not have sample
+  events yet (being worked on).
+- 4 GNSS models hit Rumoca gaps in the PVT solver function (`solvePvt`) or
+  an external-function call (LAPACK) in a when-clause.
+- `Tests.ThreePhaseAveraging` needs runtime events.
 
-### Vehicle status (2026-11-03, same Rumoca)
+The GNSS and multi-fidelity IMU sensor models have no harness yet.
+
+### Vehicle status (2026-11-03, Rumoca a4dd197b)
 
 Default mission, `python3 tools/run_all.py --vehicles`:
 

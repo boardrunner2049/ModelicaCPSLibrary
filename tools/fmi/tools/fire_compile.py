@@ -51,12 +51,12 @@ _HEAD = re.compile(r"\b(?:(?:encapsulated|partial|final|replaceable|redeclare|in
 
 
 def models() -> list[dict]:
-    """Every non-partial model, block or class of the library (outside deprecated/ and tools/)
-    as {"model": qualified name, "file": .mo path relative to the library root}."""
+    """Every non-partial model, block or class of the library (outside deprecated/, tools/
+    and the build/ output tree) as {"model": qualified name, "file": .mo path relative to the library root}."""
     out = []
     for f in sorted(LIBRARY_ROOT.rglob("*.mo")):
         rel = f.relative_to(LIBRARY_ROOT)
-        if rel.parts[0] in ("deprecated", "tools"):
+        if rel.parts[0] in ("deprecated", "tools", "build"):
             continue
         src = _STRING.sub('""', _COMMENT.sub("", f.read_text()))
         within = re.search(r"^\s*within\s+([\w.]*)\s*;", src, re.M)
