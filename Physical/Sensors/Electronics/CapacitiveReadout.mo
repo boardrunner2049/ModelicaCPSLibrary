@@ -24,6 +24,8 @@ equation
   idealVoltage=-carrierVoltage*(capacitancePlus-capacitanceMinus)/Cf;
   tau*der(voltage)+voltage=min(rail,max(-rail,idealVoltage));
   measuredDisplacement=-voltage/gain;
-  saturated=noEvent(abs(idealVoltage)>=rail);
+  // saturated is a Boolean read by the model, so it must be discrete-time (MLS 3.8.5);
+  // noEvent(...) would read the continuous idealVoltage outside an event-generating relation.
+  saturated=abs(idealVoltage)>=rail;
   assert(noEvent(abs(displacement)<length),"Readout electrode stroke exceeded");
 end CapacitiveReadout;

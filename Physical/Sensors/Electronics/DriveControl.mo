@@ -49,5 +49,7 @@ equation
     (rawFrequency<=w0*(1-p.pllRange) and phaseError<0)) then 0 else p.pllKi*phaseError;
   der(phase)=frequency;
   voltage=driveVoltage*cos(phase);
-  locked=noEvent(abs(amplitudeError)<0.05 and abs(phaseError)<0.05);
+  // locked is a Boolean read by the model, so it must be discrete-time (MLS 3.8.5);
+  // noEvent(...) would read the continuous errors outside an event-generating relation.
+  locked=abs(amplitudeError)<0.05 and abs(phaseError)<0.05;
 end DriveControl;
