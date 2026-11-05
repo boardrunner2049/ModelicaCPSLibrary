@@ -250,7 +250,7 @@ Known failures and Rumoca defects found by these harnesses:
   1 kHz drive mode diverges inside the FMU's integration of the step); 0.5 ms
   and below run, the harnesses use 0.25 ms.
 
-### Vehicle status (2026-11-03, Rumoca a4dd197b)
+### Vehicle status (2026-11-04, Rumoca e32964fc)
 
 Default mission, `python3 tools/run_all.py --vehicles`:
 
@@ -265,6 +265,14 @@ Default mission, `python3 tools/run_all.py --vehicles`:
 | payload | 43/43 | 0.06 cm | 3.4 cm / 0.07 cm / 0.60 deg | 9.1 deg |
 | test-configs/octo | 51/51 | 0.01 cm | 3.4 cm / 0.11 cm / 0.60 deg | 9.1 deg |
 | test-configs/coaxial (P1) | 51/51 | 0.01 cm | 3.4 cm / 0.11 cm / 0.60 deg | 9.1 deg |
+| quad_i1 (I1 digital IMU) | 43/43 | 0.01 cm | 3.4 cm / 0.11 cm / 0.60 deg | 8.9 deg |
+| quad_i2 (I2 device IMU) | 43/43 | 0.01 cm | 3.3 cm / 0.11 cm / 0.64 deg | 8.9 deg |
+| quad_i2_acoustic | 43/43 | 0.01 cm | 3.3 cm / 0.11 cm / 0.64 deg | 8.9 deg |
+| quad_i3 (I3 electromechanical IMU) | 43/43 | 0.01 cm | 3.4 cm / 0.11 cm / 0.60 deg | 8.8 deg |
+| quad_i3_acoustic | 43/43 | 0.01 cm | 3.4 cm / 0.11 cm / 0.60 deg | 8.8 deg |
+| legacy_quad_statistical | 43/43 | 0.01 cm | 3.3 cm / 0.11 cm / 0.76 deg | 9.0 deg |
+| legacy_quad_device | 43/43 | 0.01 cm | 3.3 cm / 0.11 cm / 0.64 deg | 8.9 deg |
+| legacy_quad_acoustic | 43/43 | 0.01 cm | 3.3 cm / 0.11 cm / 0.64 deg | 8.9 deg |
 
 A P0..P2 flight takes 10..30 s of wall time.
 
@@ -280,9 +288,11 @@ A P0..P2 flight takes 10..30 s of wall time.
   `evaluate_derivatives`: assertions and torn algebraic solves; the
   communication step makes no difference), so the full 49 s mission takes
   ~10 h and exceeded `TMO=25000`; give run_all a larger `TMO` for P3.
-- `quad_p4`, `hex_p4`: export refused, `unsupported-feature:clocks` (the
-  switching inverter's clock partitions).
-- `quad_i1`, `quad_i2`, `quad_i3`, `quad_i2_acoustic`, `quad_i3_acoustic`,
-  `legacy_quad_*`: export fails, `[EI007] redeclaration error for
-  sampleTime: selected redeclare class has no such member` (IMU sensor
-  models; Rumoca gaps being worked on).
+- `quad_p4` exports with Rumoca's `sample()` events (6058a2bb; `hex_p4` not
+  tried yet); not flown: it uses the P3 motor parameters (no lift-off) and
+  simulates at P3 speed or slower. The P3 results above are from a4dd197b.
+- The sampled-IMU configs (I1..I3, acoustic, legacy_*) needed Rumoca
+  e32964fc: the IMU redeclaration nested in the generated modifier
+  `plant(sensors(redeclare model ImuModel = ...))` was dropped (the default
+  IMU was instantiated) and `plant.sensors.imu.sampleTime` failed with
+  `[EI007]`.
