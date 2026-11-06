@@ -13,6 +13,7 @@ model, and reads vehicle state and simulated sensors.
 | Checker | [`tools/vehicle_interface/`](../tools/vehicle_interface) | Validates exported metadata; writes the runtime descriptor |
 | Runtime | [`runtime/`](../runtime) | Self-contained C library: loads the FMU in-process, drives it |
 | Example host | [`runtime/examples/hover_host.c`](../runtime/examples/hover_host.c) | Standalone host using only contract capabilities |
+| ArduPilot SITL prototype | [`runtime/hosts/ardupilot/`](../runtime/hosts/ardupilot) | Patch adding SITL model `cpvehicle` (host code, kept for reproducibility) |
 
 CP Models owns the contract, the partials, the checker and the runtime. Hosts
 (FastDyn, ArduPilot SITL, …) own their adapters. Nothing here depends on a
@@ -44,7 +45,7 @@ Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
 | FastDyn `Copter`/`Rover`/`Plane` migrated to these partials | yes | no | no |
 | Rover and fixed-wing compositions in CP Models | contract only | no | no |
 | FastDyn host adapter (planned as a device model) | yes | no | no |
-| ArduPilot SITL host | prototype | prototype | see the prototype's notes |
+| ArduPilot SITL host (`runtime/hosts/ardupilot`) | prototype | prototype on ArduPilot `Copter-4.6.2` | ArduCopter with the CP Models quad flies a guided mission (takeoff, hold, 20 m waypoint, land) in two launches of one SITL directory |
 | PX4 SITL, Gazebo, Isaac Sim hosts | design targets | no | no |
 
 A successful conformance check or launch is not evidence of model fidelity or
@@ -288,6 +289,9 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
   - the legacy FastDyn Copter FMU loads with opt-in and reports no state.
 - **Standalone host:** `cpv_hover_host` climbs to and holds 1 m with the quad
   and the hexa using the same code.
+- **ArduPilot SITL prototype:** the same quad artifact as the SITL physics
+  model, flown by ArduCopter through a checked guided mission. This is
+  evidence for one host and one vehicle only, not general SITL support.
 
 ## 7. Known gaps
 

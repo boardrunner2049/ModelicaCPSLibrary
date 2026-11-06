@@ -1,0 +1,616 @@
+From 1c464225f40e1831132d742eebf39e433f9fc51d Mon Sep 17 00:00:00 2001
+From: Arslan8 <arslankhan52@gmail.com>
+Date: Thu, 5 Nov 2026 22:53:41 -0500
+Subject: [PATCH] SITL: CP Models vehicle FMU as in-process physics (prototype)
+
+--model cpvehicle:<descriptor> loads a CP Models (ModelicaCPSLibrary)
+vehicle FMU into the SITL process through the CP Models vehicle runtime
+and uses it in place of SITL's built-in vehicle physics.
+
+- SIM_CPVehicle: servo outputs drive pwm_actuation_v1 (identity or
+  CPV_CHANNEL_MAP); kinematic_state_v1 truth and imu_v1 specific force
+  fill position, velocity, attitude, body rate and accel_body; SITL's
+  home becomes the FMU's geodetic origin; the FMU is advanced to SITL's
+  frame time in integer microseconds; any runtime error panics instead
+  of continuing on stale physics.
+- waf: --cpvehicle=PATH links the runtime; without it the model is
+  compiled out.
+- examples/CPVehicle: parameters matching the CP Models quad and a
+  checked guided mission.
+
+Tested with ArduCopter 4.6.2 and the CP Models quad only.
+---
+ Tools/ardupilotwaf/boards.py                  |  14 ++
+ libraries/AP_HAL_SITL/SITL_cmdline.cpp        |   4 +
+ libraries/SITL/SIM_CPVehicle.cpp              | 198 ++++++++++++++++++
+ libraries/SITL/SIM_CPVehicle.h                |  73 +++++++
+ libraries/SITL/examples/CPVehicle/README.md   |  80 +++++++
+ .../examples/CPVehicle/cpvehicle_quad.parm    |  13 ++
+ .../SITL/examples/CPVehicle/fly_mission.py    | 121 +++++++++++
+ wscript                                       |   3 +
+ 8 files changed, 506 insertions(+)
+ create mode 100644 libraries/SITL/SIM_CPVehicle.cpp
+ create mode 100644 libraries/SITL/SIM_CPVehicle.h
+ create mode 100644 libraries/SITL/examples/CPVehicle/README.md
+ create mode 100644 libraries/SITL/examples/CPVehicle/cpvehicle_quad.parm
+ create mode 100755 libraries/SITL/examples/CPVehicle/fly_mission.py
+
+diff --git a/Tools/ardupilotwaf/boards.py b/Tools/ardupilotwaf/boards.py
+index b1a54e45e3..b1838760d2 100644
+--- a/Tools/ardupilotwaf/boards.py
++++ b/Tools/ardupilotwaf/boards.py
+@@ -812,6 +812,20 @@ class sitl(Board):
+         if cfg.options.sitl_rgbled:
+             env.CXXFLAGS += ['-DWITH_SITL_RGBLED']
+ 
++        if cfg.options.cpvehicle:
++            # CP Models vehicle runtime: in-process FMU physics (SIM_CPVehicle).
++            root = os.path.abspath(os.path.expanduser(cfg.options.cpvehicle))
++            library = os.path.join(root, 'build', 'runtime-release', 'libcpvehicle.a')
++            header = os.path.join(root, 'runtime', 'include', 'cpvehicle', 'cpvehicle.h')
++            for required in (library, header):
++                if not os.path.isfile(required):
++                    cfg.fatal('--cpvehicle: %s not found' % required)
++            env.INCLUDES += [os.path.join(root, 'runtime', 'include')]
++            env.CXXFLAGS += ['-DAP_SIM_CPVEHICLE_ENABLED=1']
++            # LDFLAGS end the link line, after the vehicle's library archives
++            # that reference the runtime (SIM_CPVehicle is in them).
++            env.LDFLAGS += [library, '-ldl']
++
+         if cfg.options.enable_sfml_audio:
+             if not cfg.check_SFML_Audio(env):
+                 cfg.fatal("Failed to find SFML Audio libraries")
+diff --git a/libraries/AP_HAL_SITL/SITL_cmdline.cpp b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
+index 042bb2ce7f..590bbbbed2 100644
+--- a/libraries/AP_HAL_SITL/SITL_cmdline.cpp
++++ b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
+@@ -37,6 +37,7 @@
+ #include <SITL/SIM_Webots.h>
+ #include <SITL/SIM_Webots_Python.h>
+ #include <SITL/SIM_JSON.h>
++#include <SITL/SIM_CPVehicle.h>
+ #include <SITL/SIM_Blimp.h>
+ #include <SITL/SIM_NoVehicle.h>
+ #include <SITL/SIM_StratoBlimp.h>
+@@ -177,6 +178,9 @@ static const struct {
+     { "webots-python",      WebotsPython::create },
+     { "webots",             Webots::create },
+     { "JSON",               JSON::create },
++#if AP_SIM_CPVEHICLE_ENABLED
++    { "cpvehicle",          CPVehicle::create },
++#endif
+     { "blimp",              Blimp::create },
+     { "novehicle",          NoVehicle::create },
+ #if AP_SIM_STRATOBLIMP_ENABLED
+diff --git a/libraries/SITL/SIM_CPVehicle.cpp b/libraries/SITL/SIM_CPVehicle.cpp
+new file mode 100644
+index 0000000000..6b4e1cb1a7
+--- /dev/null
++++ b/libraries/SITL/SIM_CPVehicle.cpp
+@@ -0,0 +1,198 @@
++/*
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++/*
++  CP Models vehicle FMU as the SITL physics model (prototype); see SIM_CPVehicle.h.
++*/
++#include "SIM_CPVehicle.h"
++
++#if AP_SIM_CPVEHICLE_ENABLED
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <SITL/SITL.h>
++
++using namespace SITL;
++
++namespace {
++// What this host consumes. SITL simulates GPS, compass and barometer from
++// the truth itself, so the FMU's own sensor models are not used here.
++const char *const required_capabilities[] = {
++    "pwm_actuation_v1",
++    "kinematic_state_v1",
++    "imu_v1",
++};
++}
++
++CPVehicle::CPVehicle(const char *frame_str) :
++    Aircraft(frame_str)
++{
++    const char *colon = strchr(frame_str, ':');
++    if (colon == nullptr || colon[1] == '\0') {
++        AP_HAL::panic("cpvehicle: use --model cpvehicle:/path/to/vehicle.json");
++    }
++    cpv_options_t options;
++    cpv_options_init(&options);
++    options.required_capabilities = required_capabilities;
++    options.required_count = ARRAY_SIZE(required_capabilities);
++    options.instance_name = "ardupilot-sitl";
++    char error[1024];
++    const cpv_status_t status = cpv_open(colon + 1, &options, &vehicle, error, sizeof(error));
++    if (status != CPV_OK) {
++        AP_HAL::panic("cpvehicle: cannot open %s: %s: %s", colon + 1,
++                      cpv_status_string(status), error);
++    }
++
++    // Explicit mapping from SITL servo outputs to FMU pwm elements.
++    channel_count = cpv_pwm_count(vehicle);
++    if (channel_count > max_channels) {
++        AP_HAL::panic("cpvehicle: model has %u PWM channels; SITL provides %u",
++                      unsigned(channel_count), unsigned(max_channels));
++    }
++    for (uint8_t i = 0; i < max_channels; i++) {
++        channel_source[i] = i < channel_count ? int8_t(i) : -1;
++    }
++    const char *map = getenv("CPV_CHANNEL_MAP");
++    if (map != nullptr && map[0] != '\0') {
++        size_t element = 0;
++        for (const char *p = map; *p != '\0'; element++) {
++            char *end = nullptr;
++            const long servo = strtol(p, &end, 10);
++            if (end == p || servo < -1 || servo >= max_channels || element >= channel_count ||
++                (*end != ',' && *end != '\0')) {
++                AP_HAL::panic("cpvehicle: invalid CPV_CHANNEL_MAP '%s' for %u channel(s)", map,
++                              unsigned(channel_count));
++            }
++            channel_source[element] = int8_t(servo);
++            p = *end == ',' ? end + 1 : end;
++        }
++        if (element != channel_count) {
++            AP_HAL::panic("cpvehicle: CPV_CHANNEL_MAP has %u entries; the model has %u channels",
++                          unsigned(element), unsigned(channel_count));
++        }
++    }
++    ::printf("cpvehicle: %s, %u PWM channel(s), profile %s\n", cpv_model_name(vehicle),
++             unsigned(channel_count), cpv_profile(vehicle));
++    for (size_t i = 0; i < channel_count; i++) {
++        double start_us = 0;
++        cpv_pwm_start(vehicle, i, &start_us);
++        ::printf("cpvehicle:   pwm[%u] <- SERVO%d (start %.0f us)\n", unsigned(i + 1),
++                 channel_source[i] + 1, start_us);
++    }
++}
++
++CPVehicle::~CPVehicle()
++{
++    cpv_close(vehicle);
++}
++
++void CPVehicle::fail(const char *what, cpv_status_t status) const
++{
++    // Never continue on stale physics.
++    AP_HAL::panic("cpvehicle: %s at t=%.6f s: %s: %s", what, cpv_time(vehicle),
++                  cpv_status_string(status), cpv_last_error(vehicle));
++}
++
++/*
++  The FMU's geodetic origin is SITL's home, so the vehicle's NED position
++  and SITL's location agree. SITL has no geoid: home altitude is used as the
++  WGS84 ellipsoid altitude.
++ */
++void CPVehicle::start()
++{
++    cpv_status_t status;
++    if ((status = cpv_set_parameter(vehicle, "lat0", home.lat * 1.0e-7)) != CPV_OK ||
++        (status = cpv_set_parameter(vehicle, "lon0", home.lng * 1.0e-7)) != CPV_OK ||
++        (status = cpv_set_parameter(vehicle, "ground_alt_wgs84", home.alt * 0.01)) != CPV_OK) {
++        fail("setting the geodetic origin", status);
++    }
++    status = cpv_initialize(vehicle, 0.0);
++    if (status != CPV_OK && status != CPV_WARNING) {
++        fail("initialize", status);
++    }
++    start_time_us = time_now_us;
++    started = true;
++    if (!is_zero(sitl->wind_speed)) {
++        ::printf("cpvehicle: SIM_WIND_SPD is ignored; the model provides no wind input\n");
++    }
++}
++
++void CPVehicle::update(const struct sitl_input &input)
++{
++    if (!started) {
++        start();
++    }
++
++    // Actuation: SITL servo outputs to the FMU pwm vector. A zero output
++    // means the channel is not driven; the FMU keeps its previous value.
++    for (size_t i = 0; i < channel_count; i++) {
++        const int8_t servo = channel_source[i];
++        if (servo >= 0 && input.servos[servo] != 0) {
++            const cpv_status_t status = cpv_set_pwm(vehicle, i, input.servos[servo]);
++            if (status != CPV_OK) {
++                fail("set pwm", status);
++            }
++        }
++    }
++
++    // Advance to the end of this frame, in integer microseconds from start.
++    const double target_s = (time_now_us + frame_time_us - start_time_us) * 1.0e-6;
++    double reached_s = 0;
++    cpv_status_t status = cpv_advance_to(vehicle, target_s, &reached_s);
++    if (status != CPV_OK && status != CPV_WARNING) {
++        fail("advance", status);
++    }
++
++    cpv_kinematic_state_t state;
++    cpv_imu_t imu;
++    if ((status = cpv_get_state(vehicle, &state)) >= CPV_UNSUPPORTED) {
++        fail("read kinematic state", status);
++    }
++    if ((status = cpv_get_imu(vehicle, &imu)) >= CPV_UNSUPPORTED) {
++        fail("read imu", status);
++    }
++
++    // Truth at the vehicle's combined CG. SITL adds its own sensor noise to
++    // gyro and accel_body; use a model with an ideal IMU so noise is not
++    // applied twice.
++    Quaternion q(state.quaternion_wb[0], state.quaternion_wb[1], state.quaternion_wb[2],
++                 state.quaternion_wb[3]);
++    q.normalize();
++    q.rotation_matrix(dcm);
++    gyro = Vector3f(state.angular_velocity_frd[0], state.angular_velocity_frd[1],
++                    state.angular_velocity_frd[2]);
++    accel_body = Vector3f(imu.accel_frd[0], imu.accel_frd[1], imu.accel_frd[2]);
++    velocity_ef = Vector3f(state.velocity_ned[0], state.velocity_ned[1], state.velocity_ned[2]);
++    position = Vector3d(state.position_ned[0], state.position_ned[1], state.position_ned[2]);
++    // The FMU's origin is home; SITL's origin moves at 1 Hz (update_position).
++    position.xy() += origin.get_distance_NE_double(home);
++
++    // No wind input in the model: air-relative velocity is ground velocity.
++    wind_ef.zero();
++    velocity_air_ef = velocity_ef;
++    velocity_air_bf = dcm.transposed() * velocity_air_ef;
++    update_eas_airspeed();
++
++    // No battery capability in the model: a constant SIM_BATT_VOLTAGE.
++    battery_voltage = sitl->batt_voltage;
++    battery_current = 0;
++
++    update_position();
++    time_advance();
++    update_mag_field_bf();
++}
++
++#endif  // AP_SIM_CPVEHICLE_ENABLED
+diff --git a/libraries/SITL/SIM_CPVehicle.h b/libraries/SITL/SIM_CPVehicle.h
+new file mode 100644
+index 0000000000..a421228da4
+--- /dev/null
++++ b/libraries/SITL/SIM_CPVehicle.h
+@@ -0,0 +1,73 @@
++/*
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++/*
++  CP Models vehicle FMU as the SITL physics model (prototype).
++
++  The FMU is loaded into this process through the CP Models vehicle
++  runtime (libcpvehicle) and replaces SITL's built-in vehicle physics;
++  the autopilot and SITL's sensor simulation are unchanged.
++
++    --model cpvehicle:/path/to/vehicle.json
++
++  vehicle.json is a descriptor from
++  `python -m cp_vehicle_interface prepare MODEL.fmu OUT_DIR`.
++  CPV_CHANNEL_MAP (optional) lists, for each FMU pwm element in order, the
++  SITL servo output that drives it, e.g. "0,1,2,3"; the default maps
++  servo k to element k+1.
++
++  Built only with ./waf configure --cpvehicle=PATH (AP_SIM_CPVEHICLE_ENABLED).
++*/
++#pragma once
++
++#include <AP_HAL/AP_HAL_Boards.h>
++
++#ifndef AP_SIM_CPVEHICLE_ENABLED
++#define AP_SIM_CPVEHICLE_ENABLED 0
++#endif
++
++#if AP_SIM_CPVEHICLE_ENABLED
++
++#include "SIM_Aircraft.h"
++
++#include <cpvehicle/cpvehicle.h>
++
++namespace SITL {
++
++class CPVehicle : public Aircraft {
++public:
++    CPVehicle(const char *frame_str);
++    ~CPVehicle();
++
++    void update(const struct sitl_input &input) override;
++
++    static Aircraft *create(const char *frame_str) {
++        return NEW_NOTHROW CPVehicle(frame_str);
++    }
++
++private:
++    void start();
++    void fail(const char *what, cpv_status_t status) const;
++
++    static constexpr uint8_t max_channels = 32;  // sitl_input.servos
++    cpv_vehicle_t *vehicle;
++    bool started;
++    uint64_t start_time_us;
++    size_t channel_count;
++    int8_t channel_source[max_channels];  // SITL servo index per FMU pwm element, -1: none
++};
++
++}  // namespace SITL
++
++#endif  // AP_SIM_CPVEHICLE_ENABLED
+diff --git a/libraries/SITL/examples/CPVehicle/README.md b/libraries/SITL/examples/CPVehicle/README.md
+new file mode 100644
+index 0000000000..0fdbdf1fcb
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/README.md
+@@ -0,0 +1,80 @@
++# CP Models vehicle FMU as SITL physics (prototype)
++
++`--model cpvehicle:<descriptor>` replaces SITL's built-in vehicle physics
++with a CP Models (ModelicaCPSLibrary) vehicle FMU, loaded **into the SITL
++process** through the CP Models vehicle runtime (`libcpvehicle`). The
++autopilot and SITL's sensor simulation are unchanged. There is no socket and
++no second process (compare `libraries/SITL/examples/JSON`).
++
++Status: prototype, tested only with ArduCopter 4.6.2 and the CP Models quad
++(`configs/quad.toml`). It is not upstream ArduPilot code.
++
++## Build
++
++```sh
++# CP Models: build the FMU, write its descriptor, build the runtime
++cd ModelicaCPSLibrary
++python3 tools/vehicle_interface/build_vehicle_fmu.py configs/quad.toml build/quad.fmu
++(cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare ../../build/quad.fmu \
++    ../../build/quad --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1)
++cmake -S runtime -B build/runtime-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
++cmake --build build/runtime-release
++
++# ArduPilot (a venv with future, empy==3.3.4, pexpect, dronecan, pymavlink on PATH)
++./waf configure --board sitl --cpvehicle=/path/to/ModelicaCPSLibrary
++./waf copter
++```
++
++Without `--cpvehicle` nothing changes: the model is compiled out
++(`AP_SIM_CPVEHICLE_ENABLED`).
++
++## Run
++
++```sh
++build/sitl/bin/arducopter --model cpvehicle:/path/to/ModelicaCPSLibrary/build/quad/vehicle.json \
++    --defaults Tools/autotest/default_params/copter.parm,libraries/SITL/examples/CPVehicle/cpvehicle_quad.parm \
++    --home 40.414929,-86.932387,149,0 --speedup 4 -I3
++libraries/SITL/examples/CPVehicle/fly_mission.py --connect tcp:127.0.0.1:5790
++```
++
++`fly_mission.py` waits for the EKF to use GPS, then arms in GUIDED, takes off
++to 5 m, holds, flies 20 m north and back, lands, and checks each step.
++
++## What the adapter does (`SIM_CPVehicle.cpp`)
++
++| SITL | From the FMU (vehicle interface v1) |
++|---|---|
++| servo outputs `SERVO1..n` | `pwm_actuation_v1`: servo *k* drives `pwm[k+1]`, or `CPV_CHANNEL_MAP` (one SITL servo index per FMU element). A zero output leaves the channel at its previous value. |
++| `position`, `velocity_ef`, `dcm`, `gyro` | `kinematic_state_v1`: CG truth, NED, scalar-first quaternion |
++| `accel_body` | `imu_v1` `accel` (specific force, FRD) |
++| home | sets the FMU's geodetic origin (`lat0`, `lon0`, `ground_alt_wgs84`) before initialization. SITL has no geoid, so home altitude is used as the ellipsoid altitude. |
++| time | the FMU is advanced to SITL's `time_now_us + frame_time_us` (integer µs from start) every frame, in steps of at most 2 ms |
++
++- **Sensors.** SITL simulates GPS, compass, barometer and IMU noise from that
++  truth, as it does for every model. The FMU's own GPS, magnetometer and
++  barometer outputs are not used. Use a model with an ideal IMU so IMU noise
++  is not applied twice.
++- **Not modelled by the FMU here.** Battery voltage is a constant
++  `SIM_BATT_VOLTAGE`. Wind (`SIM_WIND_*`) is ignored and reported at start.
++  Payloads and clamps are not supported.
++- **Failures.** Any runtime error stops SITL (`AP_HAL::panic`) with the
++  reason. It never continues on stale physics.
++- **Channel order.** `configs/quad.toml` is wired in ArduCopter's Quad-X order
++  (`actuatorIndex = [3, 2, 4, 1]`), so the identity map is right. The hexa
++  composition is not in ArduCopter's Hexa-X order; it needs a
++  `CPV_CHANNEL_MAP` and has not been flown here.
++
++## Measured (ArduCopter 4.6.2, CP Models quad, `--speedup 4`)
++
++Two launches in the same directory (the second reuses the saved parameters)
++both passed: hover at 4.99 m with drift ≤ 0.01 m, the 20 m north waypoint
++reached to within 0.4 m, landed 0.25–0.28 m from home, maximum tilt 17.5°.
++
++## Differences from FastDyn (QEMU)
++
++| | FastDyn | This prototype |
++|---|---|---|
++| Autopilot | firmware binary on an emulated board | native SITL build |
++| Sensors | FMU sensor outputs through emulated drivers | SITL sensor simulation from FMU truth |
++| Clock | QEMU instruction count, 1 ms board tick | SITL frame loop (default 1200 Hz) |
++| FMU steps | ≤ 2 ms per step at each timer tick | one step per SITL frame (≈ 0.83 ms) |
+diff --git a/libraries/SITL/examples/CPVehicle/cpvehicle_quad.parm b/libraries/SITL/examples/CPVehicle/cpvehicle_quad.parm
+new file mode 100644
+index 0000000000..4530004042
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/cpvehicle_quad.parm
+@@ -0,0 +1,13 @@
++# ArduCopter settings for the CP Models quad (ModelicaCPSLibrary configs/quad.toml)
++# loaded with --model cpvehicle:<descriptor>. Values follow the model, not tuning.
++FRAME_CLASS     1       # quad
++FRAME_TYPE      1       # X: SERVO1..4 = front-right, rear-left, front-left, rear-right
++# The FMU's pwm_min/pwm_max (printed by the model at startup).
++MOT_PWM_MIN     1100
++MOT_PWM_MAX     1900
++# first_order_speed motors: rotor speed is linear in command, thrust is
++# quadratic in speed, so thrust is quadratic in command.
++MOT_THST_EXPO   1.0
++# Measured hover command 0.606 of the PWM span (runtime/examples/hover_host):
++# thrust fraction 0.606^2.
++MOT_THST_HOVER  0.37
+diff --git a/libraries/SITL/examples/CPVehicle/fly_mission.py b/libraries/SITL/examples/CPVehicle/fly_mission.py
+new file mode 100755
+index 0000000000..8ff4cf904e
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/fly_mission.py
+@@ -0,0 +1,121 @@
++#!/usr/bin/env python3
++"""Fly a short guided mission on ArduCopter SITL and check it.
++
++usage: fly_mission.py [--connect tcp:127.0.0.1:5760] [--alt 5] [--north 20]
++
++Waits for the EKF to accept GPS, arms in GUIDED, takes off, holds, flies
++north, comes back, lands, and checks altitude, position and disarm. Exits
++nonzero with the reason on the first failed check.
++"""
++import argparse
++import math
++import sys
++import time
++
++from pymavlink import mavutil
++
++
++def main():
++    p = argparse.ArgumentParser(description=__doc__)
++    p.add_argument("--connect", default="tcp:127.0.0.1:5760")
++    p.add_argument("--alt", type=float, default=5.0)
++    p.add_argument("--north", type=float, default=20.0)
++    p.add_argument("--timeout", type=float, default=600.0)
++    a = p.parse_args()
++    deadline = time.time() + a.timeout
++    m = mavutil.mavlink_connection(a.connect, autoreconnect=True)
++    m.wait_heartbeat(timeout=60)
++    print(f"heartbeat from system {m.target_system}")
++    m.mav.request_data_stream_send(m.target_system, m.target_component,
++                                   mavutil.mavlink.MAV_DATA_STREAM_ALL, 10, 1)
++    state = {"tilt": 0.0}
++
++    def pump(seconds):
++        end = time.time() + seconds
++        last = None
++        while time.time() < end:
++            msg = m.recv_match(blocking=True, timeout=0.5)
++            if msg is None:
++                continue
++            kind = msg.get_type()
++            if kind == "STATUSTEXT":
++                print(f"  [fc] {msg.text}")
++            elif kind == "ATTITUDE" and state.get("armed"):
++                state["tilt"] = max(state["tilt"], math.degrees(max(abs(msg.roll), abs(msg.pitch))))
++            elif kind == "LOCAL_POSITION_NED":
++                last = msg
++                state["local"] = msg
++            elif kind == "EKF_STATUS_REPORT":
++                state["ekf_flags"] = msg.flags
++            elif kind == "COMMAND_ACK":
++                state.setdefault("acks", {})[msg.command] = msg.result
++            elif kind == "HEARTBEAT" and msg.get_srcSystem() == m.target_system:
++                state["armed"] = bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
++        return last
++
++    def fail(reason):
++        print(f"FAILED: {reason}")
++        sys.exit(1)
++
++    def wait_until(predicate, what, timeout):
++        end = min(time.time() + timeout, deadline)
++        while time.time() < end:
++            pump(0.5)
++            if predicate():
++                return
++        fail(f"timed out waiting for {what}")
++
++    # Wait until the EKF has an absolute horizontal position (from GPS).
++    need = (mavutil.mavlink.EKF_POS_HORIZ_ABS | mavutil.mavlink.EKF_VELOCITY_HORIZ |
++            mavutil.mavlink.EKF_POS_VERT_ABS)
++    wait_until(lambda: state.get("ekf_flags", 0) & need == need, "EKF position from GPS", 180)
++    print("EKF has a GPS position")
++    # Arm in GUIDED once pre-arm checks pass.
++    m.set_mode("GUIDED")
++    end = time.time() + 180
++    while not state.get("armed"):
++        if time.time() > end:
++            fail("could not arm within 180 s")
++        m.mav.command_long_send(m.target_system, m.target_component,
++                                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0, 1, 0, 0, 0, 0, 0, 0)
++        pump(2)
++    print("armed")
++    state.setdefault("acks", {}).pop(mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, None)
++    m.mav.command_long_send(m.target_system, m.target_component,
++                            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, 0, a.alt)
++    wait_until(lambda: mavutil.mavlink.MAV_CMD_NAV_TAKEOFF in state["acks"], "takeoff ack", 10)
++    if state["acks"][mavutil.mavlink.MAV_CMD_NAV_TAKEOFF] != mavutil.mavlink.MAV_RESULT_ACCEPTED:
++        fail(f"takeoff refused (MAV_RESULT {state['acks'][mavutil.mavlink.MAV_CMD_NAV_TAKEOFF]})")
++    wait_until(lambda: "local" in state and -state["local"].z >= 0.95 * a.alt,
++               f"altitude {a.alt} m", 60)
++    print(f"reached {-state['local'].z:.2f} m")
++    pump(5)
++    loc = state["local"]
++    if abs(-loc.z - a.alt) > 0.5:
++        fail(f"hover altitude {-loc.z:.2f} m, expected {a.alt} m")
++    print(f"hover: altitude {-loc.z:.2f} m, drift {math.hypot(loc.x, loc.y):.2f} m")
++
++    def goto(north, east):
++        m.mav.set_position_target_local_ned_send(
++            0, m.target_system, m.target_component, mavutil.mavlink.MAV_FRAME_LOCAL_NED,
++            0b0000111111111000, north, east, -a.alt, 0, 0, 0, 0, 0, 0, 0, 0)
++
++    goto(a.north, 0)
++    wait_until(lambda: math.hypot(state["local"].x - a.north, state["local"].y) < 1.0,
++               f"{a.north} m north", 90)
++    print(f"north: ({state['local'].x:.2f}, {state['local'].y:.2f}) m")
++    goto(0, 0)
++    wait_until(lambda: math.hypot(state["local"].x, state["local"].y) < 1.0, "return", 90)
++    print(f"back: ({state['local'].x:.2f}, {state['local'].y:.2f}) m")
++    m.set_mode("LAND")
++    wait_until(lambda: not state.get("armed"), "landing and disarm", 120)
++    loc = state["local"]
++    print(f"landed and disarmed at ({loc.x:.2f}, {loc.y:.2f}, {loc.z:.2f}) m; max tilt "
++          f"{state['tilt']:.1f} deg")
++    if math.hypot(loc.x, loc.y) > 1.5:
++        fail("landed more than 1.5 m from home")
++    print("PASSED")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/wscript b/wscript
+index f400c74cdb..c51fbc3920 100644
+--- a/wscript
++++ b/wscript
+@@ -368,6 +368,9 @@ configuration in order to save typing.
+                  default=False,
+                  help="Enable SITL OSD")
+ 
++    g.add_option('--cpvehicle', action='store', default=None, metavar='PATH',
++        help="Enable the SITL 'cpvehicle' model: a CP Models (ModelicaCPSLibrary) checkout whose runtime is built in PATH/build/runtime-release (cmake -S runtime -B build/runtime-release)")
++
+     g.add_option('--sitl-rgbled', action='store_true',
+                  default=False,
+                  help="Enable SITL RGBLed")
+-- 
+2.43.0
+
