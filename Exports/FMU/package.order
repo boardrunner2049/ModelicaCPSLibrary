@@ -1,3 +1,6 @@
 VehicleInterface
 PartialCopterInterface
 CopterInterface
+PartialSensedVehicleInterface
+Rover
+FixedWing

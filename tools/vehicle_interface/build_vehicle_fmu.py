@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Build a vehicle interface FMU from a fire-compose configuration.
+"""Build a vehicle interface FMU.
 
-usage: build_vehicle_fmu.py CONFIG OUT.fmu [--work DIR]
+usage: build_vehicle_fmu.py CONFIG.toml|MODEL OUT.fmu [--work DIR]
 
-Runs `fire-compose emit CONFIG --profile vio` and exports the emitted model
-with the pinned Rumoca (tools/fmi: bin/rumoca or RUMOCA) through
-tools/fmi/tools/make_fmu.py. Compiles a concrete composition, never a partial.
+CONFIG.toml (a multirotor): runs `fire-compose emit CONFIG --profile vio` and
+exports the emitted model. MODEL (a concrete library export such as
+Exports.FMU.Rover or Exports.FMU.FixedWing): exports it directly. Both go
+through tools/fmi/tools/make_fmu.py with the pinned Rumoca (tools/fmi:
+bin/rumoca or RUMOCA). Compiles a concrete model, never a partial.
 """
 from __future__ import annotations
 
@@ -19,6 +21,12 @@ import tempfile
 LIBRARY_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = LIBRARY_ROOT / "tools" / "fire-compose" / "Cargo.toml"
 MAKE_FMU = LIBRARY_ROOT / "tools" / "fmi" / "tools" / "make_fmu.py"
+
+
+def build_model(model: str, out: Path) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([sys.executable, str(MAKE_FMU), model, str(out.resolve())], check=True)
+    return out
 
 
 def build(config: Path, out: Path, work: Path) -> Path:
@@ -38,15 +46,17 @@ def build(config: Path, out: Path, work: Path) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("config", type=Path)
+    parser.add_argument("config", help="fire-compose CONFIG.toml or a library export model")
     parser.add_argument("out", type=Path)
     parser.add_argument("--work", type=Path)
     args = parser.parse_args()
-    if args.work:
-        build(args.config.resolve(), args.out, args.work.resolve())
+    if not args.config.endswith(".toml"):
+        build_model(args.config, args.out)
+    elif args.work:
+        build(Path(args.config).resolve(), args.out, args.work.resolve())
     else:
         with tempfile.TemporaryDirectory() as tmp:
-            build(args.config.resolve(), args.out, Path(tmp))
+            build(Path(args.config).resolve(), args.out, Path(tmp))
     print(args.out)
     return 0
 

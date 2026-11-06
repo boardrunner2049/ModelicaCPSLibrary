@@ -54,7 +54,7 @@ causality = "parameter"
 shape = []
 required = false
 unit = "us"
-meaning = "Pulse width of a zero command, for hosts whose native actuator output is normalized."
+meaning = "Pulse width of normalized command 0: zero thrust on a one-sided channel (motor, throttle), full negative on a centred one (steering, control surface, reversible drive), whose neutral is the midpoint of pwm_min..pwm_max."
 [[capabilities.pwm_actuation_v1.fields]]
 name = "pwm_max"
 type = "Float64"
@@ -62,7 +62,7 @@ causality = "parameter"
 shape = []
 required = false
 unit = "us"
-meaning = "Pulse width of a full command."
+meaning = "Pulse width of normalized command 1: full thrust, or full positive on a centred channel."
 
 [capabilities.kinematic_state_v1]
 summary = "Physical truth of the vehicle at the combined CG; never a simulated measurement."

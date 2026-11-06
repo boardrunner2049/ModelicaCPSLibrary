@@ -35,8 +35,11 @@ if(BUILD_TESTING)
   target_link_libraries(test_conformance PRIVATE cpvehicle_static)
   # Conformance tests run against prepared descriptors; tests/run_conformance.sh
   # builds the FMUs and descriptors and passes this directory.
-  set(CPV_TEST_VEHICLES "" CACHE PATH "Directory holding prepared quad/, hex/ and legacy/ descriptors")
+  set(CPV_TEST_VEHICLES "" CACHE PATH "Directory holding prepared quad/, hex/, rover/, plane/ and legacy/ descriptors")
+  add_executable(test_ground_air tests/test_ground_air.c)
+  target_link_libraries(test_ground_air PRIVATE cpvehicle_static m)
   if(CPV_TEST_VEHICLES)
     add_test(NAME conformance COMMAND test_conformance ${CPV_TEST_VEHICLES})
+    add_test(NAME ground_air COMMAND test_ground_air ${CPV_TEST_VEHICLES})
   endif()
 endif()

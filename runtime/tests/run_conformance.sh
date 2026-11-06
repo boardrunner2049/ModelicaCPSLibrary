@@ -14,13 +14,16 @@ build=$root/build/runtime
 mkdir -p "$out"
 cd "$root"
 
-for vehicle in quad hex; do
+declare -A source=([quad]=configs/quad.toml [hex]=configs/hex.toml
+                   [rover]=Exports.FMU.Rover [plane]=Exports.FMU.FixedWing)
+vehicles=(quad hex rover plane)
+for vehicle in "${vehicles[@]}"; do
   if [[ ${1:-} == --rebuild-fmus || ! -f $out/$vehicle.fmu ]]; then
-    python3 tools/vehicle_interface/build_vehicle_fmu.py "configs/$vehicle.toml" "$out/$vehicle.fmu"
+    python3 tools/vehicle_interface/build_vehicle_fmu.py "${source[$vehicle]}" "$out/$vehicle.fmu"
   fi
 done
 cvi() { (cd tools/vehicle_interface && python3 -m cp_vehicle_interface "$@"); }
-for vehicle in quad hex; do
+for vehicle in "${vehicles[@]}"; do
   cvi prepare "$out/$vehicle.fmu" "$out/$vehicle" \
     --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1
 done

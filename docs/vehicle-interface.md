@@ -43,9 +43,9 @@ Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
 | CP Models multirotor exports (fire-compose `vio`): quad, hexa with gapped channels | yes | yes | conformance (§6), standalone host, FMI vehicle harness |
 | FastDyn `FastDyn.Copter` FMU as built by FastDyn today | yes | legacy profile | checker and runtime conformance (legacy) |
 | FastDyn `Copter`/`Rover`/`Plane` migrated to these partials | yes | no | no |
-| Rover and fixed-wing compositions in CP Models | contract only | no | no |
+| CP Models rover (`Exports.FMU.Rover`) and fixed-wing (`Exports.FMU.FixedWing`) | yes | yes | known-answer tests (§6), ArduRover and ArduPlane SITL missions |
 | FastDyn host adapter (planned as a device model) | yes | no | no |
-| ArduPilot SITL host (`runtime/hosts/ardupilot`) | prototype | prototype on ArduPilot `Copter-4.6.2` | ArduCopter with the CP Models quad flies a guided mission (takeoff, hold, 20 m waypoint, land) in two launches of one SITL directory |
+| ArduPilot SITL host (`runtime/hosts/ardupilot`) | prototype | prototype on ArduPilot `Copter-4.6.2` | in two launches each: ArduCopter flies the quad through a guided mission (takeoff, hold, 20 m waypoint, land); ArduRover drives the rover around a 20 m AUTO square; ArduPlane takes the fixed-wing off a runway, around a 50 m circuit and lands it in AUTO |
 | PX4 SITL, Gazebo, Isaac Sim hosts | design targets | no | no |
 
 A successful conformance check or launch is not evidence of model fidelity or
@@ -77,8 +77,8 @@ back from the live instance after initialization.
 | Field | FMI | Unit | Required | Meaning |
 |---|---|---|---|---|
 | `pwm` | Float64 input `[n]` | µs | yes | Element `k+1` is mapped host output channel `k` |
-| `pwm_min` | Float64 parameter | µs | no | Pulse width of a zero command |
-| `pwm_max` | Float64 parameter | µs | no | Pulse width of a full command |
+| `pwm_min` | Float64 parameter | µs | no | Pulse width of normalized command 0 |
+| `pwm_max` | Float64 parameter | µs | no | Pulse width of normalized command 1 |
 
 - `n` is the exported dimension, **not** the rotor count. A hexa composed with
   `actuatorIndex = {1,2,3,4,6,8}` exports `pwm[8]`; channels 4 and 6 are
@@ -88,6 +88,12 @@ back from the live instance after initialization.
   neutral value.
 - The contract imposes no channel limit and no clipping. A host enforces its
   own channel limit and mapping.
+- What a channel drives is the model's, and its documentation states it. A
+  one-sided channel (motor, throttle) maps `pwm_min..pwm_max` to zero..full;
+  a centred channel (steering, control surface, reversible drive) has its
+  neutral at the midpoint, full negative at `pwm_min` and full positive at
+  `pwm_max`. The starts put every channel at a safe value: motors off,
+  centred channels neutral.
 
 ### `kinematic_state_v1`
 
@@ -197,6 +203,17 @@ python3 -m cp_vehicle_interface prepare LEGACY.fmu OUT_DIR --profile fastdyn_leg
 python3 tools/vehicle_interface/build_vehicle_fmu.py configs/hex.toml build/hex.fmu   # from the library root
 ```
 
+`build_vehicle_fmu.py` takes a fire-compose configuration (multirotors) or a
+concrete export model: `Exports.FMU.Rover` or `Exports.FMU.FixedWing`.
+
+| Export | Plant | `pwm` (ArduPilot servo order) | Range, starts |
+|---|---|---|---|
+| `Exports.FMU.Rover` | `Vehicles.Rover.RoverPlant`: 3 kg, four compliant wheels with slip-based tyre forces, Ackermann front steering, rear open differential driven by a DC motor (no-load 10 m/s) | `[1]` steering, `[3]` throttle (both centred; `[2]`, `[4]` unconnected) | 1000..2000 µs, all 1500 |
+| `Exports.FMU.FixedWing` | `Vehicles.FixedWing.FixedWingPlant`: 2 kg, `Airframe.StabilityDerivatives` (last_letter Skywalker 2013), ±20° surfaces, 30 N static thrust falling with airspeed, tricycle gear steered by the rudder | `[1]` aileron, `[2]` elevator, `[4]` rudder (centred), `[3]` throttle | 1000..2000 µs; 1500, 1500, 1000, 1500 |
+
+The fixed-wing export also has `start_altitude_m` and `start_speed_mps` for
+an air start (default: at rest on the runway). Both start facing north.
+
 The checker parses the FMI version, the Co-Simulation interface
 (`canHandleVariableCommunicationStepSize` must be true, `needsExecutionTool`
 false), and each field's type, causality, variability, dimensions (literal,
@@ -287,17 +304,49 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
   - refusals for missing capabilities, legacy without opt-in, stale digests,
     unknown versions and a wrong token;
   - the legacy FastDyn Copter FMU loads with opt-in and reports no state.
+- **Rover and fixed-wing** (`runtime/tests/test_ground_air.c`, run with
+  floating-point traps on, as ArduPilot SITL does), each against a value
+  computed from the model's parameters:
+  - rover at rest: suspension sink `m g / 4k`, level, specific force `-g`, no
+    creep;
+  - rover at full throttle: the steady speed of the DC motor's torque
+    through tyre slip against rolling resistance, drag and its load
+    transfer (to 0.2 %); rear squat while accelerating; reverse;
+  - rover at half steering and walking speed: yaw rate within 3 % below the
+    single-track `v tan(delta) / L` (understeer), body rolling out of the
+    turn; the unconnected elements 2 and 4 change nothing;
+  - fixed-wing at rest: the two static equations of the tricycle gear (height
+    and pitch);
+  - air start: the first specific force equals `-qS (CD, 0, CL) / m`;
+  - idle glide: converges to the equilibrium where the pitch moment vanishes,
+    with the speed and descent angle of `|F_aero| = m g` (to 0.1 % and
+    0.0002 rad), wings level;
+  - each surface channel above its midpoint rolls right, pitches up or yaws
+    right, throttle adds thrust; a full-throttle run tracks the centreline,
+    cannot lift off before `CL0` carries the weight, and lifts off sooner
+    with up elevator.
 - **Standalone host:** `cpv_hover_host` climbs to and holds 1 m with the quad
   and the hexa using the same code.
-- **ArduPilot SITL prototype:** the same quad artifact as the SITL physics
-  model, flown by ArduCopter through a checked guided mission. This is
-  evidence for one host and one vehicle only, not general SITL support.
+- **ArduPilot SITL prototype:** the same quad, rover and fixed-wing artifacts
+  as the SITL physics model, flown by ArduCopter (guided mission), ArduRover
+  and ArduPlane (AUTO missions) with checks on every waypoint, cross-track
+  error, attitude and the final position. This is evidence for one host, not
+  general SITL support, and the ArduPlane parameters were set for this model
+  (`cpvehicle_plane.parm`).
 
 ## 7. Known gaps
 
 - FastDyn's `Copter`/`Rover`/`Plane` wrappers are not migrated; they run only
-  under the legacy profile and expose no `kinematic_state_v1`. CP Models has
-  no rover or fixed-wing composition yet.
+  under the legacy profile and expose no `kinematic_state_v1`.
+- The rover and fixed-wing are concrete library exports with fixed channel
+  layouts (Ackermann rover; aileron/elevator/throttle/rudder plane), not
+  fire-compose compositions; skid-steer, elevon and V-tail variants are not
+  modelled. Their parameters are representative (the plane's aerodynamics are
+  the published last_letter Skywalker 2013 coefficients), not identified from
+  a real vehicle; mass, inertia, tyre and gear values are estimates.
+- `Wheels.CompliantWheel`, `Airframe.StabilityDerivatives` and the two plants
+  have no per-model `tools/fmi` harness yet; they are tested through the two
+  exports (§6).
 - Sampled sensors, sensor timestamps and IMU batches need their own
   capability.
 - Rotor speeds and other diagnostics are exported but not part of the
