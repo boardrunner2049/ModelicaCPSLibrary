@@ -1,0 +1,418 @@
+From 978d023a4812d93f2e0945e21a0e61caef0674ff Mon Sep 17 00:00:00 2001
+From: Arslan8 <arslankhan52@gmail.com>
+Date: Fri, 6 Nov 2026 07:10:18 -0500
+Subject: [PATCH 2/2] SITL: CP Models rover and fixed-wing with the cpvehicle
+ model
+
+fly_auto.py flies and checks AUTO missions (rover: 20 m square; plane:
+runway takeoff, circuit, landing). cpvehicle_rover.parm and
+cpvehicle_plane.parm set servo ranges and the vehicle-specific values from
+the models' parameters. README: run instructions, floating-point traps,
+measured results.
+---
+ libraries/SITL/examples/CPVehicle/README.md   |  61 ++++-
+ .../examples/CPVehicle/cpvehicle_plane.parm   |  36 +++
+ .../examples/CPVehicle/cpvehicle_rover.parm   |  18 ++
+ libraries/SITL/examples/CPVehicle/fly_auto.py | 222 ++++++++++++++++++
+ 4 files changed, 327 insertions(+), 10 deletions(-)
+ create mode 100644 libraries/SITL/examples/CPVehicle/cpvehicle_plane.parm
+ create mode 100644 libraries/SITL/examples/CPVehicle/cpvehicle_rover.parm
+ create mode 100755 libraries/SITL/examples/CPVehicle/fly_auto.py
+
+diff --git a/libraries/SITL/examples/CPVehicle/README.md b/libraries/SITL/examples/CPVehicle/README.md
+index 0fdbdf1fcb..39ee5a1f51 100644
+--- a/libraries/SITL/examples/CPVehicle/README.md
++++ b/libraries/SITL/examples/CPVehicle/README.md
+@@ -6,8 +6,10 @@ process** through the CP Models vehicle runtime (`libcpvehicle`). The
+ autopilot and SITL's sensor simulation are unchanged. There is no socket and
+ no second process (compare `libraries/SITL/examples/JSON`).
+ 
+-Status: prototype, tested only with ArduCopter 4.6.2 and the CP Models quad
+-(`configs/quad.toml`). It is not upstream ArduPilot code.
++Status: prototype, tested with ArduPilot 4.6.2 (`Copter-4.6.2`): ArduCopter
++with the CP Models quad (`configs/quad.toml`), ArduRover with
++`Exports.FMU.Rover` and ArduPlane with `Exports.FMU.FixedWing`. It is not
++upstream ArduPilot code.
+ 
+ ## Build
+ 
+@@ -15,14 +17,18 @@ Status: prototype, tested only with ArduCopter 4.6.2 and the CP Models quad
+ # CP Models: build the FMU, write its descriptor, build the runtime
+ cd ModelicaCPSLibrary
+ python3 tools/vehicle_interface/build_vehicle_fmu.py configs/quad.toml build/quad.fmu
+-(cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare ../../build/quad.fmu \
+-    ../../build/quad --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1)
++python3 tools/vehicle_interface/build_vehicle_fmu.py Exports.FMU.Rover build/rover.fmu
++python3 tools/vehicle_interface/build_vehicle_fmu.py Exports.FMU.FixedWing build/plane.fmu
++for v in quad rover plane; do
++  (cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare ../../build/$v.fmu \
++      ../../build/$v --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1)
++done
+ cmake -S runtime -B build/runtime-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+ cmake --build build/runtime-release
+ 
+ # ArduPilot (a venv with future, empy==3.3.4, pexpect, dronecan, pymavlink on PATH)
+ ./waf configure --board sitl --cpvehicle=/path/to/ModelicaCPSLibrary
+-./waf copter
++./waf copter rover plane
+ ```
+ 
+ Without `--cpvehicle` nothing changes: the model is compiled out
+@@ -40,6 +46,24 @@ libraries/SITL/examples/CPVehicle/fly_mission.py --connect tcp:127.0.0.1:5790
+ `fly_mission.py` waits for the EKF to use GPS, then arms in GUIDED, takes off
+ to 5 m, holds, flies 20 m north and back, lands, and checks each step.
+ 
++```sh
++build/sitl/bin/ardurover --model cpvehicle:/path/to/ModelicaCPSLibrary/build/rover/vehicle.json \
++    --defaults Tools/autotest/default_params/rover.parm,libraries/SITL/examples/CPVehicle/cpvehicle_rover.parm \
++    --home 40.414929,-86.932387,149,0 --speedup 4 -I3
++libraries/SITL/examples/CPVehicle/fly_auto.py rover --connect tcp:127.0.0.1:5790
++
++build/sitl/bin/arduplane --model cpvehicle:/path/to/ModelicaCPSLibrary/build/plane/vehicle.json \
++    --defaults Tools/autotest/models/plane.parm,libraries/SITL/examples/CPVehicle/cpvehicle_plane.parm \
++    --home 40.414929,-86.932387,149,0 --speedup 4 -I3
++libraries/SITL/examples/CPVehicle/fly_auto.py plane --connect tcp:127.0.0.1:5790
++```
++
++`fly_auto.py` uploads a mission, arms in AUTO and checks every waypoint, the
++cross-track error on each leg, the attitude and the end: the rover drives a
++20 m square back to home; the plane takes off north from the runway, flies a
++400 x 200 m circuit at 50 m, approaches from the south and lands. Both FMUs
++start facing north, so use home heading 0.
++
+ ## What the adapter does (`SIM_CPVehicle.cpp`)
+ 
+ | SITL | From the FMU (vehicle interface v1) |
+@@ -62,13 +86,30 @@ to 5 m, holds, flies 20 m north and back, lands, and checks each step.
+ - **Channel order.** `configs/quad.toml` is wired in ArduCopter's Quad-X order
+   (`actuatorIndex = [3, 2, 4, 1]`), so the identity map is right. The hexa
+   composition is not in ArduCopter's Hexa-X order; it needs a
+-  `CPV_CHANNEL_MAP` and has not been flown here.
++  `CPV_CHANNEL_MAP` and has not been flown here. The rover (steering
++  `SERVO1`, throttle `SERVO3`) and the plane (aileron, elevator, throttle,
++  rudder on `SERVO1..4`) use ArduPilot's default order; their `.parm` files
++  set the servo ranges to the FMU's 1000..2000 µs.
++- **Floating-point traps.** SITL traps invalid operations, division by zero
++  and overflow, and the FMU runs in its process: a model computing 0/0 even
++  in an unselected branch aborts SITL. The CP Models rover and fixed-wing
++  tests run with the same traps.
+ 
+-## Measured (ArduCopter 4.6.2, CP Models quad, `--speedup 4`)
++## Measured (ArduPilot 4.6.2, `--speedup 4`)
+ 
+-Two launches in the same directory (the second reuses the saved parameters)
+-both passed: hover at 4.99 m with drift ≤ 0.01 m, the 20 m north waypoint
+-reached to within 0.4 m, landed 0.25–0.28 m from home, maximum tilt 17.5°.
++Two launches of each vehicle in the same directory (the second reuses the
++saved parameters); all passed.
++
++| Vehicle | Result |
++|---|---|
++| ArduCopter, quad | hover at 4.99 m with drift ≤ 0.01 m, the 20 m north waypoint reached to within 0.4 m, landed 0.25–0.28 m from home, maximum tilt 17.5° |
++| ArduRover, rover | all four waypoints reached, worst cross-track error 0.55–0.63 m, stopped 0.17–0.18 m from home, roll/pitch ≤ 0.2° (stock rover tuning) |
++| ArduPlane, fixed-wing | takeoff to 30 m, all circuit waypoints, worst cross-track error 16 m on 200–600 m legs, maximum bank/pitch 35°, touchdown 31–32 m before the aim point (the flare starts ~60 m out), rollout stopped 0.09 m off the centreline |
++
++The plane needed model-specific parameters (`cpvehicle_plane.parm`): servo
++ranges, airspeeds for this airframe, roll-rate gains scaled for its physical
++inertia and ±20° aileron (the stock SITL plane applies unit inertia and
++full-scale deflections), rotate speed and a shorter flare (lift/drag ≈ 3).
+ 
+ ## Differences from FastDyn (QEMU)
+ 
+diff --git a/libraries/SITL/examples/CPVehicle/cpvehicle_plane.parm b/libraries/SITL/examples/CPVehicle/cpvehicle_plane.parm
+new file mode 100644
+index 0000000000..a171169b1c
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/cpvehicle_plane.parm
+@@ -0,0 +1,36 @@
++# ArduPlane settings for the CP Models fixed-wing (ModelicaCPSLibrary
++# Exports.FMU.FixedWing) loaded with --model cpvehicle:<descriptor>, on top of
++# Tools/autotest/models/plane.parm. Values follow the model's parameters.
++# pwm[1..4] aileron, elevator, throttle, rudder; FMU pwm range 1000..2000 us is
++# the full +-20 deg surface throw (surfaces centred at 1500).
++SERVO1_MIN      1000
++SERVO1_MAX      2000
++SERVO1_TRIM     1500
++SERVO2_MIN      1000
++SERVO2_MAX      2000
++SERVO2_TRIM     1500
++SERVO3_MIN      1000
++SERVO3_MAX      2000
++SERVO3_TRIM     1000
++SERVO4_MIN      1000
++SERVO4_MAX      2000
++SERVO4_TRIM     1500
++# Neutral-elevator trim is ~15 m/s; 2 kg, 0.45 m2, CDp 0.1: level 16 m/s needs
++# ~7.3 N of the 30 N (static) propeller, about 33 % throttle; top speed ~25 m/s.
++AIRSPEED_CRUISE 16
++AIRSPEED_MIN    12
++AIRSPEED_MAX    24
++TRIM_THROTTLE   35
++# Roll: full aileron (0.35 rad) gives ~1.4 rad/s steady roll rate at 15 m/s,
++# so ~0.72 of full output per rad/s (the stock SITL plane needs 0.25).
++RLL_RATE_FF     0.72
++RLL_RATE_P      0.6
++RLL_RATE_I      0.5
++RLL_RATE_D      0.01
++# Takeoff: rotate at 11 m/s (CL0 carries the weight at 11.3 m/s); steer the
++# nose wheel (rudder) on the ground.
++TKOFF_ROTATE_SPD 11
++GROUND_STEER_ALT 5
++# Landing: lift/drag is only ~3 (CDp 0.1), so a long idle flare bleeds the
++# speed and lands short; flare later.
++LAND_FLARE_SEC  1.5
+diff --git a/libraries/SITL/examples/CPVehicle/cpvehicle_rover.parm b/libraries/SITL/examples/CPVehicle/cpvehicle_rover.parm
+new file mode 100644
+index 0000000000..602ecee49a
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/cpvehicle_rover.parm
+@@ -0,0 +1,18 @@
++# ArduRover settings for the CP Models rover (ModelicaCPSLibrary Exports.FMU.Rover)
++# loaded with --model cpvehicle:<descriptor>. Values follow the model's parameters.
++# pwm[1] steering, pwm[3] throttle, both centred; the FMU's pwm range is 1000..2000 us.
++SERVO1_FUNCTION 26
++SERVO1_MIN      1000
++SERVO1_MAX      2000
++SERVO1_TRIM     1500
++SERVO3_FUNCTION 70
++SERVO3_MIN      1000
++SERVO3_MAX      2000
++SERVO3_TRIM     1500
++# Ackermann geometry: wheelbase 0.32 m, 0.45 rad full steer -> 0.66 m radius.
++TURN_RADIUS     0.7
++# DC drive: no-load 10 m/s at full throttle, 9.24 m/s with losses; 3 m/s needs ~32 %.
++CRUISE_SPEED    3
++CRUISE_THROTTLE 32
++WP_SPEED        3
++WP_RADIUS       1
+diff --git a/libraries/SITL/examples/CPVehicle/fly_auto.py b/libraries/SITL/examples/CPVehicle/fly_auto.py
+new file mode 100755
+index 0000000000..f3211d2acc
+--- /dev/null
++++ b/libraries/SITL/examples/CPVehicle/fly_auto.py
+@@ -0,0 +1,222 @@
++#!/usr/bin/env python3
++"""Fly an AUTO mission on ArduRover or ArduPlane SITL and check it.
++
++usage: fly_auto.py rover|plane [--connect tcp:127.0.0.1:5760] [--home LAT,LON]
++
++rover: a 20 m square back to home.
++plane: runway takeoff north to 30 m, a 400 x 200 m circuit at 50 m, a
++       straight-in approach from the south and an automatic landing at home.
++
++Uploads the mission, waits for the EKF to use GPS, arms, flies it in AUTO
++and checks every waypoint, the cross-track error on each leg, attitude
++limits and the final position. Exits nonzero with the reason on the first
++failed check.
++"""
++import argparse
++import math
++import sys
++import time
++
++from pymavlink import mavutil
++
++MAV = mavutil.mavlink
++EARTH_RADIUS = 6378137.0
++
++# (command, north m, east m, altitude m, param1); altitude relative to home.
++MISSIONS = {
++    "rover": [
++        (MAV.MAV_CMD_NAV_WAYPOINT, 20, 0, 0, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, 20, 20, 0, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, 0, 20, 0, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, 0, 0, 0, 0),
++    ],
++    "plane": [
++        (MAV.MAV_CMD_NAV_TAKEOFF, 0, 0, 30, 12),  # param1: minimum pitch, deg
++        (MAV.MAV_CMD_NAV_WAYPOINT, 250, 0, 50, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, 250, 200, 50, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, -350, 200, 50, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, -350, 0, 30, 0),
++        (MAV.MAV_CMD_NAV_WAYPOINT, -150, 0, 12, 0),
++        (MAV.MAV_CMD_NAV_LAND, 60, 0, 0, 0),
++    ],
++}
++# Per vehicle: cross-track limit on legs [m], reach radius at the last item [m],
++# attitude limit [deg].
++LIMITS = {
++    "rover": dict(cross_track=1.5, final=2.0, attitude=15.0),
++    "plane": dict(cross_track=25.0, final=40.0, attitude=70.0),
++}
++
++
++def main():
++    p = argparse.ArgumentParser(description=__doc__,
++                                formatter_class=argparse.RawDescriptionHelpFormatter)
++    p.add_argument("vehicle", choices=sorted(MISSIONS))
++    p.add_argument("--connect", default="tcp:127.0.0.1:5760")
++    p.add_argument("--home", default="40.414929,-86.932387")
++    p.add_argument("--timeout", type=float, default=900.0)
++    a = p.parse_args()
++    lat0, lon0 = (float(x) for x in a.home.split(","))
++    mission = MISSIONS[a.vehicle]
++    limits = LIMITS[a.vehicle]
++    deadline = time.time() + a.timeout
++
++    m = mavutil.mavlink_connection(a.connect, autoreconnect=True)
++    m.wait_heartbeat(timeout=60)
++    print(f"heartbeat from system {m.target_system}")
++    m.mav.request_data_stream_send(m.target_system, m.target_component,
++                                   MAV.MAV_DATA_STREAM_ALL, 10, 1)
++    state = {"attitude": 0.0, "reached": set(), "track": []}
++
++    def pump(seconds):
++        end = time.time() + seconds
++        while time.time() < end:
++            msg = m.recv_match(blocking=True, timeout=0.5)
++            if msg is None:
++                continue
++            kind = msg.get_type()
++            if kind == "STATUSTEXT":
++                print(f"  [fc] {msg.text}")
++            elif kind == "ATTITUDE" and state.get("armed"):
++                state["attitude"] = max(state["attitude"],
++                                        math.degrees(max(abs(msg.roll), abs(msg.pitch))))
++            elif kind == "LOCAL_POSITION_NED":
++                state["local"] = msg
++                if state.get("armed"):
++                    state["track"].append((state.get("leg", 0), msg.x, msg.y, -msg.z))
++            elif kind == "GLOBAL_POSITION_INT":
++                state["global"] = msg
++            elif kind == "VFR_HUD":
++                state["hud"] = msg
++            elif kind == "EKF_STATUS_REPORT":
++                state["ekf_flags"] = msg.flags
++            elif kind == "MISSION_CURRENT":
++                state["leg"] = msg.seq
++            elif kind == "MISSION_ITEM_REACHED":
++                if msg.seq not in state["reached"]:
++                    print(f"reached item {msg.seq}")
++                state["reached"].add(msg.seq)
++            elif kind == "HEARTBEAT" and msg.get_srcSystem() == m.target_system:
++                state["armed"] = bool(msg.base_mode & MAV.MAV_MODE_FLAG_SAFETY_ARMED)
++
++    def fail(reason):
++        print(f"FAILED: {reason}")
++        sys.exit(1)
++
++    def wait_until(predicate, what, timeout):
++        end = min(time.time() + timeout, deadline)
++        while time.time() < end:
++            pump(0.5)
++            if predicate():
++                return
++        fail(f"timed out waiting for {what}")
++
++    def to_global(north, east):
++        lat = lat0 + math.degrees(north / EARTH_RADIUS)
++        lon = lon0 + math.degrees(east / (EARTH_RADIUS * math.cos(math.radians(lat0))))
++        return int(round(lat * 1e7)), int(round(lon * 1e7))
++
++    need = MAV.EKF_POS_HORIZ_ABS | MAV.EKF_VELOCITY_HORIZ | MAV.EKF_POS_VERT_ABS
++    wait_until(lambda: state.get("ekf_flags", 0) & need == need, "EKF position from GPS", 180)
++    print("EKF has a GPS position")
++    # Upload: item 0 is home, then the mission.
++    items = [(MAV.MAV_CMD_NAV_WAYPOINT, 0, 0, 0, 0)] + mission
++    m.mav.mission_count_send(m.target_system, m.target_component, len(items))
++    sent = set()
++    end = time.time() + 30
++    while time.time() < end:
++        msg = m.recv_match(type=["MISSION_REQUEST", "MISSION_REQUEST_INT", "MISSION_ACK"],
++                           blocking=True, timeout=1)
++        if msg is None:
++            continue
++        if msg.get_type() == "MISSION_ACK":
++            if msg.type != MAV.MAV_MISSION_ACCEPTED:
++                fail(f"mission refused (MAV_MISSION_RESULT {msg.type})")
++            break
++        cmd, north, east, alt, p1 = items[msg.seq]
++        lat, lon = to_global(north, east)
++        m.mav.mission_item_int_send(m.target_system, m.target_component, msg.seq,
++                                    MAV.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, cmd, 0, 1,
++                                    p1, 0, 0, 0, lat, lon, alt)
++        sent.add(msg.seq)
++    else:
++        fail("mission upload timed out")
++    if len(sent) != len(items):
++        fail(f"mission upload incomplete: {len(sent)} of {len(items)} items")
++    print(f"mission uploaded: {len(mission)} items")
++
++    m.mav.command_long_send(m.target_system, m.target_component, MAV.MAV_CMD_MISSION_START,
++                            0, 0, 0, 0, 0, 0, 0, 0)
++    m.set_mode("AUTO")
++    end = time.time() + 180
++    while not state.get("armed"):
++        if time.time() > end:
++            fail("could not arm within 180 s")
++        m.mav.command_long_send(m.target_system, m.target_component,
++                                MAV.MAV_CMD_COMPONENT_ARM_DISARM, 0, 1, 0, 0, 0, 0, 0, 0)
++        pump(2)
++    print("armed in AUTO")
++
++    last = len(items) - 1
++    if a.vehicle == "plane":
++        # Landing ends on the ground, rolled out to a stop on the last leg.
++        wait_until(lambda: state.get("leg") == last and "hud" in state
++                   and state["hud"].groundspeed < 0.5 and -state["local"].z < 0.5,
++                   "landing and rollout", deadline - time.time())
++        last_waypoint = last - 1
++    else:
++        wait_until(lambda: last in state["reached"], f"mission item {last}", deadline - time.time())
++        last_waypoint = last
++    missing = [i for i in range(1, last_waypoint + 1) if i not in state["reached"]]
++    if missing:
++        fail(f"items not reached: {missing}")
++
++    # Cross-track error on each leg between consecutive waypoints, after
++    # the vehicle has had 1/4 of the leg to converge onto it.
++    worst = 0.0
++    for seq in range(2, len(items)):
++        _, n0, e0, _, _ = items[seq - 1]
++        _, n1, e1, _, _ = items[seq]
++        length = math.hypot(n1 - n0, e1 - e0)
++        if length < 1:
++            continue
++        for leg, x, y, _ in state["track"]:
++            if leg != seq:
++                continue
++            along = ((x - n0) * (n1 - n0) + (y - e0) * (e1 - e0)) / length
++            if along < 0.25 * length or along > length:
++                continue
++            cross = abs((x - n0) * (e1 - e0) - (y - e0) * (n1 - n0)) / length
++            worst = max(worst, cross)
++    print(f"worst cross-track error {worst:.2f} m, max roll/pitch {state['attitude']:.1f} deg")
++    if worst > limits["cross_track"]:
++        fail(f"cross-track error {worst:.2f} m > {limits['cross_track']} m")
++    if state["attitude"] > limits["attitude"]:
++        fail(f"attitude {state['attitude']:.1f} deg > {limits['attitude']} deg")
++
++    _, n_end, e_end, _, _ = items[last]
++    if a.vehicle == "plane":
++        # Touchdown: the first sample on the landing leg within 0.3 m of the ground.
++        touch = next(((x, y) for leg, x, y, alt in state["track"] if leg == last and alt < 0.3),
++                     None)
++        if touch is None:
++            fail("no touchdown recorded")
++        miss = math.hypot(touch[0] - n_end, touch[1] - e_end)
++        loc = state["local"]
++        print(f"touchdown at ({touch[0]:.1f}, {touch[1]:.1f}) m, {miss:.1f} m from the landing "
++              f"point; stopped at ({loc.x:.1f}, {loc.y:.1f}) m, {abs(loc.y):.2f} m off the "
++              f"centreline")
++        if abs(loc.y) > 3.0:
++            fail(f"rollout left the centreline by {abs(loc.y):.2f} m")
++    else:
++        pump(3)
++        loc = state["local"]
++        miss = math.hypot(loc.x - n_end, loc.y - e_end)
++        print(f"stopped at ({loc.x:.2f}, {loc.y:.2f}) m, {miss:.2f} m from the last item")
++    if miss > limits["final"]:
++        fail(f"{miss:.2f} m from the last item (limit {limits['final']} m)")
++    print("PASSED")
++
++
++if __name__ == "__main__":
++    main()
+-- 
+2.43.0
+

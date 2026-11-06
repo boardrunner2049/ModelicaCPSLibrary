@@ -1,7 +1,8 @@
 From 1c464225f40e1831132d742eebf39e433f9fc51d Mon Sep 17 00:00:00 2001
 From: Arslan8 <arslankhan52@gmail.com>
 Date: Thu, 5 Nov 2026 22:53:41 -0500
-Subject: [PATCH] SITL: CP Models vehicle FMU as in-process physics (prototype)
+Subject: [PATCH 1/2] SITL: CP Models vehicle FMU as in-process physics
+ (prototype)
 
 --model cpvehicle:<descriptor> loads a CP Models (ModelicaCPSLibrary)
 vehicle FMU into the SITL process through the CP Models vehicle runtime
