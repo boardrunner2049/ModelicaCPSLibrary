@@ -1,7 +1,7 @@
 From 978d023a4812d93f2e0945e21a0e61caef0674ff Mon Sep 17 00:00:00 2001
 From: Arslan8 <arslankhan52@gmail.com>
 Date: Fri, 6 Nov 2026 07:10:18 -0500
-Subject: [PATCH 2/2] SITL: CP Models rover and fixed-wing with the cpvehicle
+Subject: [PATCH 2/3] SITL: CP Models rover and fixed-wing with the cpvehicle
  model
 
 fly_auto.py flies and checks AUTO missions (rover: 20 m square; plane:

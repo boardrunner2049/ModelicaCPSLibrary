@@ -6,6 +6,8 @@
  * the descriptor is bound to the files it loads (SHA-256), that the host's
  * required capabilities are provided, and that the instance declares the
  * contract version it was checked against. It never guesses a value reference.
+ * Alternatively a model can be linked into the program and opened with
+ * cpv_open_model (cpvehicle_model.h); everything after opening is the same.
  *
  * Lifecycle:  cpv_open -> [cpv_set_parameter] -> cpv_initialize ->
  *             { set inputs; cpv_advance_to; read outputs } -> [cpv_reset] -> cpv_close

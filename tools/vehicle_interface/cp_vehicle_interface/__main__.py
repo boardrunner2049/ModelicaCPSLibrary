@@ -2,7 +2,7 @@
 
   python -m cp_vehicle_interface check MODEL.fmu [--require CAP ...] [--profile NAME]
   python -m cp_vehicle_interface prepare MODEL.fmu OUT_DIR [--require CAP ...]
-         [--profile NAME] [--set NAME=VALUE ...]
+         [--profile NAME] [--set NAME=VALUE ...] [--shim NAME]
   python -m cp_vehicle_interface capabilities
 """
 from __future__ import annotations
@@ -39,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
         if name == "prepare":
             p.add_argument("out_dir")
             p.add_argument("--set", action="append", default=[], metavar="NAME=VALUE")
+            p.add_argument("--shim", metavar="NAME",
+                           help="also write OUT_DIR/shim/ to link the model into a host "
+                                "as cpv_model_NAME (cmake -DCPV_MODELS=OUT_DIR/shim)")
         p.add_argument("--require", action="append", default=[], metavar="CAPABILITY")
         p.add_argument("--profile", default=STANDARD_PROFILE)
     sub.add_parser("capabilities")
@@ -60,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             path, _, report = prepare(args.fmu, args.out_dir, required=args.require,
                                       profile=args.profile, overrides=_overrides(args.set),
-                                      contract=contract)
+                                      contract=contract, shim=args.shim)
             errors = []
     except (MetadataError, PrepareError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -75,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{report.model}: conforms ({report.profile}); provides {provided}")
     if args.command == "prepare":
         print(f"descriptor: {path}")
+        if args.shim:
+            print(f"shim: {path.parent / 'shim'} (cpv_model_{args.shim})")
     return 0
 
 

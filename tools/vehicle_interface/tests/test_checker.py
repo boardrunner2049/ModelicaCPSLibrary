@@ -277,6 +277,60 @@ class PrepareTests(unittest.TestCase):
             self.assertFalse((tmp / "escape.txt").exists())
 
 
+BUILD_DESCRIPTION = b"""<?xml version="1.0"?><fmiBuildDescription fmiVersion="3.0">
+  <BuildConfiguration modelIdentifier="Test"><SourceFileSet language="C99">
+    <SourceFile name="model.c"/><SourceFile name="%s"/>
+    <PreprocessorDefinition name="FMI3_OVERRIDE_FUNCTION_PREFIX" value="1"/>
+    <PreprocessorDefinition name="KEEP_ME" value="3"/>
+  </SourceFileSet></BuildConfiguration></fmiBuildDescription>"""
+
+
+def source_members(second="extra.c"):
+    return [("sources/buildDescription.xml", BUILD_DESCRIPTION % second.encode()),
+            ("sources/model.c", b"/* model */"), ("sources/extra.c", b"/* extra */")]
+
+
+class ShimTests(unittest.TestCase):
+    def test_shim_holds_the_descriptor_and_the_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            _, descriptor, _ = prepare(fake_fmu(tmp, members=source_members()), tmp / "out",
+                                       required=ALL, overrides={"mass": 2.0}, shim="test_vehicle")
+            shim = tmp / "out" / "shim"
+            code = (shim / "cpv_model_test_vehicle.c").read_text()
+            self.assertIn("const cpv_model_t cpv_model_test_vehicle = {", code)
+            self.assertIn("#define FMI3_FUNCTION_PREFIX Test_", code)
+            for cap, fields in descriptor["capabilities"].items():
+                for name, entry in fields.items():
+                    if entry is not None:
+                        self.assertIn(f'{{"{cap}", "{name}", {entry["vr"]}u, {entry["count"]}u, ',
+                                      code)
+            self.assertIn('{"mass", 2.0},', code)
+            self.assertIn("{1000.0, 1000.0, 1000.0, 1000.0}", code)  # pwm start
+            self.assertIn(f".source_sha256 = \"{descriptor['artifact']['source_sha256']}\"", code)
+            cmake = (shim / "cpv_model.cmake").read_text()
+            self.assertIn("set(CPV_MODEL_NAME test_vehicle)", cmake)
+            self.assertIn("set(CPV_MODEL_SOURCES sources/model.c sources/extra.c)", cmake)
+            self.assertIn("set(CPV_MODEL_DEFINITIONS KEEP_ME=3)", cmake)  # shared-library define dropped
+            self.assertTrue((shim / "sources" / "model.c").is_file())
+
+    def test_bad_names_and_missing_sources_write_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            for name in ("Rover", "1plane", "a-b", "x" * 49, ""):
+                with self.assertRaises(PrepareError, msg=name):
+                    prepare(fake_fmu(tmp, members=source_members()), tmp / "out", shim=name)
+                self.assertFalse((tmp / "out").exists())
+            for members, why in (((), "no sources/ directory"),
+                                 (source_members("../escape.c"), "not a relative path"),
+                                 (source_members("missing.c"), "listed but missing")):
+                with self.assertRaises(PrepareError) as ctx:
+                    prepare(fake_fmu(tmp, members=members), tmp / "out", shim="rover")
+                self.assertIn(why, str(ctx.exception))
+                self.assertFalse((tmp / "out" / "vehicle.json").exists())
+                self.assertFalse((tmp / "out" / "shim").exists())
+
+
 @unittest.skipUnless((BUILT / "quad.fmu").is_file() and (BUILT / "hex.fmu").is_file(),
                      "build the example FMUs first (runtime/tests/run_conformance.sh)")
 class GeneratedFmuTests(unittest.TestCase):

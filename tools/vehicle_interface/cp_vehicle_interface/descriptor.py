@@ -14,11 +14,13 @@ import math
 from pathlib import Path
 import platform
 import shutil
+import xml.etree.ElementTree as ET
 import zipfile
 
 from .check import STANDARD_PROFILE, Report, check
 from .contract import Contract, load_contract
 from .metadata import Metadata, parse, read_model_description
+from .shim import NAME_PATTERN, write_shim
 
 DESCRIPTOR_NAME = "vehicle.json"
 EXTRACTED_DIR = "fmu"
@@ -154,12 +156,18 @@ def build_descriptor(report: Report, meta: Metadata, contract: Contract, *, fmu:
 
 def prepare(fmu: Path | str, out_dir: Path | str, *, required: list[str] = (),
             profile: str = STANDARD_PROFILE, overrides: dict[str, float] | None = None,
-            contract: Contract | None = None) -> tuple[Path, dict, Report]:
+            contract: Contract | None = None, shim: str | None = None
+            ) -> tuple[Path, dict, Report]:
     """Check the FMU, extract it under out_dir and write out_dir/vehicle.json.
 
+    With shim=NAME, also write out_dir/shim/ (see shim.py): the same model as
+    C data plus the FMU's sources, to link into a host as cpv_model_NAME.
     Raises PrepareError with every structural error; nothing is written then.
     """
     fmu, out_dir = Path(fmu), Path(out_dir)
+    if shim is not None and not NAME_PATTERN.fullmatch(shim):
+        raise PrepareError([f"shim name {shim!r} must match {NAME_PATTERN.pattern} "
+                            "(it becomes the C symbol cpv_model_NAME)"])
     contract = contract or load_contract()
     meta = parse(read_model_description(fmu))
     report = check(meta, contract, list(required), profile)
@@ -192,5 +200,12 @@ def prepare(fmu: Path | str, out_dir: Path | str, *, required: list[str] = (),
                                   out_dir=out_dir, required=list(required),
                                   overrides={k: float(v) for k, v in overrides.items()})
     path = out_dir / DESCRIPTOR_NAME
+    if shim is not None:
+        try:
+            write_shim(descriptor, extracted, out_dir, shim)
+        except (ValueError, OSError, ET.ParseError) as exc:
+            shutil.rmtree(extracted, ignore_errors=True)
+            shutil.rmtree(out_dir / "shim", ignore_errors=True)
+            raise PrepareError([f"{report.model}: cannot write the shim: {exc}"]) from exc
     path.write_text(json.dumps(descriptor, indent=2) + "\n")
     return path, descriptor, report

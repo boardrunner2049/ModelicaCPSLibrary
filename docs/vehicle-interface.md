@@ -10,8 +10,8 @@ model, and reads vehicle state and simulated sensors.
 | Contract (normative) | [`contract/vehicle_interface.toml`](../contract/vehicle_interface.toml) | Names, types, shapes, units, frames, capabilities, marker, profiles |
 | Reference partials | [`Exports/FMU/VehicleInterface/`](../Exports/FMU/VehicleInterface) | Declare each capability's variables for models authored here |
 | Multirotor export | [`Exports/FMU/PartialCopterInterface.mo`](../Exports/FMU/PartialCopterInterface.mo) | Extends the partials; fire-compose `--profile vio` builds on it |
-| Checker | [`tools/vehicle_interface/`](../tools/vehicle_interface) | Validates exported metadata; writes the runtime descriptor |
-| Runtime | [`runtime/`](../runtime) | Self-contained C library: loads the FMU in-process, drives it |
+| Checker | [`tools/vehicle_interface/`](../tools/vehicle_interface) | Validates exported metadata; writes the runtime descriptor and, on request, a linkable C shim |
+| Runtime | [`runtime/`](../runtime) | Self-contained C library: runs the FMU in-process (loaded from a descriptor, or linked into the program), drives it |
 | Example host | [`runtime/examples/hover_host.c`](../runtime/examples/hover_host.c) | Standalone host using only contract capabilities |
 | ArduPilot SITL prototype | [`runtime/hosts/ardupilot/`](../runtime/hosts/ardupilot) | Patch adding SITL model `cpvehicle` (host code, kept for reproducibility) |
 
@@ -198,7 +198,7 @@ producer declares the marker.
 cd tools/vehicle_interface
 python3 -m cp_vehicle_interface capabilities
 python3 -m cp_vehicle_interface check MODEL.fmu --require pwm_actuation_v1 --require kinematic_state_v1
-python3 -m cp_vehicle_interface prepare MODEL.fmu OUT_DIR --require ... [--set lat0=47.0]
+python3 -m cp_vehicle_interface prepare MODEL.fmu OUT_DIR --require ... [--set lat0=47.0] [--shim NAME]
 python3 -m cp_vehicle_interface prepare LEGACY.fmu OUT_DIR --profile fastdyn_legacy
 python3 tools/vehicle_interface/build_vehicle_fmu.py configs/hex.toml build/hex.fmu   # from the library root
 ```
@@ -239,6 +239,20 @@ variability `fixed` or `tunable`; anything else (structural parameters,
 arrays, the marker, inputs) is refused. Nothing is written for a
 nonconforming FMU.
 
+`--shim NAME` also writes `OUT_DIR/shim/`, the same checked model in a form a
+host links into its program instead of loading at run time:
+
+| File | Content |
+|---|---|
+| `cpv_model_NAME.c` | `const cpv_model_t cpv_model_NAME`: exactly the descriptor's content as C data (versions, profile, marker, capabilities, value references, sizes, start values, parameters, overrides, token) and the model's FMI 3 functions |
+| `sources/` | the FMU's C sources as shipped (`buildDescription.xml` decides which files and definitions) |
+| `cpv_model.cmake` | name, source list and preprocessor definitions for the runtime build |
+
+The model is compiled from those sources under FMI 3's source-code naming
+(every function prefixed with the model identifier), with the flags of the
+FMU's own binary (C99, `-O2`). NAME is a lowercase C identifier. An FMU
+without `sources/` cannot be linked and is refused.
+
 ## 5. Runtime
 
 `runtime/` builds `libcpvehicle` (static and shared) with CMake. It depends
@@ -246,6 +260,28 @@ only on libc, libm and libdl. The FMI 3 headers are vendored, and it has its
 own small JSON reader and SHA-256, so it never parses XML or unpacks archives.
 The API is in
 [`runtime/include/cpvehicle/cpvehicle.h`](../runtime/include/cpvehicle/cpvehicle.h).
+
+A host opens a vehicle in one of two ways; everything after opening is the
+same:
+
+| | `cpv_open(path)` | `cpv_open_model(cpv_find_model(NAME))` |
+|---|---|---|
+| Model comes from | `OUT_DIR/vehicle.json` and the FMU's shared library, `dlopen`ed | `OUT_DIR/shim/`, compiled into `libcpvehicle` |
+| Needs at run time | the prepared directory | nothing |
+| Change the vehicle | prepare again | prepare again and rebuild the host |
+| Header | `cpvehicle.h` | also [`cpvehicle_model.h`](../runtime/include/cpvehicle/cpvehicle_model.h) |
+
+Linked models are listed at configure time:
+
+```sh
+cmake -S runtime -B build/runtime-release -DCMAKE_BUILD_TYPE=Release \
+  -DCPV_MODELS="build/rover/shim;build/plane/shim"
+```
+
+Each model is partially linked into one object in which only
+`cpv_model_NAME` stays global (GNU `ld -r` and `objcopy`), so any number of
+models, all with Rumoca's internal function names, link into one program.
+`cpv_model_count`, `cpv_model_at` and `cpv_find_model` list them.
 
 ```
 cpv_open -> [cpv_set_parameter] -> cpv_initialize -> { set inputs; cpv_advance_to; read } -> [cpv_reset] -> cpv_close
@@ -257,6 +293,10 @@ cpv_open -> [cpv_set_parameter] -> cpv_initialize -> { set inputs; cpv_advance_t
   match the files** (prepare again). It then `dlopen`s the library and
   instantiates (no event mode, no early return). On any failure it cleans up
   everything it created.
+- **`cpv_open_model`** applies the same checks to a linked model (the same
+  code validates both), except the digests: the shim and its sources were
+  written together from one checked FMU, and the instantiation token still
+  has to match the compiled sources.
 - **`cpv_initialize`** applies overrides and the current input vectors
   (initially the model's starts) in Initialization Mode, then checks
   the live `cp_vehicle_interface_version`.
@@ -281,7 +321,7 @@ cpv_open -> [cpv_set_parameter] -> cpv_initialize -> { set inputs; cpv_advance_t
 ## 6. Tests
 
 ```sh
-runtime/tests/run_conformance.sh          # builds FMUs, descriptors, runtime (ASan/UBSan) and runs all
+runtime/tests/run_conformance.sh          # builds FMUs, descriptors, shims, runtime (ASan/UBSan) and runs all
 python3 -m unittest tools/vehicle_interface/tests/test_checker.py
 ```
 
@@ -325,10 +365,18 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
     right, throttle adds thrust; a full-throttle run tracks the centreline,
     cannot lift off before `CL0` carries the weight, and lifts off sooner
     with up elevator.
+- **Linked models** (`runtime/tests/test_linked_models.c`; the conformance
+  run links all four example vehicles): each linked model and its descriptor
+  (the FMU's own binary) are driven for 3 s with every PWM channel moving, an
+  external wrench and a parameter override, and must agree **bit for bit** in
+  description and in every output at every frame, and again after a reset;
+  lookup by name; refusals (schema, contract version, marker, missing FMI
+  function, foreign token, missing host capability); all four open and
+  stepped at once.
 - **Standalone host:** `cpv_hover_host` climbs to and holds 1 m with the quad
   and the hexa using the same code.
-- **ArduPilot SITL prototype:** the same quad, rover and fixed-wing artifacts
-  as the SITL physics model, flown by ArduCopter (guided mission), ArduRover
+- **ArduPilot SITL prototype:** the same quad, rover and fixed-wing models,
+  linked into the SITL binaries, as the SITL physics model, flown by ArduCopter (guided mission), ArduRover
   and ArduPlane (AUTO missions) with checks on every waypoint, cross-track
   error, attitude and the final position. This is evidence for one host, not
   general SITL support, and the ArduPlane parameters were set for this model
@@ -354,3 +402,6 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
 - Units are not exported by the pinned Rumoca.
 - Contact coupling, wind and other environment inputs beyond the external
   wrench are future capabilities.
+- Linking models (`CPV_MODELS`) needs GNU binutils (`ld -r`, `objcopy`) and is
+  tested on Linux only; a linked model with resources refers to them by the
+  absolute path of the prepared directory.

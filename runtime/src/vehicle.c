@@ -1,6 +1,8 @@
-/* CP Models vehicle runtime: descriptor validation, FMU lifecycle, ports, stepping. */
+/* CP Models vehicle runtime: model validation (descriptor file or linked model),
+ * FMU lifecycle, ports, stepping. */
 #define _POSIX_C_SOURCE 200809L
 #include "cpvehicle/cpvehicle.h"
+#include "cpvehicle/cpvehicle_model.h"
 
 #include "fmi3FunctionTypes.h"
 #include "json.h"
@@ -195,48 +197,7 @@ static void fmu_log(fmi3InstanceEnvironment env, fmi3Status status, fmi3String c
             message ? message : "");
 }
 
-/* --------------------------------------------------------------- descriptor */
-
-static cpv_status_t load_field(cpv_vehicle_t *v, const char *capability, const char *name,
-                               const cpv_json_t *entry) {
-  field_t *f = &v->fields[v->field_count];
-  uint64_t vr, count;
-  if (entry->type != CPV_JSON_OBJECT ||
-      json_uint(cpv_json_get(entry, "vr"), UINT32_MAX, &vr) ||
-      json_uint(cpv_json_get(entry, "count"), 1u << 20, &count) || count == 0) {
-    set_error(v, "descriptor: field %s.%s needs a valid vr and count", capability, name);
-    return CPV_ERR_DESCRIPTOR;
-  }
-  f->capability = copy_string(capability);
-  f->name = copy_string(name);
-  f->vr = (fmi3ValueReference)vr;
-  f->count = (size_t)count;
-  v->field_count++;
-  if (!f->capability || !f->name)
-    return CPV_ERR_NOMEM;
-  const cpv_json_t *start = cpv_json_get(entry, "start");
-  if (start && start->type == CPV_JSON_ARRAY) {
-    if (start->count != f->count) {
-      set_error(v, "descriptor: field %s has %zu element(s) but %zu start value(s)", name,
-                f->count, start->count);
-      return CPV_ERR_DESCRIPTOR;
-    }
-    f->start = malloc(f->count * sizeof(double));
-    if (!f->start)
-      return CPV_ERR_NOMEM;
-    for (size_t i = 0; i < f->count; i++) {
-      if (start->items[i].type != CPV_JSON_NUMBER || !isfinite(start->items[i].number)) {
-        set_error(v, "descriptor: field %s has a non-finite start value", name);
-        return CPV_ERR_DESCRIPTOR;
-      }
-      f->start[i] = start->items[i].number;
-    }
-  } else if (start && start->type != CPV_JSON_NULL) {
-    set_error(v, "descriptor: field %s has a malformed start", name);
-    return CPV_ERR_DESCRIPTOR;
-  }
-  return CPV_OK;
-}
+/* -------------------------------------------------------------------- model */
 
 static cpv_status_t add_override(cpv_vehicle_t *v, const char *name, double value) {
   const parameter_t *p = NULL;
@@ -272,6 +233,223 @@ static cpv_status_t add_override(cpv_vehicle_t *v, const char *name, double valu
   return CPV_OK;
 }
 
+static cpv_status_t load_field(cpv_vehicle_t *v, const cpv_model_field_t *mf) {
+  if (!mf->capability || !mf->name || mf->count == 0 || mf->count > (1u << 20)) {
+    set_error(v, "descriptor: field %s.%s needs a valid vr and count",
+              mf->capability ? mf->capability : "?", mf->name ? mf->name : "?");
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (!has_capability(v, mf->capability)) {
+    set_error(v, "descriptor: field %s belongs to undescribed capability %s", mf->name,
+              mf->capability);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  field_t *f = &v->fields[v->field_count++];
+  f->capability = copy_string(mf->capability);
+  f->name = copy_string(mf->name);
+  f->vr = (fmi3ValueReference)mf->vr;
+  f->count = mf->count;
+  if (!f->capability || !f->name)
+    return CPV_ERR_NOMEM;
+  if (mf->start) {
+    if (!finite_all(mf->start, mf->count)) {
+      set_error(v, "descriptor: field %s has a non-finite start value", mf->name);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    if (!(f->start = malloc(f->count * sizeof(double))))
+      return CPV_ERR_NOMEM;
+    memcpy(f->start, mf->start, f->count * sizeof(double));
+  }
+  return CPV_OK;
+}
+
+/* Validate a model description, from a descriptor file or linked into the
+ * program, and copy it into the instance. The FMI functions are bound later. */
+static cpv_status_t load_model(cpv_vehicle_t *v, const cpv_model_t *m, const cpv_options_t *o) {
+  cpv_status_t s;
+  if (m->descriptor_schema != CPV_DESCRIPTOR_SCHEMA) {
+    set_error(v, "descriptor: unsupported descriptor_schema (this runtime reads %d)",
+              CPV_DESCRIPTOR_SCHEMA);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (!m->contract_name || strcmp(m->contract_name, CPV_CONTRACT_NAME) != 0 ||
+      m->contract_version != CPV_CONTRACT_VERSION) {
+    set_error(v, "descriptor: not a %s version %d descriptor", CPV_CONTRACT_NAME,
+              CPV_CONTRACT_VERSION);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (!m->profile) {
+    set_error(v, "descriptor: profile is required");
+    return CPV_ERR_DESCRIPTOR;
+  }
+  int legacy = strcmp(m->profile, STANDARD_PROFILE) != 0;
+  if (legacy && strncmp(m->profile, LEGACY_PREFIX, strlen(LEGACY_PREFIX)) != 0) {
+    set_error(v, "descriptor: unknown profile %s", m->profile);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (legacy && !o->allow_legacy_profile) {
+    set_error(v, "descriptor uses the legacy profile %s (no version marker); the host must "
+                 "explicitly allow legacy profiles", m->profile);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (!(v->profile = copy_string(m->profile)))
+    return CPV_ERR_NOMEM;
+  if (!legacy) {
+    if (!m->has_marker || m->marker_value != CPV_CONTRACT_VERSION) {
+      set_error(v, "descriptor: the standard profile requires a version %d marker",
+                CPV_CONTRACT_VERSION);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    v->has_marker = 1;
+    v->marker_vr = (fmi3ValueReference)m->marker_vr;
+    v->marker_value = m->marker_value;
+  }
+  if (!m->instantiation_token) {
+    set_error(v, "descriptor: artifact.instantiation_token is required");
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (!(v->model_name = copy_string(m->model_name ? m->model_name : "")))
+    return CPV_ERR_NOMEM;
+
+  v->capabilities = calloc(m->capability_count ? m->capability_count : 1, sizeof(char *));
+  v->fields = calloc(m->field_count ? m->field_count : 1, sizeof(field_t));
+  if (!v->capabilities || !v->fields)
+    return CPV_ERR_NOMEM;
+  for (size_t i = 0; i < m->capability_count; i++) {
+    if (!m->capabilities[i]) {
+      set_error(v, "descriptor: capability %zu is malformed", i);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    if (!(v->capabilities[v->capability_count++] = copy_string(m->capabilities[i])))
+      return CPV_ERR_NOMEM;
+  }
+  for (size_t i = 0; i < m->field_count; i++)
+    if ((s = load_field(v, &m->fields[i])))
+      return s;
+
+  /* Capabilities required at prepare time and by this host. */
+  for (size_t i = 0; i < m->required_count; i++)
+    if (m->required_capabilities[i] && !has_capability(v, m->required_capabilities[i])) {
+      set_error(v, "descriptor requires %s, which it does not describe",
+                m->required_capabilities[i]);
+      return CPV_ERR_DESCRIPTOR;
+    }
+  for (size_t i = 0; i < o->required_count; i++)
+    if (!o->required_capabilities[i] || !has_capability(v, o->required_capabilities[i])) {
+      set_error(v, "model %s does not provide %s, which the host requires (profile %s)",
+                v->model_name, o->required_capabilities[i] ? o->required_capabilities[i] : "(null)",
+                v->profile);
+      return CPV_ERR_CAPABILITY;
+    }
+
+  v->overridable = calloc(m->parameter_count ? m->parameter_count : 1, sizeof(parameter_t));
+  if (!v->overridable)
+    return CPV_ERR_NOMEM;
+  for (size_t i = 0; i < m->parameter_count; i++) {
+    if (!m->parameters[i].name) {
+      set_error(v, "descriptor: parameter %zu has no name", i);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    parameter_t *p = &v->overridable[v->overridable_count++];
+    p->vr = (fmi3ValueReference)m->parameters[i].vr;
+    if (!(p->name = copy_string(m->parameters[i].name)))
+      return CPV_ERR_NOMEM;
+  }
+  for (size_t i = 0; i < m->override_count; i++) {
+    if (!m->overrides[i].name) {
+      set_error(v, "descriptor: override %zu has no name", i);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    if ((s = add_override(v, m->overrides[i].name, m->overrides[i].value)))
+      return s == CPV_ERR_ARGUMENT ? CPV_ERR_DESCRIPTOR : s;
+  }
+  v->descriptor_override_count = v->override_count;
+  if (v->override_count) {
+    if (!(v->descriptor_values = malloc(v->override_count * sizeof(double))))
+      return CPV_ERR_NOMEM;
+    for (size_t i = 0; i < v->override_count; i++)
+      v->descriptor_values[i] = v->overrides[i].value;
+  }
+
+  /* Ports the runtime drives directly. */
+  v->pwm = find_field(v, "pwm");
+  v->pwm_min = find_field(v, "pwm_min");
+  v->pwm_max = find_field(v, "pwm_max");
+  v->force = find_field(v, "external_force_frd");
+  v->moment = find_field(v, "external_moment_frd");
+  if (has_capability(v, "pwm_actuation_v1") && (!v->pwm || !v->pwm->start)) {
+    set_error(v, "descriptor: pwm_actuation_v1 needs pwm with a complete start vector");
+    return CPV_ERR_DESCRIPTOR;
+  }
+  if (has_capability(v, "external_wrench_v1") &&
+      (!v->force || !v->moment || v->force->count != 3 || v->moment->count != 3 ||
+       !v->force->start || !v->moment->start)) {
+    set_error(v, "descriptor: external_wrench_v1 needs 3-element force and moment with starts");
+    return CPV_ERR_DESCRIPTOR;
+  }
+  return CPV_OK;
+}
+
+#define BIND(field, member, type, name)                                                            \
+  do {                                                                                             \
+    if (!f->member) {                                                                              \
+      set_error(v, "FMU library lacks %s", name);                                                  \
+      return CPV_ERR_LOAD;                                                                         \
+    }                                                                                              \
+    v->field = (type *)f->member;                                                                  \
+  } while (0)
+
+static cpv_status_t bind_functions(cpv_vehicle_t *v, const cpv_fmi3_functions_t *f) {
+  BIND(instantiate, instantiate_co_simulation, fmi3InstantiateCoSimulationTYPE,
+       "fmi3InstantiateCoSimulation");
+  BIND(free_instance, free_instance, fmi3FreeInstanceTYPE, "fmi3FreeInstance");
+  BIND(enter_initialization, enter_initialization_mode, fmi3EnterInitializationModeTYPE,
+       "fmi3EnterInitializationMode");
+  BIND(exit_initialization, exit_initialization_mode, fmi3ExitInitializationModeTYPE,
+       "fmi3ExitInitializationMode");
+  BIND(do_step, do_step, fmi3DoStepTYPE, "fmi3DoStep");
+  BIND(get_float64, get_float64, fmi3GetFloat64TYPE, "fmi3GetFloat64");
+  BIND(set_float64, set_float64, fmi3SetFloat64TYPE, "fmi3SetFloat64");
+  BIND(get_int32, get_int32, fmi3GetInt32TYPE, "fmi3GetInt32");
+  BIND(reset, reset, fmi3ResetTYPE, "fmi3Reset");
+  BIND(terminate, terminate, fmi3TerminateTYPE, "fmi3Terminate");
+  return CPV_OK;
+}
+
+static void restore_inputs(cpv_vehicle_t *v) {
+  if (v->pwm)
+    memcpy(v->pwm_values, v->pwm->start, v->pwm->count * sizeof(double));
+  v->pwm_dirty = v->pwm != NULL;
+  if (v->force) {
+    memcpy(v->wrench, v->force->start, 3 * sizeof(double));
+    memcpy(v->wrench + 3, v->moment->start, 3 * sizeof(double));
+  }
+  v->wrench_dirty = v->force != NULL;
+}
+
+/* ----------------------------------------------------------------- descriptor */
+
+/* A model description read from a descriptor file. Strings point into the
+ * parsed JSON; the arrays are owned here. */
+typedef struct {
+  cpv_model_t model;
+  const char **capabilities;
+  const char **required;
+  cpv_model_field_t *fields;
+  cpv_model_parameter_t *parameters;
+  cpv_model_override_t *overrides;
+} json_model_t;
+
+static void json_model_free(json_model_t *j) {
+  for (size_t i = 0; j->fields && i < j->model.field_count; i++)
+    free((void *)j->fields[i].start);
+  free(j->capabilities);
+  free(j->required);
+  free(j->fields);
+  free(j->parameters);
+  free(j->overrides);
+}
+
 static cpv_status_t verify_digest(cpv_vehicle_t *v, const char *descriptor_path,
                                   const cpv_json_t *artifact, const char *path_key,
                                   const char *digest_key, char **resolved) {
@@ -303,77 +481,84 @@ static cpv_status_t verify_digest(cpv_vehicle_t *v, const char *descriptor_path,
   return CPV_OK;
 }
 
-static cpv_status_t load_descriptor(cpv_vehicle_t *v, const char *path, const cpv_options_t *o,
-                                    const cpv_json_t *root, char **library, char **resources,
-                                    const char **token) {
+static cpv_status_t json_field(cpv_vehicle_t *v, const char *capability, const char *name,
+                               const cpv_json_t *entry, cpv_model_field_t *f) {
+  uint64_t vr, count;
+  if (entry->type != CPV_JSON_OBJECT ||
+      json_uint(cpv_json_get(entry, "vr"), UINT32_MAX, &vr) ||
+      json_uint(cpv_json_get(entry, "count"), 1u << 20, &count) || count == 0) {
+    set_error(v, "descriptor: field %s.%s needs a valid vr and count", capability, name);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  *f = (cpv_model_field_t){capability, name, (unsigned int)vr, (size_t)count, NULL};
+  const cpv_json_t *start = cpv_json_get(entry, "start");
+  if (start && start->type == CPV_JSON_ARRAY) {
+    if (start->count != f->count) {
+      set_error(v, "descriptor: field %s has %zu element(s) but %zu start value(s)", name,
+                f->count, start->count);
+      return CPV_ERR_DESCRIPTOR;
+    }
+    double *values = malloc(f->count * sizeof(double));
+    if (!values)
+      return CPV_ERR_NOMEM;
+    f->start = values;
+    for (size_t i = 0; i < f->count; i++) {
+      if (start->items[i].type != CPV_JSON_NUMBER || !isfinite(start->items[i].number)) {
+        set_error(v, "descriptor: field %s has a non-finite start value", name);
+        return CPV_ERR_DESCRIPTOR;
+      }
+      values[i] = start->items[i].number;
+    }
+  } else if (start && start->type != CPV_JSON_NULL) {
+    set_error(v, "descriptor: field %s has a malformed start", name);
+    return CPV_ERR_DESCRIPTOR;
+  }
+  return CPV_OK;
+}
+
+/* Read the descriptor into a model description and check that it is bound to
+ * the extracted files (SHA-256) it would load. */
+static cpv_status_t model_from_json(cpv_vehicle_t *v, const char *path, const cpv_json_t *root,
+                                    json_model_t *j, char **library, char **resources) {
+  cpv_model_t *m = &j->model;
   uint64_t number;
+  cpv_status_t s;
   if (root->type != CPV_JSON_OBJECT) {
     set_error(v, "descriptor: top level is not an object");
     return CPV_ERR_DESCRIPTOR;
   }
-  if (json_uint(cpv_json_get(root, "descriptor_schema"), INT_MAX, &number) ||
-      number != CPV_DESCRIPTOR_SCHEMA) {
-    set_error(v, "descriptor: unsupported descriptor_schema (this runtime reads %d)",
-              CPV_DESCRIPTOR_SCHEMA);
-    return CPV_ERR_DESCRIPTOR;
-  }
+  m->descriptor_schema =
+      json_uint(cpv_json_get(root, "descriptor_schema"), INT_MAX, &number) ? -1 : (int)number;
   const cpv_json_t *contract = cpv_json_get(root, "contract");
-  const char *contract_name = json_string(contract, "name");
-  if (!contract_name || strcmp(contract_name, CPV_CONTRACT_NAME) != 0 ||
-      json_uint(cpv_json_get(contract, "version"), INT_MAX, &number) ||
-      number != CPV_CONTRACT_VERSION) {
-    set_error(v, "descriptor: not a %s version %d descriptor", CPV_CONTRACT_NAME,
-              CPV_CONTRACT_VERSION);
-    return CPV_ERR_DESCRIPTOR;
-  }
-  const char *profile = json_string(root, "profile");
-  if (!profile) {
-    set_error(v, "descriptor: profile is required");
-    return CPV_ERR_DESCRIPTOR;
-  }
-  int legacy = strcmp(profile, STANDARD_PROFILE) != 0;
-  if (legacy && strncmp(profile, LEGACY_PREFIX, strlen(LEGACY_PREFIX)) != 0) {
-    set_error(v, "descriptor: unknown profile %s", profile);
-    return CPV_ERR_DESCRIPTOR;
-  }
-  if (legacy && !o->allow_legacy_profile) {
-    set_error(v, "descriptor uses the legacy profile %s (no version marker); the host must "
-                 "explicitly allow legacy profiles", profile);
-    return CPV_ERR_DESCRIPTOR;
-  }
-  v->profile = copy_string(profile);
-
+  m->contract_name = json_string(contract, "name");
+  m->contract_version =
+      json_uint(cpv_json_get(contract, "version"), INT_MAX, &number) ? -1 : (int)number;
+  m->profile = json_string(root, "profile");
   const cpv_json_t *marker = cpv_json_get(root, "marker");
-  if (!legacy) {
-    uint64_t vr, value;
-    if (!marker || json_uint(cpv_json_get(marker, "vr"), UINT32_MAX, &vr) ||
-        json_uint(cpv_json_get(marker, "value"), INT_MAX, &value) ||
-        value != CPV_CONTRACT_VERSION) {
-      set_error(v, "descriptor: the standard profile requires a version %d marker",
-                CPV_CONTRACT_VERSION);
-      return CPV_ERR_DESCRIPTOR;
-    }
-    v->has_marker = 1;
-    v->marker_vr = (fmi3ValueReference)vr;
-    v->marker_value = (int)value;
+  uint64_t vr, value;
+  if (marker && !json_uint(cpv_json_get(marker, "vr"), UINT32_MAX, &vr) &&
+      !json_uint(cpv_json_get(marker, "value"), INT_MAX, &value)) {
+    m->has_marker = 1;
+    m->marker_vr = (unsigned int)vr;
+    m->marker_value = (int)value;
   }
+  /* Header problems are reported before the files are read. */
+  if (m->descriptor_schema != CPV_DESCRIPTOR_SCHEMA || !m->contract_name ||
+      strcmp(m->contract_name, CPV_CONTRACT_NAME) != 0 ||
+      m->contract_version != CPV_CONTRACT_VERSION || !m->profile)
+    return CPV_OK;
 
   const cpv_json_t *artifact = cpv_json_get(root, "artifact");
-  cpv_status_t s;
   if ((s = verify_digest(v, path, artifact, "model_description", "model_description_sha256",
                          NULL)) ||
       (s = verify_digest(v, path, artifact, "library", "library_sha256", library)))
     return s;
-  *token = json_string(artifact, "instantiation_token");
-  if (!*token) {
-    set_error(v, "descriptor: artifact.instantiation_token is required");
-    return CPV_ERR_DESCRIPTOR;
-  }
+  m->instantiation_token = json_string(artifact, "instantiation_token");
   const char *res = json_string(artifact, "resources");
   if (res && !(*resources = join_path(path, res)))
     return CPV_ERR_NOMEM;
-  const char *model = json_string(artifact, "model_name");
-  v->model_name = copy_string(model ? model : "");
+  m->model_name = json_string(artifact, "model_name");
+  m->source_sha256 = json_string(artifact, "source_sha256");
 
   const cpv_json_t *caps = cpv_json_get(root, "capabilities");
   if (!caps || caps->type != CPV_JSON_OBJECT) {
@@ -388,100 +573,95 @@ static cpv_status_t load_descriptor(cpv_vehicle_t *v, const char *path, const cp
     }
     total += caps->items[i].count;
   }
-  v->capabilities = calloc(caps->count ? caps->count : 1, sizeof(char *));
-  v->fields = calloc(total ? total : 1, sizeof(field_t));
-  if (!v->capabilities || !v->fields)
+  j->capabilities = calloc(caps->count ? caps->count : 1, sizeof(char *));
+  j->fields = calloc(total ? total : 1, sizeof(cpv_model_field_t));
+  if (!j->capabilities || !j->fields)
     return CPV_ERR_NOMEM;
+  m->capabilities = j->capabilities;
+  m->fields = j->fields;
   for (size_t i = 0; i < caps->count; i++) {
-    if (!(v->capabilities[v->capability_count++] = copy_string(caps->keys[i])))
-      return CPV_ERR_NOMEM;
+    j->capabilities[m->capability_count++] = caps->keys[i];
     const cpv_json_t *fields = &caps->items[i];
-    for (size_t j = 0; j < fields->count; j++) {
-      if (fields->items[j].type == CPV_JSON_NULL)
+    for (size_t k = 0; k < fields->count; k++) {
+      if (fields->items[k].type == CPV_JSON_NULL)
         continue; /* optional field the model does not export */
-      if ((s = load_field(v, caps->keys[i], fields->keys[j], &fields->items[j])))
+      s = json_field(v, caps->keys[i], fields->keys[k], &fields->items[k],
+                     &j->fields[m->field_count]);
+      if (j->fields[m->field_count].name)
+        m->field_count++; /* owns its start array from here on */
+      if (s)
         return s;
     }
   }
 
-  /* Capabilities required at prepare time and by this host. */
   const cpv_json_t *required = cpv_json_get(root, "required_capabilities");
-  for (size_t i = 0; required && required->type == CPV_JSON_ARRAY && i < required->count; i++)
-    if (required->items[i].type == CPV_JSON_STRING && !has_capability(v, required->items[i].string)) {
-      set_error(v, "descriptor requires %s, which it does not describe", required->items[i].string);
-      return CPV_ERR_DESCRIPTOR;
-    }
-  for (size_t i = 0; i < o->required_count; i++)
-    if (!o->required_capabilities[i] || !has_capability(v, o->required_capabilities[i])) {
-      set_error(v, "model %s does not provide %s, which the host requires (profile %s)",
-                v->model_name, o->required_capabilities[i] ? o->required_capabilities[i] : "(null)",
-                v->profile);
-      return CPV_ERR_CAPABILITY;
-    }
+  if (required && required->type == CPV_JSON_ARRAY) {
+    if (!(j->required = calloc(required->count ? required->count : 1, sizeof(char *))))
+      return CPV_ERR_NOMEM;
+    m->required_capabilities = j->required;
+    for (size_t i = 0; i < required->count; i++)
+      if (required->items[i].type == CPV_JSON_STRING)
+        j->required[m->required_count++] = required->items[i].string;
+  }
 
   const cpv_json_t *params = cpv_json_get(root, "parameters");
   if (params && params->type == CPV_JSON_OBJECT) {
-    v->overridable = calloc(params->count ? params->count : 1, sizeof(parameter_t));
-    if (!v->overridable)
+    if (!(j->parameters = calloc(params->count ? params->count : 1, sizeof(*j->parameters))))
       return CPV_ERR_NOMEM;
+    m->parameters = j->parameters;
     for (size_t i = 0; i < params->count; i++) {
-      uint64_t vr;
       if (json_uint(cpv_json_get(&params->items[i], "vr"), UINT32_MAX, &vr)) {
         set_error(v, "descriptor: parameter %s has no valid vr", params->keys[i]);
         return CPV_ERR_DESCRIPTOR;
       }
-      parameter_t *p = &v->overridable[v->overridable_count++];
-      p->name = copy_string(params->keys[i]);
-      p->vr = (fmi3ValueReference)vr;
-      if (!p->name)
-        return CPV_ERR_NOMEM;
+      j->parameters[m->parameter_count++] = (cpv_model_parameter_t){params->keys[i],
+                                                                    (unsigned int)vr};
     }
   }
   const cpv_json_t *overrides = cpv_json_get(root, "overrides");
-  for (size_t i = 0; overrides && overrides->type == CPV_JSON_OBJECT && i < overrides->count; i++) {
-    if (overrides->items[i].type != CPV_JSON_NUMBER) {
-      set_error(v, "descriptor: override %s is not a number", overrides->keys[i]);
-      return CPV_ERR_DESCRIPTOR;
-    }
-    if ((s = add_override(v, overrides->keys[i], overrides->items[i].number)))
-      return s == CPV_ERR_ARGUMENT ? CPV_ERR_DESCRIPTOR : s;
-  }
-  v->descriptor_override_count = v->override_count;
-  if (v->override_count) {
-    if (!(v->descriptor_values = malloc(v->override_count * sizeof(double))))
+  if (overrides && overrides->type == CPV_JSON_OBJECT) {
+    if (!(j->overrides = calloc(overrides->count ? overrides->count : 1, sizeof(*j->overrides))))
       return CPV_ERR_NOMEM;
-    for (size_t i = 0; i < v->override_count; i++)
-      v->descriptor_values[i] = v->overrides[i].value;
-  }
-
-  /* Ports the runtime drives directly. */
-  v->pwm = find_field(v, "pwm");
-  v->pwm_min = find_field(v, "pwm_min");
-  v->pwm_max = find_field(v, "pwm_max");
-  v->force = find_field(v, "external_force_frd");
-  v->moment = find_field(v, "external_moment_frd");
-  if (has_capability(v, "pwm_actuation_v1") && (!v->pwm || !v->pwm->start)) {
-    set_error(v, "descriptor: pwm_actuation_v1 needs pwm with a complete start vector");
-    return CPV_ERR_DESCRIPTOR;
-  }
-  if (has_capability(v, "external_wrench_v1") &&
-      (!v->force || !v->moment || v->force->count != 3 || v->moment->count != 3 ||
-       !v->force->start || !v->moment->start)) {
-    set_error(v, "descriptor: external_wrench_v1 needs 3-element force and moment with starts");
-    return CPV_ERR_DESCRIPTOR;
+    m->overrides = j->overrides;
+    for (size_t i = 0; i < overrides->count; i++) {
+      if (overrides->items[i].type != CPV_JSON_NUMBER) {
+        set_error(v, "descriptor: override %s is not a number", overrides->keys[i]);
+        return CPV_ERR_DESCRIPTOR;
+      }
+      j->overrides[m->override_count++] =
+          (cpv_model_override_t){overrides->keys[i], overrides->items[i].number};
+    }
   }
   return CPV_OK;
 }
 
-static void restore_inputs(cpv_vehicle_t *v) {
-  if (v->pwm)
-    memcpy(v->pwm_values, v->pwm->start, v->pwm->count * sizeof(double));
-  v->pwm_dirty = v->pwm != NULL;
-  if (v->force) {
-    memcpy(v->wrench, v->force->start, 3 * sizeof(double));
-    memcpy(v->wrench + 3, v->moment->start, 3 * sizeof(double));
+#define LOAD_SYMBOL(member, name)                                                                  \
+  do {                                                                                             \
+    *(void **)(&f->member) = dlsym(*handle, name);                                                 \
+    if (!f->member) {                                                                              \
+      set_error(v, "FMU library lacks %s", name);                                                  \
+      return CPV_ERR_LOAD;                                                                         \
+    }                                                                                              \
+  } while (0)
+
+static cpv_status_t load_library(cpv_vehicle_t *v, const char *library, void **handle,
+                                 cpv_fmi3_functions_t *f) {
+  *handle = dlopen(library, RTLD_NOW | RTLD_LOCAL);
+  if (!*handle) {
+    set_error(v, "cannot load %s: %s", library, dlerror());
+    return CPV_ERR_LOAD;
   }
-  v->wrench_dirty = v->force != NULL;
+  LOAD_SYMBOL(instantiate_co_simulation, "fmi3InstantiateCoSimulation");
+  LOAD_SYMBOL(free_instance, "fmi3FreeInstance");
+  LOAD_SYMBOL(enter_initialization_mode, "fmi3EnterInitializationMode");
+  LOAD_SYMBOL(exit_initialization_mode, "fmi3ExitInitializationMode");
+  LOAD_SYMBOL(do_step, "fmi3DoStep");
+  LOAD_SYMBOL(get_float64, "fmi3GetFloat64");
+  LOAD_SYMBOL(set_float64, "fmi3SetFloat64");
+  LOAD_SYMBOL(get_int32, "fmi3GetInt32");
+  LOAD_SYMBOL(reset, "fmi3Reset");
+  LOAD_SYMBOL(terminate, "fmi3Terminate");
+  return CPV_OK;
 }
 
 /* ----------------------------------------------------------------- lifecycle */
@@ -525,31 +705,51 @@ static void destroy(cpv_vehicle_t *v) {
   free(v);
 }
 
-#define LOAD_SYMBOL(field, name)                                                                   \
-  do {                                                                                             \
-    *(void **)(&v->field) = dlsym(v->library, name);                                               \
-    if (!v->field) {                                                                               \
-      set_error(v, "FMU library lacks %s", name);                                                  \
-      return CPV_ERR_LOAD;                                                                         \
-    }                                                                                              \
-  } while (0)
+static cpv_vehicle_t *create(const cpv_options_t *o, cpv_status_t *s) {
+  cpv_vehicle_t *v = calloc(1, sizeof(*v));
+  if (!v) {
+    *s = CPV_ERR_NOMEM;
+    return NULL;
+  }
+  v->instance_name = copy_string(o->instance_name ? o->instance_name : "cpvehicle");
+  v->max_step_s = o->max_step_s;
+  v->log = o->log;
+  v->log_user = o->log_user;
+  if (!v->instance_name)
+    *s = CPV_ERR_NOMEM;
+  else if (!(o->max_step_s >= 0) || !isfinite(o->max_step_s)) {
+    set_error(v, "max_step_s must be finite and non-negative");
+    *s = CPV_ERR_ARGUMENT;
+  }
+  return v;
+}
 
-static cpv_status_t load_library(cpv_vehicle_t *v, const char *library) {
-  v->library = dlopen(library, RTLD_NOW | RTLD_LOCAL);
-  if (!v->library) {
-    set_error(v, "cannot load %s: %s", library, dlerror());
+/* After the model is loaded and its functions bound: input buffers and the instance. */
+static cpv_status_t instantiate(cpv_vehicle_t *v, const char *token, const char *resource_uri) {
+  if (v->pwm && !(v->pwm_values = malloc(v->pwm->count * sizeof(double))))
+    return CPV_ERR_NOMEM;
+  restore_inputs(v);
+  v->instance = v->instantiate(v->instance_name, token, resource_uri, fmi3False, fmi3False,
+                               fmi3False /* eventModeUsed */, fmi3False /* earlyReturnAllowed */,
+                               NULL, 0, v, fmu_log, NULL);
+  if (!v->instance) {
+    set_error(v, "fmi3InstantiateCoSimulation failed for %s%s%s", v->model_name,
+              v->fmu_message[0] ? ": " : "", v->fmu_message);
     return CPV_ERR_LOAD;
   }
-  LOAD_SYMBOL(instantiate, "fmi3InstantiateCoSimulation");
-  LOAD_SYMBOL(free_instance, "fmi3FreeInstance");
-  LOAD_SYMBOL(enter_initialization, "fmi3EnterInitializationMode");
-  LOAD_SYMBOL(exit_initialization, "fmi3ExitInitializationMode");
-  LOAD_SYMBOL(do_step, "fmi3DoStep");
-  LOAD_SYMBOL(get_float64, "fmi3GetFloat64");
-  LOAD_SYMBOL(set_float64, "fmi3SetFloat64");
-  LOAD_SYMBOL(get_int32, "fmi3GetInt32");
-  LOAD_SYMBOL(reset, "fmi3Reset");
-  LOAD_SYMBOL(terminate, "fmi3Terminate");
+  v->state = STATE_INSTANTIATED;
+  return CPV_OK;
+}
+
+static cpv_status_t finish(cpv_vehicle_t *v, cpv_status_t s, cpv_vehicle_t **out, char *error,
+                           size_t error_size) {
+  if (s != CPV_OK) {
+    if (error && error_size)
+      snprintf(error, error_size, "%s", v && v->error[0] ? v->error : cpv_status_string(s));
+    destroy(v);
+    return s;
+  }
+  *out = v;
   return CPV_OK;
 }
 
@@ -567,27 +767,14 @@ cpv_status_t cpv_open(const char *descriptor_path, const cpv_options_t *options,
   cpv_options_t defaults;
   cpv_options_init(&defaults);
   const cpv_options_t *o = options ? options : &defaults;
-  cpv_vehicle_t *v = calloc(1, sizeof(*v));
-  if (!v)
-    return CPV_ERR_NOMEM;
-  v->instance_name = copy_string(o->instance_name ? o->instance_name : "cpvehicle");
-  v->max_step_s = o->max_step_s;
-  v->log = o->log;
-  v->log_user = o->log_user;
   cpv_status_t s = CPV_OK;
+  cpv_vehicle_t *v = create(o, &s);
   char *library = NULL, *resources = NULL, *text = NULL, *resource_uri = NULL;
   cpv_json_t *root = NULL;
-  const char *token = NULL;
+  json_model_t j = {0};
   size_t length = 0;
-  if (!v->instance_name) {
-    s = CPV_ERR_NOMEM;
+  if (s)
     goto done;
-  }
-  if (!(o->max_step_s >= 0) || !isfinite(o->max_step_s)) {
-    set_error(v, "max_step_s must be finite and non-negative");
-    s = CPV_ERR_ARGUMENT;
-    goto done;
-  }
   if (!(text = read_file(descriptor_path, &length))) {
     set_error(v, "cannot read descriptor %s", descriptor_path);
     s = CPV_ERR_DESCRIPTOR;
@@ -597,49 +784,50 @@ cpv_status_t cpv_open(const char *descriptor_path, const cpv_options_t *options,
     s = CPV_ERR_DESCRIPTOR;
     goto done;
   }
-  if ((s = load_descriptor(v, descriptor_path, o, root, &library, &resources, &token)))
-    goto done;
-  if (v->pwm && !(v->pwm_values = malloc(v->pwm->count * sizeof(double)))) {
-    s = CPV_ERR_NOMEM;
-    goto done;
-  }
-  restore_inputs(v);
-  if ((s = load_library(v, library)))
+  if ((s = model_from_json(v, descriptor_path, root, &j, &library, &resources)) ||
+      (s = load_model(v, &j.model, o)) ||
+      (s = load_library(v, library, &v->library, &j.model.fmi3)) ||
+      (s = bind_functions(v, &j.model.fmi3)))
     goto done;
   /* FMI 3 expects a file URI to the resources directory, ending in '/'. */
   if (resources) {
     size_t n = strlen(resources) + 9;
-    resource_uri = malloc(n);
-    if (!resource_uri) {
+    if (!(resource_uri = malloc(n))) {
       s = CPV_ERR_NOMEM;
       goto done;
     }
     snprintf(resource_uri, n, "file://%s/", resources);
   }
-  v->instance = v->instantiate(v->instance_name, token, resource_uri, fmi3False, fmi3False,
-                               fmi3False /* eventModeUsed */, fmi3False /* earlyReturnAllowed */,
-                               NULL, 0, v, fmu_log, NULL);
-  if (!v->instance) {
-    set_error(v, "fmi3InstantiateCoSimulation failed for %s%s%s", v->model_name,
-              v->fmu_message[0] ? ": " : "", v->fmu_message);
-    s = CPV_ERR_LOAD;
-    goto done;
-  }
-  v->state = STATE_INSTANTIATED;
+  s = instantiate(v, j.model.instantiation_token, resource_uri);
 done:
+  json_model_free(&j);
   free(resource_uri);
   free(library);
   free(resources);
   free(text);
   cpv_json_free(root);
-  if (s != CPV_OK) {
+  return finish(v, s, out, error, error_size);
+}
+
+cpv_status_t cpv_open_model(const cpv_model_t *model, const cpv_options_t *options,
+                            cpv_vehicle_t **out, char *error, size_t error_size) {
+  if (out)
+    *out = NULL;
+  if (error && error_size)
+    error[0] = '\0';
+  if (!model || !out) {
     if (error && error_size)
-      snprintf(error, error_size, "%s", v->error[0] ? v->error : cpv_status_string(s));
-    destroy(v);
-    return s;
+      snprintf(error, error_size, "cpv_open_model: model and out are required");
+    return CPV_ERR_ARGUMENT;
   }
-  *out = v;
-  return CPV_OK;
+  cpv_options_t defaults;
+  cpv_options_init(&defaults);
+  const cpv_options_t *o = options ? options : &defaults;
+  cpv_status_t s = CPV_OK;
+  cpv_vehicle_t *v = create(o, &s);
+  if (!s && !(s = load_model(v, model, o)) && !(s = bind_functions(v, &model->fmi3)))
+    s = instantiate(v, model->instantiation_token, model->resources_uri);
+  return finish(v, s, out, error, error_size);
 }
 
 void cpv_close(cpv_vehicle_t *v) { destroy(v); }
