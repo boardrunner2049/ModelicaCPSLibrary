@@ -1,0 +1,267 @@
+# CP Models vehicle interface: normative machine-readable contract.
+#
+# This table is authoritative. docs/vehicle-interface.md explains it, the
+# checker (tools/vehicle_interface) enforces it on exported FMU metadata, and
+# the runtime (runtime/) consumes only descriptors the checker produced.
+#
+# Field keys:
+#   name        exported FMI variable name
+#   type        FMI 3 type element (Float64, Int32, ...)
+#   causality   allowed FMI causality, or a list of allowed causalities
+#   variability allowed FMI variability, or a list (absent: not checked)
+#   shape       [] scalar; [3] fixed; ["n"] one dimension of any size >= 1
+#   required    required for the capability to be provided
+#   start       "finite": every element needs a finite literal start value
+#   unit        documented unit; checked only when the FMU declares one
+#   frame       documented frame or datum
+#   meaning     documented semantics (not machine-checked)
+
+[contract]
+name = "cp_vehicle_interface"
+version = 1
+# The descriptor schema is versioned independently of the contract.
+descriptor_schema = 1
+fmi_version = "3."
+reference_point = "combined_cg"
+
+# Every conforming FMU declares this marker. Rumoca exports a Modelica
+# `constant Integer` as causality="local" variability="constant" with its
+# value as start; a `final parameter` exports without a start value, so the
+# value could not be checked from metadata. The runtime re-reads the value
+# from the instance after initialization.
+[marker]
+name = "cp_vehicle_interface_version"
+type = "Int32"
+causality = ["local", "output"]
+variability = "constant"
+value = 1
+
+[capabilities.pwm_actuation_v1]
+summary = "Pulse-width commands, one element per mapped host output channel."
+[[capabilities.pwm_actuation_v1.fields]]
+name = "pwm"
+type = "Float64"
+causality = "input"
+shape = ["n"]
+required = true
+start = "finite"
+unit = "us"
+meaning = "Element k+1 is mapped host output channel k. n is the exported dimension, not the rotor count; unused channels are valid and keep their start value."
+[[capabilities.pwm_actuation_v1.fields]]
+name = "pwm_min"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = false
+unit = "us"
+meaning = "Pulse width of a zero command, for hosts whose native actuator output is normalized."
+[[capabilities.pwm_actuation_v1.fields]]
+name = "pwm_max"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = false
+unit = "us"
+meaning = "Pulse width of a full command."
+
+[capabilities.kinematic_state_v1]
+summary = "Physical truth of the vehicle at the combined CG; never a simulated measurement."
+[[capabilities.kinematic_state_v1.fields]]
+name = "state.position_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m"
+frame = "local NED at the geodetic origin"
+meaning = "CG position relative to the origin (lat0, lon0, ground_alt_wgs84); down is zero at ground_alt_wgs84."
+[[capabilities.kinematic_state_v1.fields]]
+name = "state.velocity_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m/s"
+frame = "local NED"
+meaning = "CG velocity."
+[[capabilities.kinematic_state_v1.fields]]
+name = "state.quaternion_wb"
+type = "Float64"
+causality = "output"
+shape = [4]
+required = true
+unit = "1"
+frame = "body FRD to local NED"
+meaning = "Scalar-first (w,x,y,z) Hamilton quaternion q with v_ned = q * v_frd * conj(q). Unit norm up to integration error; q and -q are the same attitude."
+[[capabilities.kinematic_state_v1.fields]]
+name = "state.angular_velocity_frd"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "rad/s"
+frame = "body FRD"
+meaning = "Body angular velocity relative to NED, resolved in body FRD."
+[[capabilities.kinematic_state_v1.fields]]
+name = "lat0"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = true
+unit = "deg"
+frame = "WGS84"
+meaning = "Geodetic origin latitude."
+[[capabilities.kinematic_state_v1.fields]]
+name = "lon0"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = true
+unit = "deg"
+frame = "WGS84"
+meaning = "Geodetic origin longitude."
+[[capabilities.kinematic_state_v1.fields]]
+name = "ground_alt_wgs84"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = true
+unit = "m"
+frame = "WGS84 ellipsoid"
+meaning = "Origin altitude above the ellipsoid; NED down is zero here."
+
+[capabilities.imu_v1]
+summary = "Latest IMU reading at the current communication point."
+[[capabilities.imu_v1.fields]]
+name = "accel"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m/s2"
+frame = "body FRD"
+meaning = "Specific force (acceleration minus gravity); about (0, 0, -9.81) at rest and level."
+[[capabilities.imu_v1.fields]]
+name = "gyro"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "rad/s"
+frame = "body FRD"
+meaning = "Angular rate."
+
+[capabilities.magnetometer_v1]
+summary = "Latest magnetometer reading."
+[[capabilities.magnetometer_v1.fields]]
+name = "mag"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "G"
+frame = "body FRD"
+meaning = "Magnetic field in Gauss (1 G = 1e-4 T)."
+
+[capabilities.gnss_v1]
+summary = "Latest GNSS fix."
+[[capabilities.gnss_v1.fields]]
+name = "gps"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+frame = "WGS84"
+meaning = "Mixed units: latitude [deg], longitude [deg], altitude above the WGS84 ellipsoid [m]. One FMI unit cannot describe it."
+[[capabilities.gnss_v1.fields]]
+name = "vel_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m/s"
+frame = "local NED"
+meaning = "Velocity."
+[[capabilities.gnss_v1.fields]]
+name = "yaw_deg"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "deg"
+frame = "clockwise from true north"
+meaning = "Heading. In current CP Models exports it is derived from attitude truth, not a GNSS measurement."
+[[capabilities.gnss_v1.fields]]
+name = "earth_radius_m"
+type = "Float64"
+causality = "parameter"
+shape = []
+required = false
+unit = "m"
+meaning = "Spherical Earth radius of the local geodetic conversion."
+
+[capabilities.barometer_v1]
+summary = "Latest barometer reading."
+[[capabilities.barometer_v1.fields]]
+name = "baro_pressure_pa"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "Pa"
+meaning = "Static pressure."
+[[capabilities.barometer_v1.fields]]
+name = "baro_temperature_c"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "degC"
+meaning = "Sensor temperature."
+[[capabilities.barometer_v1.fields]]
+name = "baro_altitude_m"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "m"
+meaning = "Up-positive altitude above the ground plane."
+[[capabilities.barometer_v1.fields]]
+name = "baro_climb_rate_mps"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "m/s"
+meaning = "Up-positive climb rate."
+
+[capabilities.external_wrench_v1]
+summary = "Host-supplied non-gravity wrench acting on the vehicle."
+[[capabilities.external_wrench_v1.fields]]
+name = "external_force_frd"
+type = "Float64"
+causality = "input"
+shape = [3]
+required = true
+start = "finite"
+unit = "N"
+frame = "body FRD, applied at the combined CG"
+meaning = "Added to the plant's own forces. Zero is no effect. Held between communication points."
+[[capabilities.external_wrench_v1.fields]]
+name = "external_moment_frd"
+type = "Float64"
+causality = "input"
+shape = [3]
+required = true
+start = "finite"
+unit = "N.m"
+frame = "body FRD, about the combined CG"
+meaning = "Added to the plant's own moments. Zero is no effect. Held between communication points."
+
+# An FMU without the marker is accepted only when the host explicitly selects
+# this profile; the checker then warns. It describes the exports of FastDyn's
+# FastDyn.Copter/Rover/Plane wrappers before migration. Removal is decided
+# once every supported producer declares the marker.
+[profiles.fastdyn_legacy]
+summary = "FastDyn wrappers and CP Models exports that predate the marker."
+capabilities = ["pwm_actuation_v1", "imu_v1", "magnetometer_v1", "gnss_v1", "barometer_v1"]

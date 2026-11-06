@@ -139,6 +139,15 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         physical.insert(0, Modifier::Bind("geometry".into(), reference("geometry")));
         physical.push(Modifier::Bind("pressure".into(), Value::Real(101325.0)));
         physical.push(Modifier::Bind("temperature".into(), Value::Real(288.15)));
+        // Vehicle interface external_wrench_v1: the host's wrench at the CG, body FRD.
+        physical.push(Modifier::Bind(
+            "externalForce_b".into(),
+            reference("external_force_frd"),
+        ));
+        physical.push(Modifier::Bind(
+            "externalMoment_b".into(),
+            reference("external_moment_frd"),
+        ));
         components.push(instance(plant_class, "plant", vec![], physical));
         let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
         boundary.extend(fields(&c.interface)?);

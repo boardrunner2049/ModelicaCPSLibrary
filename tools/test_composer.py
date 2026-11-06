@@ -576,7 +576,9 @@ end ChannelsRun;
                     values = [1100+800*u for u in command] if profile == 'vio' else command
                     port = 'pwm' if profile == 'vio' else 'normalizedCommand'
                     harness = work/'P1Run.mo'
-                    harness.write_text('model P1Run\n  P1Vehicle vehicle('+port+'={'+','.join(map(str,values))+'});\nend P1Run;\n')
+                    # The vio export's inputs: PWM and the external_wrench_v1 wrench (zero).
+                    wrench = ', external_force_frd=zeros(3), external_moment_frd=zeros(3)' if profile == 'vio' else ''
+                    harness.write_text('model P1Run\n  P1Vehicle vehicle('+port+'={'+','.join(map(str,values))+'}'+wrench+');\nend P1Run;\n')
                     files = [work/'generated/sources/ModelicaCPSLibrary/package.mo', work/'generated/P1Vehicle.mo', harness]
                     script = work/'simulate.mos'
                     script.write_text('loadModel(Modelica,{"4.0.0"});\n'
