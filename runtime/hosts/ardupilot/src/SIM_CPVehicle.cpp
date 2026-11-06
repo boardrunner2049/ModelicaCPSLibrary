@@ -178,15 +178,15 @@ void CPVehicle::update(const struct sitl_input &input)
         fail("read imu", status);
     }
 
-    // Truth at the vehicle's combined CG. SITL adds its own sensor noise to
-    // gyro and accel_body; use a model with an ideal IMU so noise is not
-    // applied twice.
+    // Attitude and position are truth at the vehicle's combined CG. The IMU
+    // (gyro and accel_body) is the model's own IMU, so the IMU model selected
+    // in the vehicle's configuration is what the autopilot reads; SITL's
+    // SIM_GYR*_RND / SIM_ACC*_RND noise (default 0) would add to it.
     Quaternion q(state.quaternion_wb[0], state.quaternion_wb[1], state.quaternion_wb[2],
                  state.quaternion_wb[3]);
     q.normalize();
     q.rotation_matrix(dcm);
-    gyro = Vector3f(state.angular_velocity_frd[0], state.angular_velocity_frd[1],
-                    state.angular_velocity_frd[2]);
+    gyro = Vector3f(imu.gyro_frd[0], imu.gyro_frd[1], imu.gyro_frd[2]);
     accel_body = Vector3f(imu.accel_frd[0], imu.accel_frd[1], imu.accel_frd[2]);
     velocity_ef = Vector3f(state.velocity_ned[0], state.velocity_ned[1], state.velocity_ned[2]);
     position = Vector3d(state.position_ned[0], state.position_ned[1], state.position_ned[2]);

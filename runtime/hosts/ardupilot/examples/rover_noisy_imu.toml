@@ -1,0 +1,31 @@
+# A heavier rover with a noisy, biased IMU (I2) mounted ahead of the CG.
+#   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/rover_noisy_imu.toml --mission
+[sitl]
+speedup = 1
+home = [40.414929, -86.932387, 149.0, 0.0]
+
+[physics]
+schema_version = 3
+vehicle = "rover"
+model_name = "RoverNoisyImu"
+
+[physics.plant]
+mass = 4.0
+imuPosition_b = [0.08, 0.0, -0.03]
+
+[physics.models.imu]
+model = "errors"          # ideal | digital | errors | electromechanical
+
+[physics.imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+seed = 7
+streamId = 1
+noiseStd = [0.05, 0.05, 0.05, 0.005, 0.005, 0.005]
+biasStd = [0.02, 0.02, 0.02, 0.001, 0.001, 0.001]
+biasTau = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]

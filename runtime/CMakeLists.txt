@@ -84,6 +84,8 @@ set_target_properties(cpvehicle_static PROPERTIES OUTPUT_NAME cpvehicle)
 
 add_executable(cpv_hover_host examples/hover_host.c)
 target_link_libraries(cpv_hover_host PRIVATE cpvehicle_static)
+add_executable(cpv_realtime examples/realtime_probe.c)
+target_link_libraries(cpv_realtime PRIVATE cpvehicle_static)
 
 include(CTest)
 if(BUILD_TESTING)

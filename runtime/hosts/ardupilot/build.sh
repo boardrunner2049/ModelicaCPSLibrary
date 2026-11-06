@@ -3,17 +3,20 @@
 #
 #   runtime/hosts/ardupilot/build.sh [VEHICLE...]
 #
-# VEHICLE names a configs/VEHICLE.toml (default: quad hex rover plane rover_i2).
-# Each becomes the SITL model `--model cpvehicle:VEHICLE`. WAF_TARGETS selects
-# the autopilots (default: copter rover plane).
+# VEHICLE is a configuration name (configs/VEHICLE.toml) or a TOML file: a
+# vehicle configuration or a run file with [sitl] and [physics] (runspec.py).
+# Default: quad hex rover plane rover_i2. Each becomes the SITL model
+# `--model cpvehicle:NAME`. Every vehicle prepared so far (build/vehicle-interface)
+# stays linked in. WAF_TARGETS selects the autopilots (default: copter rover plane).
 #
 # Steps, all idempotent:
 #   1. third_party/ardupilot at its pinned upstream commit (git submodule);
 #   2. the three ArduPilot hooks (hooks.patch: model table entry, --cpvehicle
 #      waf option, link flags) applied to that working tree, and this
 #      directory's SIM_CPVehicle.{cpp,h} linked into libraries/SITL;
-#   3. each configuration composed and exported to an FMU (rebuilt when the
-#      configuration is newer), checked, and written as a linkable shim;
+#   3. each configuration composed and exported to an FMU (compiled again only
+#      when the composed model, library or compiler changed), checked, and
+#      written as a linkable shim;
 #   4. the vehicle runtime built with those models (build/runtime-release);
 #   5. ArduPilot configured with --cpvehicle and built.
 #
@@ -44,17 +47,15 @@ done
 echo "== vehicles: ${vehicles[*]}"
 out=$root/build/vehicle-interface
 mkdir -p "$out"
-models=()
-for v in "${vehicles[@]}"; do
-  config=configs/$v.toml
-  [[ -f $config ]] || { echo "no $config" >&2; exit 2; }
-  if [[ ! -f $out/$v.fmu || $config -nt $out/$v.fmu ]]; then
-    python3 tools/vehicle_interface/build_vehicle_fmu.py "$config" "$out/$v.fmu"
-  fi
-  (cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare "$out/$v.fmu" "$out/$v" \
-     --shim "$v" --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1 | head -1)
-  models+=("$out/$v/shim")
+for target in "${vehicles[@]}"; do
+  eval "$(python3 "$here/runspec.py" "$target")"
+  python3 tools/vehicle_interface/build_vehicle_fmu.py "$CONFIG" "$out/$NAME.fmu" --if-changed \
+    ${TABLE:+--table "$TABLE"} > /dev/null
+  (cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare "$out/$NAME.fmu" "$out/$NAME" \
+     --shim "$NAME" --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1 | head -1)
 done
+models=("$out"/*/shim)
+echo "== linked: $(for m in "${models[@]}"; do basename "$(dirname "$m")"; done | tr '\n' ' ')"
 
 echo "== runtime"
 cmake -S runtime -B build/runtime-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
@@ -65,4 +66,4 @@ echo "== ArduPilot SITL: ${targets[*]}"
 cd "$ap"
 ./waf configure --board sitl --cpvehicle="$root" > /dev/null
 ./waf "${targets[@]}"
-echo "binaries: $ap/build/sitl/bin; run: $here/examples/view.sh NAME"
+echo "binaries: $ap/build/sitl/bin; run: $here/run.sh VEHICLE"

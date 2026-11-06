@@ -1,0 +1,26 @@
+# The fixed-wing, 10 % heavier, with a sampled and quantized IMU (I1) and the
+# GNSS antenna on the tail.
+#   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/plane_digital_imu.toml --mission
+[sitl]
+speedup = 2
+
+[physics]
+schema_version = 3
+vehicle = "fixed_wing"
+model_name = "PlaneDigitalImu"
+
+[physics.plant]
+mass = 2.2
+gnssPosition_b = [-0.6, 0.0, -0.05]
+
+[physics.models.imu]
+model = "digital"
+
+[physics.imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]

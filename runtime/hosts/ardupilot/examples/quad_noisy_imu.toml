@@ -1,0 +1,43 @@
+# The quad, 20 % heavier, with a noisy and biased IMU (I2).
+# (model = "electromechanical" also works but runs ~0.04x real time: too slow
+# for SITL.)
+#   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/quad_noisy_imu.toml --mission
+[sitl]
+speedup = 1
+
+[physics]
+schema_version = 3
+model_name = "QuadNoisyImu"   # vehicle = "multirotor" is the default
+
+[physics.geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]   # ArduCopter Quad-X motor order
+spinSign = [-1, 1, -1, 1]
+
+[physics.mass]
+mode = "aggregate"
+[physics.mass.aggregate]
+mass = 1.8
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[physics.initial]
+p_start = [0.0, 0.0, -0.12]
+q_start = [1.0, 0.0, 0.0, 0.0]   # facing north
+
+[physics.models.imu]
+model = "errors"          # ideal | digital | errors | electromechanical
+
+[physics.imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+seed = 11
+streamId = 1
+noiseStd = [0.05, 0.05, 0.05, 0.005, 0.005, 0.005]
+biasStd = [0.02, 0.02, 0.02, 0.001, 0.001, 0.001]
+biasTau = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]

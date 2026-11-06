@@ -239,6 +239,13 @@ so one file can describe both the firmware run and the vehicle.
 `configs/rover_i2.toml` is the rover with an I2 IMU (sampled, quantized, noisy,
 biased) mounted 5 cm ahead of the CG.
 
+To fly a configuration in ArduPilot SITL in one step,
+`runtime/hosts/ardupilot/run.sh FILE.toml [--mission|--headless]` (a run file
+adds `[sitl]` to the vehicle under `[physics]`; see
+[`runtime/hosts/ardupilot/README.md`](../runtime/hosts/ardupilot/README.md)).
+`build_vehicle_fmu.py --if-changed` skips the compilation when the composed
+model, library sources and compiler are those of the existing FMU.
+
 | Export | Plant | `pwm` (ArduPilot servo order) | Range, starts |
 |---|---|---|---|
 | `Exports.FMU.Rover` | `Vehicles.Rover.RoverPlant`: 3 kg, four compliant wheels with slip-based tyre forces, Ackermann front steering, rear open differential driven by a DC motor (no-load 10 m/s) | `[1]` steering, `[3]` throttle (both centred; `[2]`, `[4]` unconnected) | 1000..2000 µs, all 1500 |
@@ -418,7 +425,8 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   function, foreign token, missing host capability); all five open and
   stepped at once.
 - **Standalone host:** `cpv_hover_host` climbs to and holds 1 m with the quad
-  and the hexa using the same code.
+  and the hexa using the same code. `cpv_realtime NAME` reports how many
+  times faster than real time a linked model runs at 1200 Hz frames.
 - **ArduPilot SITL prototype:** the same quad, rover (also rover_i2) and fixed-wing models,
   linked into the SITL binaries, as the SITL physics model, flown by ArduCopter (guided mission), ArduRover
   and ArduPlane (AUTO missions) with checks on every waypoint, cross-track
@@ -450,6 +458,13 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
 - Rotor speeds and other diagnostics are exported but not part of the
   contract.
 - Units are not exported by the pinned Rumoca.
+- Speed: the electromechanical IMU (I3) integrates the MEMS resonators and
+  runs at ~0.04x real time in a vehicle (I0 ~14x, I1/I2 3-9x), too slow for
+  real-time hosts such as SITL.
+- The plants' default Earth magnetic field input,
+  `magneticField_w = {0, 20e-6, 45e-6}` T in NED, has no north component; a
+  host that feeds the model's magnetometer to a compass-using autopilot would
+  see headings about 90 degrees off. The ArduPilot host uses SITL's compass.
 - Contact coupling, wind and other environment inputs beyond the external
   wrench are future capabilities.
 - Linking models (`CPV_MODELS`) needs GNU binutils (`ld -r`, `objcopy`) and is
