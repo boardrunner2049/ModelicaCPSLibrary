@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Build a vehicle interface FMU.
 
-usage: build_vehicle_fmu.py CONFIG.toml|MODEL OUT.fmu [--work DIR]
+usage: build_vehicle_fmu.py CONFIG.toml|MODEL OUT.fmu [--table PATH] [--work DIR]
 
-CONFIG.toml (a multirotor): runs `fire-compose emit CONFIG --profile vio` and
-exports the emitted model. MODEL (a concrete library export such as
-Exports.FMU.Rover or Exports.FMU.FixedWing): exports it directly. Both go
-through tools/fmi/tools/make_fmu.py with the pinned Rumoca (tools/fmi:
-bin/rumoca or RUMOCA). Compiles a concrete model, never a partial.
+CONFIG.toml (any vehicle kind: multirotor, rover, fixed_wing): runs
+`fire-compose emit CONFIG --profile vio` and exports the emitted model. With
+--table, the physics configuration is that table of a host configuration, e.g.
+--table 'FMU.models.quad.physics' in a FastDyn configuration. MODEL (a concrete
+library export such as Exports.FMU.Rover): exports it directly. Both go through
+tools/fmi/tools/make_fmu.py with the pinned Rumoca (tools/fmi: bin/rumoca or
+RUMOCA). Compiles a concrete model, never a partial.
 """
 from __future__ import annotations
 
@@ -29,10 +31,11 @@ def build_model(model: str, out: Path) -> Path:
     return out
 
 
-def build(config: Path, out: Path, work: Path) -> Path:
+def build(config: Path, out: Path, work: Path, table: str | None = None) -> Path:
     emit = work / "emit"
+    selector = ["--config-table", table] if table else []
     subprocess.run(["cargo", "run", "-q", "--locked", "--manifest-path", str(COMPOSE), "--",
-                    "emit", str(config), "--profile", "vio", "--output-dir", str(emit),
+                    "emit", str(config), *selector, "--profile", "vio", "--output-dir", str(emit),
                     "--library-root", str(LIBRARY_ROOT)], check=True)
     manifest = next(emit.glob("*.manifest.json"))
     model = json.loads(manifest.read_text())["model"]
@@ -48,15 +51,18 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("config", help="fire-compose CONFIG.toml or a library export model")
     parser.add_argument("out", type=Path)
+    parser.add_argument("--table", help="TOML table path of the physics configuration")
     parser.add_argument("--work", type=Path)
     args = parser.parse_args()
     if not args.config.endswith(".toml"):
+        if args.table:
+            parser.error("--table applies to a CONFIG.toml")
         build_model(args.config, args.out)
     elif args.work:
-        build(Path(args.config).resolve(), args.out, args.work.resolve())
+        build(Path(args.config).resolve(), args.out, args.work.resolve(), args.table)
     else:
         with tempfile.TemporaryDirectory() as tmp:
-            build(Path(args.config).resolve(), args.out, Path(tmp))
+            build(Path(args.config).resolve(), args.out, Path(tmp), args.table)
     print(args.out)
     return 0
 

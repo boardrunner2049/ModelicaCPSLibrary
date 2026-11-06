@@ -1,0 +1,27 @@
+# Conventional fixed-wing (Vehicles.FixedWing.FixedWingWithSensors) behind the
+# vehicle interface export Exports.FMU.FixedWing: pwm[1..4] aileron, elevator,
+# throttle, rudder (ArduPlane servo order). Every value left out keeps the
+# Modelica default; this file sets none, so it composes Exports.FMU.FixedWing
+# unchanged.
+schema_version = 3
+vehicle = "fixed_wing"
+model_name = "ConfiguredFixedWing"
+
+# [plant]: any FixedWingPlant parameter, and the sensor mounts.
+# [plant]
+# mass = 2.0
+# maxThrust = 30.0                    # N static
+# servoTimeConstant = 0.04
+# gnssPosition_b = [0.0, 0.0, -0.05]
+# [plant.aero]                        # Airframe.Coefficients fields
+# S = 0.45
+# b = 1.88
+# CL0 = 0.56
+
+# [initial]
+# altitude = 0.0                      # m above the runway; 0 starts on the ground
+# speed = 0.0                         # m/s forward, wings level
+# q_start = [1.0, 0.0, 0.0, 0.0]
+
+# [interface]: pwm_min, pwm_max, lat0, lon0, ground_alt_wgs84, earth_radius_m.
+# Sensors: as for rover.toml.

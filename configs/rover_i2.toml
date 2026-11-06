@@ -1,0 +1,26 @@
+# rover.toml with an I2 IMU: sampled at 400 Hz, quantized, band-limited, with
+# white noise and Gauss-Markov bias (Systems.Sensing.IMU.ErrorSensor), mounted
+# 5 cm ahead of the CG. Magnetometer, GNSS and barometer stay ideal.
+schema_version = 3
+vehicle = "rover"
+model_name = "RoverI2"
+
+[plant]
+imuPosition_b = [0.05, 0.0, 0.0]
+
+[models.imu]
+model = "errors"
+
+[imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+seed = 2718
+streamId = 1
+noiseStd = [0.01, 0.01, 0.01, 0.001, 0.001, 0.001]
+biasStd = [0.001, 0.001, 0.001, 0.0001, 0.0001, 0.0001]
+biasTau = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]

@@ -12,6 +12,9 @@ pub struct ResolvedFireConfig {
     pub schema_version: i64,
     pub acquisition: String,
     pub model_name: String,
+    /// multirotor, or a vehicle kind of crate::vehicle (rover, fixed_wing).
+    pub vehicle: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub preset: String,
     pub geometry: Table,
     pub mass: Table,
@@ -31,6 +34,9 @@ pub struct ResolvedFireConfig {
     pub imu: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub acoustic: Table,
+    /// Rover/fixed-wing plant modifiers; only the values the configuration sets.
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub plant: Table,
 }
 
 impl ResolvedFireConfig {
@@ -108,7 +114,7 @@ pub(crate) fn table<'a>(v: &'a Value, allowed: &[&str], label: &str) -> Result<&
     }
     Ok(t)
 }
-fn section(t: &Table, key: &str) -> Value {
+pub(crate) fn section(t: &Table, key: &str) -> Value {
     t.get(key)
         .cloned()
         .unwrap_or_else(|| Value::Table(Table::new()))
@@ -170,7 +176,7 @@ fn det(a: &[[f64; 3]; 3]) -> f64 {
         - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
         + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0])
 }
-fn rotation(v: &Value, label: &str) -> Result<()> {
+pub(crate) fn rotation(v: &Value, label: &str) -> Result<()> {
     let a = matrix(v, label)?;
     let mut error: f64 = 0.;
     for i in 0..3 {
@@ -188,7 +194,7 @@ fn rotation(v: &Value, label: &str) -> Result<()> {
     }
     Ok(())
 }
-fn inertia(v: &Value, label: &str) -> Result<()> {
+pub(crate) fn inertia(v: &Value, label: &str) -> Result<()> {
     let a = matrix(v, label)?;
     let scale = a.iter().flatten().fold(0f64, |s, x| s.max(x.abs()));
     for (i, row) in a.iter().enumerate() {
@@ -553,9 +559,24 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         .ok_or(
             "schema_version must be 3 (NED/FRD continuous); migrate legacy ENU/FLU data explicitly",
         )?;
+    if version != 3 {
+        return Err(
+            "schema_version must be 3 (NED/FRD continuous); migrate legacy ENU/FLU data explicitly"
+                .into(),
+        );
+    }
+    let vehicle = root
+        .get("vehicle")
+        .map(|v| v.as_str().ok_or("vehicle: expected string"))
+        .transpose()?
+        .unwrap_or("multirotor");
+    if vehicle != "multirotor" {
+        return crate::vehicle::parse(root, vehicle);
+    }
     let allowed = vec![
         "schema_version",
         "model_name",
+        "vehicle",
         "geometry",
         "mass",
         "motor",
@@ -570,32 +591,9 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         "imu",
         "vulnerabilities",
     ];
-    if version != 3 {
-        return Err(
-            "schema_version must be 3 (NED/FRD continuous); migrate legacy ENU/FLU data explicitly"
-                .into(),
-        );
-    }
     table(&raw, &allowed, "config")?;
-    let acquisition = root
-        .get("acquisition")
-        .and_then(Value::as_str)
-        .unwrap_or("continuous");
-    if acquisition != "continuous"
-        || root
-            .get("acquisition")
-            .is_some_and(|v| v.as_str().is_none())
-    {
-        return Err("global acquisition must remain continuous; select independent IMU acquisition via models.imu.model".into());
-    }
-    let name = root
-        .get("model_name")
-        .cloned()
-        .unwrap_or(Value::String("ConfiguredCopter".into()));
-    let name = name.as_str().ok_or("model_name must be an identifier")?;
-    if !identifier(name) || !name.starts_with(|c: char| c.is_ascii_uppercase()) {
-        return Err("model_name must be an identifier starting with an uppercase letter".into());
-    }
+    let acquisition = acquisition(root)?;
+    let name = model_name(root, "ConfiguredCopter")?;
     let (preset, g) = geometry(&section(root, "geometry"))?;
     let m = mass(&section(root, "mass"), &g)?;
     let nr = g["nRotors"].as_integer().unwrap() as usize;
@@ -655,8 +653,9 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let acoustic = crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?;
     Ok(ResolvedFireConfig {
         schema_version: version,
-        acquisition: acquisition.into(),
-        model_name: name.into(),
+        acquisition,
+        model_name: name,
+        vehicle: vehicle.into(),
         preset,
         geometry: g,
         mass: m,
@@ -670,7 +669,47 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         interface,
         imu,
         acoustic,
+        plant: Table::new(),
     })
+}
+
+pub(crate) fn acquisition(root: &Table) -> Result<String> {
+    let acquisition = root
+        .get("acquisition")
+        .and_then(Value::as_str)
+        .unwrap_or("continuous");
+    if acquisition != "continuous"
+        || root
+            .get("acquisition")
+            .is_some_and(|v| v.as_str().is_none())
+    {
+        return Err("global acquisition must remain continuous; select independent IMU acquisition via models.imu.model".into());
+    }
+    Ok(acquisition.into())
+}
+
+pub(crate) fn model_name(root: &Table, default: &str) -> Result<String> {
+    let name = root
+        .get("model_name")
+        .cloned()
+        .unwrap_or(Value::String(default.into()));
+    let name = name.as_str().ok_or("model_name must be an identifier")?;
+    if !identifier(name) || !name.starts_with(|c: char| c.is_ascii_uppercase()) {
+        return Err("model_name must be an identifier starting with an uppercase letter".into());
+    }
+    Ok(name.into())
+}
+
+/// Ideal-only sensors: `model = "ideal"` or the legacy `response = "ideal"`.
+pub(crate) fn ideal_sensor(raw: &Value, key: &str) -> Result<()> {
+    let v = table(raw, &["model", "response"], &format!("models.{key}"))?;
+    let selected: Vec<_> = v.values().collect();
+    if selected.len() != 1 || selected[0].as_str() != Some("ideal") {
+        return Err(format!(
+            "models.{key}: only the ideal model is supported (model = \"ideal\")"
+        ));
+    }
+    Ok(())
 }
 
 fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
@@ -1045,21 +1084,28 @@ fn resolve_models(raw: &Value) -> Result<Table> {
     }
     for key in ["magnetometer", "gnss", "barometer"] {
         if let Some(raw) = t.get(key) {
-            let v = table(raw, &["response"], &format!("models.{key}"))?;
-            if v.get("response").and_then(Value::as_str) != Some("ideal") {
-                return Err(format!(
-                    "models.{key}: only ideal response is supported; dynamics are deprecated"
-                ));
-            }
+            ideal_sensor(raw, key)?;
         }
     }
     Ok(out)
 }
 
 fn resolve_interface(raw: &Value) -> Result<Table> {
+    resolve_interface_with(raw, 1100., 1900., true)
+}
+
+/// Validate [interface]. With `fill`, absent fields take their defaults; without,
+/// the result holds only the fields the configuration sets (the export's
+/// Modelica defaults apply), and pwm_min/pwm_max are checked against those.
+pub(crate) fn resolve_interface_with(
+    raw: &Value,
+    pwm_min: f64,
+    pwm_max: f64,
+    fill: bool,
+) -> Result<Table> {
     let fields = [
-        ("pwm_min", 1100.),
-        ("pwm_max", 1900.),
+        ("pwm_min", pwm_min),
+        ("pwm_max", pwm_max),
         ("lat0", 40.414929),
         ("lon0", -86.932387),
         ("ground_alt_wgs84", 149.),
@@ -1078,6 +1124,9 @@ fn resolve_interface(raw: &Value) -> Result<Table> {
     }
     if get("lat0")?.abs() >= 90. || get("lon0")?.abs() > 180. {
         return Err("interface: invalid reference latitude/longitude".into());
+    }
+    if !fill {
+        out.retain(|k, _| t.contains_key(k));
     }
     Ok(out)
 }

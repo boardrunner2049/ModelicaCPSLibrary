@@ -1,8 +1,8 @@
 /* Known-answer tests of the rover and fixed-wing vehicle FMUs.
  *
  * usage: test_ground_air VEHICLES_DIR
- *   VEHICLES_DIR/rover/vehicle.json  Exports.FMU.Rover, default parameters
- *   VEHICLES_DIR/plane/vehicle.json  Exports.FMU.FixedWing, default parameters
+ *   VEHICLES_DIR/rover/vehicle.json  Exports.FMU.Rover, default parameters (configs/rover.toml)
+ *   VEHICLES_DIR/plane/vehicle.json  Exports.FMU.FixedWing, default parameters (configs/plane.toml)
  *
  * Each physical check compares the simulation with a value computed here
  * from the model's published parameters (Vehicles.Rover.RoverPlant,

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Build the example vehicle FMUs, prepare descriptors and linkable shims, build
-# the runtime with sanitizers and the four models linked in, and run the checker
-# tests, the runtime conformance tests and the standalone host.
+# Build the example vehicle FMUs from their configs/*.toml, prepare descriptors
+# and linkable shims, build the runtime with sanitizers and every model linked
+# in, and run the composer and checker tests, the runtime conformance tests and
+# the standalone host. A configuration newer than its FMU rebuilds it;
+# --rebuild-fmus rebuilds all (needed after Modelica source changes).
 #
 #   runtime/tests/run_conformance.sh [--rebuild-fmus]
 #
@@ -14,12 +16,12 @@ build=$root/build/runtime
 mkdir -p "$out"
 cd "$root"
 
-declare -A source=([quad]=configs/quad.toml [hex]=configs/hex.toml
-                   [rover]=Exports.FMU.Rover [plane]=Exports.FMU.FixedWing)
-vehicles=(quad hex rover plane)
+# Every vehicle is a fire-compose configuration; rover_i2 is rover with an I2 IMU.
+vehicles=(quad hex rover plane rover_i2)
 for vehicle in "${vehicles[@]}"; do
-  if [[ ${1:-} == --rebuild-fmus || ! -f $out/$vehicle.fmu ]]; then
-    python3 tools/vehicle_interface/build_vehicle_fmu.py "${source[$vehicle]}" "$out/$vehicle.fmu"
+  config=configs/$vehicle.toml
+  if [[ ${1:-} == --rebuild-fmus || ! -f $out/$vehicle.fmu || $config -nt $out/$vehicle.fmu ]]; then
+    python3 tools/vehicle_interface/build_vehicle_fmu.py "$config" "$out/$vehicle.fmu"
   fi
 done
 cvi() { (cd tools/vehicle_interface && python3 -m cp_vehicle_interface "$@"); }
@@ -37,6 +39,7 @@ cmake -S runtime -B "$build" -DCPV_SANITIZE=ON -DCPV_TEST_VEHICLES="$out" \
   -DCPV_MODELS="${models%;}" >/dev/null
 cmake --build "$build" -j >/dev/null
 python3 -m unittest tools/vehicle_interface/tests/test_checker.py
+cargo test -q --locked --offline --manifest-path tools/fire-compose/Cargo.toml
 ctest --test-dir "$build" --output-on-failure
 for vehicle in quad hex; do
   "$build/cpv_hover_host" "$out/$vehicle/vehicle.json" 1.0 12 | tail -1

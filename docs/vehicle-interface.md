@@ -44,6 +44,7 @@ Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
 | FastDyn `FastDyn.Copter` FMU as built by FastDyn today | yes | legacy profile | checker and runtime conformance (legacy) |
 | FastDyn `Copter`/`Rover`/`Plane` migrated to these partials | yes | no | no |
 | CP Models rover (`Exports.FMU.Rover`) and fixed-wing (`Exports.FMU.FixedWing`) | yes | yes | known-answer tests (§6), ArduRover and ArduPlane SITL missions |
+| Vehicle configuration in TOML (§4): multirotor, rover, fixed-wing; IMU I0–I3 | yes | yes | composer tests; `configs/rover.toml`, `configs/plane.toml` bit-identical to the exports; `configs/rover_i2.toml` (I2 IMU) through conformance and an ArduRover mission |
 | FastDyn host adapter (planned as a device model) | yes | no | no |
 | ArduPilot SITL host (`runtime/hosts/ardupilot`) | prototype | prototype on ArduPilot `Copter-4.6.2` | in two launches each: ArduCopter flies the quad through a guided mission (takeoff, hold, 20 m waypoint, land); ArduRover drives the rover around a 20 m AUTO square; ArduPlane takes the fixed-wing off a runway, around a 50 m circuit and lands it in AUTO |
 | PX4 SITL, Gazebo, Isaac Sim hosts | design targets | no | no |
@@ -201,10 +202,42 @@ python3 -m cp_vehicle_interface check MODEL.fmu --require pwm_actuation_v1 --req
 python3 -m cp_vehicle_interface prepare MODEL.fmu OUT_DIR --require ... [--set lat0=47.0] [--shim NAME]
 python3 -m cp_vehicle_interface prepare LEGACY.fmu OUT_DIR --profile fastdyn_legacy
 python3 tools/vehicle_interface/build_vehicle_fmu.py configs/hex.toml build/hex.fmu   # from the library root
+python3 tools/vehicle_interface/build_vehicle_fmu.py run.toml build/rover.fmu --table 'FMU.models.rover.physics'
 ```
 
-`build_vehicle_fmu.py` takes a fire-compose configuration (multirotors) or a
-concrete export model: `Exports.FMU.Rover` or `Exports.FMU.FixedWing`.
+### Vehicle configuration
+
+Every example vehicle is a fire-compose configuration (`configs/*.toml`,
+`schema_version = 3`). `build_vehicle_fmu.py CONFIG.toml OUT.fmu` composes and
+exports it; it also still takes a concrete export model by name
+(`Exports.FMU.Rover`). `vehicle` selects the kind:
+
+| `vehicle` | Composes | Vehicle tables |
+|---|---|---|
+| `multirotor` (default) | ESCs, motors and rotors around `Vehicles.Copter.MultirotorWithSensors`, behind `Exports.FMU.CopterInterface` | `[geometry]`, `[mass]`, `[models] esc/motor/rotor` (P0–P4) with `[motor]`, `[esc]`, `[rotor]`, `[power]`, `[landing_gear]`, `[initial]` ([fire-compose README](../tools/fire-compose/README.md)) |
+| `rover` | `extends Exports.FMU.Rover(...)` | `[plant]`: any `RoverPlant` parameter and the sensor mounts `imuPosition_b`, `R_bImu`, `R_bMag`, `gnssPosition_b`, `barometerPosition_b`; `[initial] q_start` |
+| `fixed_wing` | `extends Exports.FMU.FixedWing(...)` | `[plant]`: any `FixedWingPlant` parameter and the sensor mounts; `[plant.aero]`: `Airframe.Coefficients` fields; `[initial] altitude, speed, q_start` |
+
+Every kind takes `[interface]` (`pwm_min`, `pwm_max`, `lat0`, `lon0`,
+`ground_alt_wgs84`, `earth_radius_m`) and the sensor selection:
+`[models.imu] model = "ideal" | "digital" | "errors" | "electromechanical"`
+(I0–I3, parameters in `[imu]`, see `Systems/Sensing/IMU/README.md`);
+magnetometer, GNSS and barometer are ideal (`[models.gnss] model = "ideal"`);
+`[vulnerabilities.acoustic]` as for a multirotor. A rover or fixed-wing
+configuration lists only what it changes and everything else keeps its
+Modelica default, so `configs/rover.toml` and `configs/plane.toml` compose the
+exports unchanged. The composer refuses unknown keys, wrong shapes, non-proper
+rotations and non-physical inertia, and a test checks every key against the
+Modelica parameter declarations. The rover's drive and the plane's propeller
+are part of their plants (set their parameters in `[plant]`); there is no
+esc/motor/rotor selection for them.
+
+A host configuration can carry the physics as one of its tables, as FastDyn's
+`[FMU.models.NAME.physics]` does; `--table` names it (TOML dotted-key syntax),
+so one file can describe both the firmware run and the vehicle.
+
+`configs/rover_i2.toml` is the rover with an I2 IMU (sampled, quantized, noisy,
+biased) mounted 5 cm ahead of the CG.
 
 | Export | Plant | `pwm` (ArduPilot servo order) | Range, starts |
 |---|---|---|---|
@@ -212,7 +245,8 @@ concrete export model: `Exports.FMU.Rover` or `Exports.FMU.FixedWing`.
 | `Exports.FMU.FixedWing` | `Vehicles.FixedWing.FixedWingPlant`: 2 kg, `Airframe.StabilityDerivatives` (last_letter Skywalker 2013), ±20° surfaces, 30 N static thrust falling with airspeed, tricycle gear steered by the rudder | `[1]` aileron, `[2]` elevator, `[4]` rudder (centred), `[3]` throttle | 1000..2000 µs; 1500, 1500, 1000, 1500 |
 
 The fixed-wing export also has `start_altitude_m` and `start_speed_mps` for
-an air start (default: at rest on the runway). Both start facing north.
+an air start (default: at rest on the runway; `[initial] altitude, speed`).
+Both start facing north.
 
 The checker parses the FMI version, the Co-Simulation interface
 (`canHandleVariableCommunicationStepSize` must be true, `needsExecutionTool`
@@ -323,7 +357,17 @@ cpv_open -> [cpv_set_parameter] -> cpv_initialize -> { set inputs; cpv_advance_t
 ```sh
 runtime/tests/run_conformance.sh          # builds FMUs, descriptors, shims, runtime (ASan/UBSan) and runs all
 python3 -m unittest tools/vehicle_interface/tests/test_checker.py
+cargo test --manifest-path tools/fire-compose/Cargo.toml
 ```
+
+- **Composer** (`tools/fire-compose/src/vehicle.rs`): every rover and
+  fixed-wing key is a parameter the Modelica plant, record or export
+  declares; an empty configuration extends the export with no modifier;
+  plant, record, initial, interface and IMU values become the expected
+  modifiers; multirotor tables, propulsion selection, unknown keys, bad
+  values and the plant profile are refused; a host table selects the
+  vehicle. Every existing multirotor configuration composes byte-identical
+  Modelica to before.
 
 - **Checker:** synthetic metadata for every refusal rule (marker forms,
   types, causality, shapes, starts, units, partial capabilities, FMI flags,
@@ -366,16 +410,16 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
     cannot lift off before `CL0` carries the weight, and lifts off sooner
     with up elevator.
 - **Linked models** (`runtime/tests/test_linked_models.c`; the conformance
-  run links all four example vehicles): each linked model and its descriptor
+  run links all five example vehicles: quad, hex, rover, plane, rover_i2): each linked model and its descriptor
   (the FMU's own binary) are driven for 3 s with every PWM channel moving, an
   external wrench and a parameter override, and must agree **bit for bit** in
   description and in every output at every frame, and again after a reset;
   lookup by name; refusals (schema, contract version, marker, missing FMI
-  function, foreign token, missing host capability); all four open and
+  function, foreign token, missing host capability); all five open and
   stepped at once.
 - **Standalone host:** `cpv_hover_host` climbs to and holds 1 m with the quad
   and the hexa using the same code.
-- **ArduPilot SITL prototype:** the same quad, rover and fixed-wing models,
+- **ArduPilot SITL prototype:** the same quad, rover (also rover_i2) and fixed-wing models,
   linked into the SITL binaries, as the SITL physics model, flown by ArduCopter (guided mission), ArduRover
   and ArduPlane (AUTO missions) with checks on every waypoint, cross-track
   error, attitude and the final position. This is evidence for one host, not
@@ -386,10 +430,16 @@ python3 -m unittest tools/vehicle_interface/tests/test_checker.py
 
 - FastDyn's `Copter`/`Rover`/`Plane` wrappers are not migrated; they run only
   under the legacy profile and expose no `kinematic_state_v1`.
-- The rover and fixed-wing are concrete library exports with fixed channel
-  layouts (Ackermann rover; aileron/elevator/throttle/rudder plane), not
-  fire-compose compositions; skid-steer, elevon and V-tail variants are not
-  modelled. Their parameters are representative (the plane's aerodynamics are
+- The rover and fixed-wing have fixed channel layouts (Ackermann rover;
+  aileron/elevator/throttle/rudder plane; remap outputs in the firmware, e.g.
+  ArduPilot `SERVOn_FUNCTION`) and their drives are fixed plant equations;
+  skid-steer, elevon and V-tail variants are not modelled.
+- Sensor selection covers the IMU (I0–I3). GNSS G1/G2
+  (`GNSS.StatisticalSensor`, `ObservableSensor`) and the range sensor exist in
+  the library but are not selectable: G1 inside a vehicle model fails to
+  compile with the pinned Rumoca ("same-tick discrete producers form an
+  algebraic loop" in `SampledDelivery`; it compiles standalone, e.g.
+  `Tests.GnssStatistical`), and a range sensor needs a contract capability. Their parameters are representative (the plane's aerodynamics are
   the published last_letter Skywalker 2013 coefficients), not identified from
   a real vehicle; mass, inertia, tyre and gear values are estimates.
 - `Wheels.CompliantWheel`, `Airframe.StabilityDerivatives` and the two plants

@@ -1,0 +1,61 @@
+From 57a2ba914d3472c51fa53bc39b1f9f6f6039c1aa Mon Sep 17 00:00:00 2001
+From: Arslan8 <arslankhan52@gmail.com>
+Date: Fri, 6 Nov 2026 15:53:33 -0500
+Subject: [PATCH 4/4] SITL: cpvehicle examples are built from CP Models TOML
+ configurations
+
+The rover and fixed-wing are now configs/rover.toml and configs/plane.toml
+(vehicle kind, plant parameters, sensor selection), like the quad. Adds the
+measured ArduRover mission with configs/rover_i2.toml (I2 IMU).
+---
+ libraries/SITL/examples/CPVehicle/README.md | 22 +++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
+
+diff --git a/libraries/SITL/examples/CPVehicle/README.md b/libraries/SITL/examples/CPVehicle/README.md
+index 59e087fb05..c1e93b4793 100644
+--- a/libraries/SITL/examples/CPVehicle/README.md
++++ b/libraries/SITL/examples/CPVehicle/README.md
+@@ -8,19 +8,24 @@ second process, and nothing is loaded at run time: no descriptor file and no
+ shared library (compare `libraries/SITL/examples/JSON`).
+ 
+ Status: prototype, tested with ArduPilot 4.6.2 (`Copter-4.6.2`): ArduCopter
+-with the CP Models quad (`configs/quad.toml`), ArduRover with
+-`Exports.FMU.Rover` and ArduPlane with `Exports.FMU.FixedWing`. It is not
+-upstream ArduPilot code.
++with the CP Models quad (`configs/quad.toml`), ArduRover with the rover
++(`configs/rover.toml`, and `configs/rover_i2.toml` with an I2 IMU) and
++ArduPlane with the fixed-wing (`configs/plane.toml`). It is not upstream
++ArduPilot code.
+ 
+ ## Build
+ 
++Each vehicle is a CP Models TOML configuration: the vehicle kind, its plant
++parameters and its sensors (for example the IMU fidelity and mount). See
++CP Models `docs/vehicle-interface.md`, "Vehicle configuration".
++
+ ```sh
+-# CP Models: build each FMU, check it and write its linkable shim, then build
+-# the runtime with the models compiled in
++# CP Models: build each FMU from its configuration, check it and write its
++# linkable shim, then build the runtime with the models compiled in
+ cd ModelicaCPSLibrary
+-python3 tools/vehicle_interface/build_vehicle_fmu.py configs/quad.toml build/quad.fmu
+-python3 tools/vehicle_interface/build_vehicle_fmu.py Exports.FMU.Rover build/rover.fmu
+-python3 tools/vehicle_interface/build_vehicle_fmu.py Exports.FMU.FixedWing build/plane.fmu
++for v in quad rover plane; do
++  python3 tools/vehicle_interface/build_vehicle_fmu.py configs/$v.toml build/$v.fmu
++done
+ for v in quad rover plane; do
+   (cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare ../../build/$v.fmu \
+       ../../build/$v --shim $v \
+@@ -114,6 +119,7 @@ the CP Models tests).
+ |---|---|
+ | ArduCopter, quad | hover at 4.99 m with drift ≤ 0.01 m, the 20 m north waypoint reached to within 0.4 m, landed 0.25–0.28 m from home, maximum tilt 17.5° |
+ | ArduRover, rover | all four waypoints reached, worst cross-track error 0.55–0.63 m, stopped 0.17–0.18 m from home, roll/pitch ≤ 0.2° (stock rover tuning) |
++| ArduRover, rover_i2 (I2 IMU: 400 Hz, quantized, noise and bias) | same mission: worst cross-track error 0.58 m, stopped 0.18 m from home, roll/pitch ≤ 0.2° |
+ | ArduPlane, fixed-wing | takeoff to 30 m, all circuit waypoints, worst cross-track error 16 m on 200–600 m legs, maximum bank/pitch 35°, touchdown 31–32 m before the aim point (the flare starts ~60 m out), rollout stopped 0.09 m off the centreline |
+ 
+ The plane needed model-specific parameters (`cpvehicle_plane.parm`): servo
+-- 
+2.43.0
+

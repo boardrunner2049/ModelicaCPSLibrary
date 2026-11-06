@@ -4,6 +4,15 @@ Rust configuration frontend for the minimum continuous NED/FRD multicopter core.
 It emits standard Modelica source and a provenance manifest; the compiler owns
 Modelica semantics. No Rumoca library is needed to compose.
 
+`vehicle = "multirotor"` (the default) composes a multicopter as described
+below. `vehicle = "rover"` and `vehicle = "fixed_wing"` compose
+`Exports.FMU.Rover` / `Exports.FMU.FixedWing` with the values a configuration
+sets in `[plant]` (plant parameters and sensor mounts; `[plant.aero]` for the
+fixed-wing coefficients), `[initial]`, `[interface]` and the IMU selection
+(`[models.imu]`, `[imu]`), and the `vio` profile only. See
+[docs/vehicle-interface.md](../../docs/vehicle-interface.md#vehicle-configuration)
+and `configs/rover.toml`, `configs/plane.toml`, `configs/rover_i2.toml`.
+
 ```sh
 cargo run --locked --offline --manifest-path tools/fire-compose/Cargo.toml -- validate configs/quad.toml --json
 cargo run --locked --offline --manifest-path tools/fire-compose/Cargo.toml -- emit configs/hex.toml --profile vio

@@ -1,0 +1,35 @@
+# Ackermann rover (Vehicles.Rover.RoverWithSensors) behind the vehicle interface
+# export Exports.FMU.Rover: pwm[1] steering, pwm[3] throttle (ArduRover servo order).
+# Every value left out keeps the Modelica default; this file sets none, so it
+# composes Exports.FMU.Rover unchanged.
+schema_version = 3
+vehicle = "rover"
+model_name = "ConfiguredRover"
+
+# [plant]: any RoverPlant parameter, and the sensor mounts.
+# [plant]
+# mass = 3.0                          # kg
+# inertia = [[0.028, 0.0, 0.0], [0.0, 0.056, 0.0], [0.0, 0.0, 0.073]]
+# wheelbase = 0.32
+# track = 0.26
+# wheelRadius = 0.055
+# maxSteerAngle = 0.45                # rad at full command
+# motorStallTorque = 1.4              # N.m at the axle
+# motorNoLoadSpeed = 182.0            # rad/s at the axle
+# imuPosition_b = [0.0, 0.0, 0.0]     # m from the CG, body FRD
+# gnssPosition_b = [0.0, 0.0, -0.1]
+# R_bImu = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+
+# [initial]
+# q_start = [1.0, 0.0, 0.0, 0.0]      # identity faces north
+
+# [interface]
+# pwm_min = 1000.0
+# pwm_max = 2000.0
+# lat0 = 40.414929
+# lon0 = -86.932387
+# ground_alt_wgs84 = 149.0
+
+# Sensors: [models.imu] model = "ideal" | "digital" | "errors" | "electromechanical",
+# its parameters in [imu] (see rover_i2.toml); magnetometer, GNSS and barometer
+# are ideal.

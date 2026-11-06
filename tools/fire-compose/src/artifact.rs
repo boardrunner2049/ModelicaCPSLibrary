@@ -144,6 +144,39 @@ pub fn emit(
         }
         previous = Some(prior);
     }
+    let mut manifest_value = if config.vehicle == "multirotor" {
+        multirotor_manifest(config, raw, profile, &root, &source)?
+    } else {
+        vehicle_manifest(config, raw, profile, &root, &source)?
+    };
+    if let Some(prior) = previous {
+        if ["config_sha256", "generated_model_sha256", "profile"]
+            .iter()
+            .all(|key| prior[*key] == manifest_value[*key])
+            && prior["source"]["sha256"] == manifest_value["source"]["sha256"]
+        {
+            if prior["verification"].is_object() {
+                manifest_value["verification"] = prior["verification"].clone();
+            }
+            if prior["compiler"].is_object() {
+                manifest_value["compiler"] = prior["compiler"].clone();
+            }
+        }
+    }
+    fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+    write_if_changed(&model, source.as_bytes())?;
+    let text = serde_json::to_string_pretty(&manifest_value).map_err(|e| e.to_string())? + "\n";
+    write_if_changed(&manifest, text.as_bytes())?;
+    Ok((model, manifest))
+}
+
+fn multirotor_manifest(
+    config: &ResolvedFireConfig,
+    raw: &str,
+    profile: &str,
+    root: &Path,
+    source: &str,
+) -> Result<Value> {
     let ground_contact = config.landing_gear["enabled"].as_bool().unwrap();
     let mut manifest_value = json!({
         "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":2,
@@ -153,7 +186,7 @@ pub fn emit(
                    "contact":if ground_contact { "four_point_spring_damper" } else { "none" },
                    "sensors":"ideal_with_fixed_bias","acquisition":"continuous"},
         "schema_version":config.schema_version,"profile":profile,"model":config.model_name,
-        "config_sha256":hash(raw.as_bytes()),"config":config,"source":source_identity(&root)?,
+        "config_sha256":hash(raw.as_bytes()),"config":config,"source":source_identity(root)?,
         "generated_model_sha256":hash(source.as_bytes()),
         "interface":{"nRotors":config.geometry["nRotors"],"nActuators":config.geometry["nActuators"],
                      "actuatorIndex":config.geometry["actuatorIndex"]},
@@ -252,25 +285,43 @@ pub fn emit(
         "vehicle": "ModelicaCPSLibrary.Vehicles.Copter.MultirotorWithSensors",
         "vehicle_input": "rotor-local hub force and moment"
     });
-    if let Some(prior) = previous {
-        if ["config_sha256", "generated_model_sha256", "profile"]
-            .iter()
-            .all(|key| prior[*key] == manifest_value[*key])
-            && prior["source"]["sha256"] == manifest_value["source"]["sha256"]
-        {
-            if prior["verification"].is_object() {
-                manifest_value["verification"] = prior["verification"].clone();
-            }
-            if prior["compiler"].is_object() {
-                manifest_value["compiler"] = prior["compiler"].clone();
-            }
-        }
+    Ok(manifest_value)
+}
+
+/// Rover/fixed-wing: the configuration, provenance and the selected sensors;
+/// the export class documents the plant, propulsion and PWM channel meaning.
+fn vehicle_manifest(
+    config: &ResolvedFireConfig,
+    raw: &str,
+    profile: &str,
+    root: &Path,
+    source: &str,
+) -> Result<Value> {
+    let kind = crate::vehicle::kind(&config.vehicle)?;
+    let mut manifest = json!({
+        "generator_id":GENERATOR,"generator_version":env!("CARGO_PKG_VERSION"),"manifest_version":2,
+        "core_contract":"ned_frd_continuous_v1",
+        "frames":{"world":"NED","body":"FRD","sensor":"local; v_b=R_bs*v_s"},
+        "vehicle":kind.name,"export":kind.export,"plant":kind.plant,
+        "schema_version":config.schema_version,"profile":profile,"model":config.model_name,
+        "config_sha256":hash(raw.as_bytes()),"config":config,"source":source_identity(root)?,
+        "generated_model_sha256":hash(source.as_bytes()),
+        "event_requirements":{"sampled_sensors":config.imu_model()!="ideal"},
+        "verification":{"configuration":"passed","modelica_check":"not_run","fmi_generation":"not_run","fmu_simulation":"not_run","firmware":"not_run"}
+    });
+    manifest["imu"] = json!({"level":config.imu_level(),"class":config.imu_class(),
+        "parameters":config.imu,"other_sensors":"continuous_ideal",
+        "readout":if config.imu_model()=="ideal" {"continuous"} else {"sampled"},
+        "fidelity_definition":"digital_errors_electromechanical_v2",
+        "calibration":"user_supplied_not_hardware_validated"});
+    if config.imu_model() != "ideal" {
+        manifest["core_contract"] = json!("ned_frd_sampled_imu_v1");
+        manifest["imu"]["samplePeriod_s"] = json!(config.imu["samplePeriod"]);
     }
-    fs::create_dir_all(&output).map_err(|e| e.to_string())?;
-    write_if_changed(&model, source.as_bytes())?;
-    let text = serde_json::to_string_pretty(&manifest_value).map_err(|e| e.to_string())? + "\n";
-    write_if_changed(&manifest, text.as_bytes())?;
-    Ok((model, manifest))
+    if !config.acoustic.is_empty() {
+        manifest["acoustic_vulnerability"] = json!({"configuration":config.acoustic});
+    }
+    Ok(manifest)
 }
 
 fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {

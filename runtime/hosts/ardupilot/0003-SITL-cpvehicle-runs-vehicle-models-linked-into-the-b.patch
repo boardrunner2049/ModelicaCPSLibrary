@@ -1,7 +1,7 @@
 From 01eeeb3c55bdbe1ab33791a48778bdb6aa6672a6 Mon Sep 17 00:00:00 2001
 From: Arslan8 <arslankhan52@gmail.com>
 Date: Fri, 6 Nov 2026 13:49:03 -0500
-Subject: [PATCH 3/3] SITL: cpvehicle runs vehicle models linked into the
+Subject: [PATCH 3/4] SITL: cpvehicle runs vehicle models linked into the
  binary
 
 --model cpvehicle:NAME now opens a CP Models vehicle model compiled into

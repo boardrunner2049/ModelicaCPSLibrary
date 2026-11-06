@@ -4,7 +4,7 @@ use crate::config::ResolvedFireConfig;
 use crate::Result;
 use toml::map::Map;
 
-fn literal(v: &toml::Value) -> Result<Value> {
+pub(crate) fn literal(v: &toml::Value) -> Result<Value> {
     Ok(match v {
         toml::Value::Boolean(v) => Value::Bool(*v),
         toml::Value::Integer(v) => Value::Integer(*v),
@@ -95,8 +95,8 @@ fn plant_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
             )?,
         ));
     }
-    if c.imu_model() != "ideal" || !c.imu.is_empty() {
-        m.push(Modifier::Nested("sensors".into(), imu_modifiers(c)?));
+    if let Some(sensors) = sensor_modifiers(c)? {
+        m.push(sensors);
     }
     m.extend(fields(&c.initial)?);
     m.push(Modifier::Bind(
@@ -124,6 +124,9 @@ fn reference(name: &str) -> Value {
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
+    if c.vehicle != "multirotor" {
+        return crate::vehicle::compose(c, profile);
+    }
     let profile = crate::canonical_profile(profile)?;
     let vio = profile == "vio";
     let dynamic = c.electromechanical();
@@ -234,44 +237,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         components.push(speed);
         (None, vec![], "normalizedCommand")
     };
-    if c.imu_temperature() {
-        let mut temperature = instance(
-            "Modelica.Units.SI.Temperature",
-            "imuTemperature",
-            vec![],
-            vec![],
-        );
-        temperature.prefix = Prefix::Input;
-        temperature.modifiers.push(Modifier::Bind(
-            "start".into(),
-            literal(
-                c.imu
-                    .get("referenceTemperature")
-                    .unwrap_or(&toml::Value::Float(293.15)),
-            )?,
-        ));
-        temperature.binding = Some(literal(
-            c.imu
-                .get("referenceTemperature")
-                .unwrap_or(&toml::Value::Float(293.15)),
-        )?);
-        components.push(temperature);
-    }
-    if c.imu_model() == "acoustic" {
-        let mut pressure = instance(
-            "Modelica.Units.SI.Pressure",
-            "imuAcousticPressure",
-            vec![],
-            vec![],
-        );
-        pressure.prefix = Prefix::Input;
-        pressure
-            .modifiers
-            .push(Modifier::Bind("start".into(), Value::Real(0.)));
-        pressure.binding = Some(Value::Real(0.0));
-        components.push(pressure);
-    }
-    acoustic_components(c, &mut components)?;
+    sensor_components(c, &mut components)?;
     components.push(instance(c.esc_class(), "escs", vec![nr], fields(&c.esc)?));
     let mut motor_fields = fields(&c.motor)?;
     if dynamic {
@@ -488,6 +454,60 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     })
 }
 
+/// Inputs the selected IMU and acoustic vulnerability add to the composed model.
+pub(crate) fn sensor_components(
+    c: &ResolvedFireConfig,
+    components: &mut Vec<Instance>,
+) -> Result<()> {
+    if c.imu_temperature() {
+        let mut temperature = instance(
+            "Modelica.Units.SI.Temperature",
+            "imuTemperature",
+            vec![],
+            vec![],
+        );
+        temperature.prefix = Prefix::Input;
+        temperature.modifiers.push(Modifier::Bind(
+            "start".into(),
+            literal(
+                c.imu
+                    .get("referenceTemperature")
+                    .unwrap_or(&toml::Value::Float(293.15)),
+            )?,
+        ));
+        temperature.binding = Some(literal(
+            c.imu
+                .get("referenceTemperature")
+                .unwrap_or(&toml::Value::Float(293.15)),
+        )?);
+        components.push(temperature);
+    }
+    if c.imu_model() == "acoustic" {
+        let mut pressure = instance(
+            "Modelica.Units.SI.Pressure",
+            "imuAcousticPressure",
+            vec![],
+            vec![],
+        );
+        pressure.prefix = Prefix::Input;
+        pressure
+            .modifiers
+            .push(Modifier::Bind("start".into(), Value::Real(0.)));
+        pressure.binding = Some(Value::Real(0.0));
+        components.push(pressure);
+    }
+    acoustic_components(c, components)?;
+    Ok(())
+}
+
+/// `sensors(...)` plant modifier for the selected IMU, or None for the default ideal suite.
+pub(crate) fn sensor_modifiers(c: &ResolvedFireConfig) -> Result<Option<Modifier>> {
+    if c.imu_model() == "ideal" && c.imu.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(Modifier::Nested("sensors".into(), imu_modifiers(c)?)))
+}
+
 fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
     let mut sensor = Vec::new();
     let mut parameters = Vec::new();
@@ -566,7 +586,7 @@ fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {
     ])
 }
 
-fn imu_boundary(
+pub(crate) fn imu_boundary(
     c: &ResolvedFireConfig,
     components: &mut Vec<Instance>,
     equalities: &mut Vec<(String, Value)>,
