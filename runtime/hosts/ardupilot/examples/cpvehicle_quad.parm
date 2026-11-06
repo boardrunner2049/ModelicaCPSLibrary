@@ -1,0 +1,13 @@
+# ArduCopter settings for the CP Models quad (ModelicaCPSLibrary configs/quad.toml)
+# loaded with --model cpvehicle:<descriptor>. Values follow the model, not tuning.
+FRAME_CLASS     1       # quad
+FRAME_TYPE      1       # X: SERVO1..4 = front-right, rear-left, front-left, rear-right
+# The FMU's pwm_min/pwm_max (printed by the model at startup).
+MOT_PWM_MIN     1100
+MOT_PWM_MAX     1900
+# first_order_speed motors: rotor speed is linear in command, thrust is
+# quadratic in speed, so thrust is quadratic in command.
+MOT_THST_EXPO   1.0
+# Measured hover command 0.606 of the PWM span (runtime/examples/hover_host):
+# thrust fraction 0.606^2.
+MOT_THST_HOVER  0.37

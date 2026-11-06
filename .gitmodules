@@ -1,0 +1,5 @@
+[submodule "third_party/ardupilot"]
+	path = third_party/ardupilot
+	url = https://github.com/ArduPilot/ardupilot.git
+	ignore = dirty
+	shallow = true

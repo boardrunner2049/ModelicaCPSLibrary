@@ -1,0 +1,18 @@
+# ArduRover settings for the CP Models rover (ModelicaCPSLibrary Exports.FMU.Rover)
+# loaded with --model cpvehicle:<descriptor>. Values follow the model's parameters.
+# pwm[1] steering, pwm[3] throttle, both centred; the FMU's pwm range is 1000..2000 us.
+SERVO1_FUNCTION 26
+SERVO1_MIN      1000
+SERVO1_MAX      2000
+SERVO1_TRIM     1500
+SERVO3_FUNCTION 70
+SERVO3_MIN      1000
+SERVO3_MAX      2000
+SERVO3_TRIM     1500
+# Ackermann geometry: wheelbase 0.32 m, 0.45 rad full steer -> 0.66 m radius.
+TURN_RADIUS     0.7
+# DC drive: no-load 10 m/s at full throttle, 9.24 m/s with losses; 3 m/s needs ~32 %.
+CRUISE_SPEED    3
+CRUISE_THROTTLE 32
+WP_SPEED        3
+WP_RADIUS       1

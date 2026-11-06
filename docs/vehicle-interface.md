@@ -13,7 +13,7 @@ model, and reads vehicle state and simulated sensors.
 | Checker | [`tools/vehicle_interface/`](../tools/vehicle_interface) | Validates exported metadata; writes the runtime descriptor and, on request, a linkable C shim |
 | Runtime | [`runtime/`](../runtime) | Self-contained C library: runs the FMU in-process (loaded from a descriptor, or linked into the program), drives it |
 | Example host | [`runtime/examples/hover_host.c`](../runtime/examples/hover_host.c) | Standalone host using only contract capabilities |
-| ArduPilot SITL prototype | [`runtime/hosts/ardupilot/`](../runtime/hosts/ardupilot) | Patch adding SITL model `cpvehicle` (host code, kept for reproducibility) |
+| ArduPilot SITL prototype | [`runtime/hosts/ardupilot/`](../runtime/hosts/ardupilot), ArduPilot as submodule `third_party/ardupilot` | SITL model `cpvehicle` and `build.sh` (configurations to SITL binaries) |
 
 CP Models owns the contract, the partials, the checker and the runtime. Hosts
 (FastDyn, ArduPilot SITL, …) own their adapters. Nothing here depends on a
@@ -46,7 +46,7 @@ Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
 | CP Models rover (`Exports.FMU.Rover`) and fixed-wing (`Exports.FMU.FixedWing`) | yes | yes | known-answer tests (§6), ArduRover and ArduPlane SITL missions |
 | Vehicle configuration in TOML (§4): multirotor, rover, fixed-wing; IMU I0–I3 | yes | yes | composer tests; `configs/rover.toml`, `configs/plane.toml` bit-identical to the exports; `configs/rover_i2.toml` (I2 IMU) through conformance and an ArduRover mission |
 | FastDyn host adapter (planned as a device model) | yes | no | no |
-| ArduPilot SITL host (`runtime/hosts/ardupilot`) | prototype | prototype on ArduPilot `Copter-4.6.2` | in two launches each: ArduCopter flies the quad through a guided mission (takeoff, hold, 20 m waypoint, land); ArduRover drives the rover around a 20 m AUTO square; ArduPlane takes the fixed-wing off a runway, around a 50 m circuit and lands it in AUTO |
+| ArduPilot SITL host (`runtime/hosts/ardupilot`, upstream ArduPilot pinned as a submodule) | prototype | prototype on ArduPilot `Copter-4.6.2` | in two launches each: ArduCopter flies the quad through a guided mission (takeoff, hold, 20 m waypoint, land); ArduRover drives the rover around a 20 m AUTO square; ArduPlane takes the fixed-wing off a runway, around a 50 m circuit and lands it in AUTO |
 | PX4 SITL, Gazebo, Isaac Sim hosts | design targets | no | no |
 
 A successful conformance check or launch is not evidence of model fidelity or

@@ -1,0 +1,62 @@
+diff --git a/Tools/ardupilotwaf/boards.py b/Tools/ardupilotwaf/boards.py
+index b1a54e45e3..782dfe5533 100644
+--- a/Tools/ardupilotwaf/boards.py
++++ b/Tools/ardupilotwaf/boards.py
+@@ -812,6 +812,21 @@ class sitl(Board):
+         if cfg.options.sitl_rgbled:
+             env.CXXFLAGS += ['-DWITH_SITL_RGBLED']
+ 
++        if cfg.options.cpvehicle:
++            # CP Models vehicle runtime with its linked vehicle models
++            # (cmake -DCPV_MODELS=...): in-process FMU physics (SIM_CPVehicle).
++            root = os.path.abspath(os.path.expanduser(cfg.options.cpvehicle))
++            library = os.path.join(root, 'build', 'runtime-release', 'libcpvehicle.a')
++            header = os.path.join(root, 'runtime', 'include', 'cpvehicle', 'cpvehicle_model.h')
++            for required in (library, header):
++                if not os.path.isfile(required):
++                    cfg.fatal('--cpvehicle: %s not found' % required)
++            env.INCLUDES += [os.path.join(root, 'runtime', 'include')]
++            env.CXXFLAGS += ['-DAP_SIM_CPVEHICLE_ENABLED=1']
++            # LDFLAGS end the link line, after the vehicle's library archives
++            # that reference the runtime (SIM_CPVehicle is in them).
++            env.LDFLAGS += [library, '-ldl']
++
+         if cfg.options.enable_sfml_audio:
+             if not cfg.check_SFML_Audio(env):
+                 cfg.fatal("Failed to find SFML Audio libraries")
+diff --git a/libraries/AP_HAL_SITL/SITL_cmdline.cpp b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
+index 042bb2ce7f..590bbbbed2 100644
+--- a/libraries/AP_HAL_SITL/SITL_cmdline.cpp
++++ b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
+@@ -37,6 +37,7 @@
+ #include <SITL/SIM_Webots.h>
+ #include <SITL/SIM_Webots_Python.h>
+ #include <SITL/SIM_JSON.h>
++#include <SITL/SIM_CPVehicle.h>
+ #include <SITL/SIM_Blimp.h>
+ #include <SITL/SIM_NoVehicle.h>
+ #include <SITL/SIM_StratoBlimp.h>
+@@ -177,6 +178,9 @@ static const struct {
+     { "webots-python",      WebotsPython::create },
+     { "webots",             Webots::create },
+     { "JSON",               JSON::create },
++#if AP_SIM_CPVEHICLE_ENABLED
++    { "cpvehicle",          CPVehicle::create },
++#endif
+     { "blimp",              Blimp::create },
+     { "novehicle",          NoVehicle::create },
+ #if AP_SIM_STRATOBLIMP_ENABLED
+diff --git a/wscript b/wscript
+index f400c74cdb..4024566c35 100644
+--- a/wscript
++++ b/wscript
+@@ -368,6 +368,9 @@ configuration in order to save typing.
+                  default=False,
+                  help="Enable SITL OSD")
+ 
++    g.add_option('--cpvehicle', action='store', default=None, metavar='PATH',
++        help="Enable the SITL 'cpvehicle' model: a CP Models (ModelicaCPSLibrary) checkout whose runtime, with its vehicle models linked in, is built in PATH/build/runtime-release (cmake -S runtime -B build/runtime-release -DCPV_MODELS=...); run with --model cpvehicle:NAME")
++
+     g.add_option('--sitl-rgbled', action='store_true',
+                  default=False,
+                  help="Enable SITL RGBLed")

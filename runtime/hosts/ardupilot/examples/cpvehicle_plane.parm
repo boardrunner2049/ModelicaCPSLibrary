@@ -1,0 +1,36 @@
+# ArduPlane settings for the CP Models fixed-wing (ModelicaCPSLibrary
+# Exports.FMU.FixedWing) loaded with --model cpvehicle:<descriptor>, on top of
+# Tools/autotest/models/plane.parm. Values follow the model's parameters.
+# pwm[1..4] aileron, elevator, throttle, rudder; FMU pwm range 1000..2000 us is
+# the full +-20 deg surface throw (surfaces centred at 1500).
+SERVO1_MIN      1000
+SERVO1_MAX      2000
+SERVO1_TRIM     1500
+SERVO2_MIN      1000
+SERVO2_MAX      2000
+SERVO2_TRIM     1500
+SERVO3_MIN      1000
+SERVO3_MAX      2000
+SERVO3_TRIM     1000
+SERVO4_MIN      1000
+SERVO4_MAX      2000
+SERVO4_TRIM     1500
+# Neutral-elevator trim is ~15 m/s; 2 kg, 0.45 m2, CDp 0.1: level 16 m/s needs
+# ~7.3 N of the 30 N (static) propeller, about 33 % throttle; top speed ~25 m/s.
+AIRSPEED_CRUISE 16
+AIRSPEED_MIN    12
+AIRSPEED_MAX    24
+TRIM_THROTTLE   35
+# Roll: full aileron (0.35 rad) gives ~1.4 rad/s steady roll rate at 15 m/s,
+# so ~0.72 of full output per rad/s (the stock SITL plane needs 0.25).
+RLL_RATE_FF     0.72
+RLL_RATE_P      0.6
+RLL_RATE_I      0.5
+RLL_RATE_D      0.01
+# Takeoff: rotate at 11 m/s (CL0 carries the weight at 11.3 m/s); steer the
+# nose wheel (rudder) on the ground.
+TKOFF_ROTATE_SPD 11
+GROUND_STEER_ALT 5
+# Landing: lift/drag is only ~3 (CDp 0.1), so a long idle flare bleeds the
+# speed and lands short; flare later.
+LAND_FLARE_SEC  1.5
