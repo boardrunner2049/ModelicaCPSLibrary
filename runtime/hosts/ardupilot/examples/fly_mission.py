@@ -10,9 +10,10 @@ nonzero with the reason on the first failed check.
 import argparse
 import math
 import sys
-import time
 
 from pymavlink import mavutil
+
+from mavclock import AutopilotClock
 
 
 def main():
@@ -20,10 +21,11 @@ def main():
     p.add_argument("--connect", default="tcp:127.0.0.1:5760")
     p.add_argument("--alt", type=float, default=5.0)
     p.add_argument("--north", type=float, default=20.0)
-    p.add_argument("--timeout", type=float, default=600.0)
+    p.add_argument("--timeout", type=float, help="autopilot seconds", default=600.0)
     a = p.parse_args()
-    deadline = time.time() + a.timeout
     m = mavutil.mavlink_connection(a.connect, autoreconnect=True)
+    clock = AutopilotClock(m)
+    deadline = a.timeout  # autopilot seconds since boot
     m.wait_heartbeat(timeout=60)
     print(f"heartbeat from system {m.target_system}")
     m.mav.request_data_stream_send(m.target_system, m.target_component,
@@ -31,10 +33,10 @@ def main():
     state = {"tilt": 0.0}
 
     def pump(seconds):
-        end = time.time() + seconds
+        end = clock.now + seconds
         last = None
-        while time.time() < end:
-            msg = m.recv_match(blocking=True, timeout=0.5)
+        while clock.now < end:
+            msg = clock.recv()
             if msg is None:
                 continue
             kind = msg.get_type()
@@ -58,8 +60,8 @@ def main():
         sys.exit(1)
 
     def wait_until(predicate, what, timeout):
-        end = min(time.time() + timeout, deadline)
-        while time.time() < end:
+        end = min(clock.now + timeout, deadline)
+        while clock.now < end:
             pump(0.5)
             if predicate():
                 return
@@ -72,9 +74,9 @@ def main():
     print("EKF has a GPS position")
     # Arm in GUIDED once pre-arm checks pass.
     m.set_mode("GUIDED")
-    end = time.time() + 180
+    end = clock.now + 180
     while not state.get("armed"):
-        if time.time() > end:
+        if clock.now > end:
             fail("could not arm within 180 s")
         m.mav.command_long_send(m.target_system, m.target_component,
                                 mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0, 1, 0, 0, 0, 0, 0, 0)
@@ -118,4 +120,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except TimeoutError as e:
+        print(f"FAILED: {e}")
+        sys.exit(1)

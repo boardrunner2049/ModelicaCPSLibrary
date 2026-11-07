@@ -15,8 +15,9 @@ here:
 | `src/SIM_CPVehicle.{cpp,h}` | the SITL model: maps SITL servos, time and home to the vehicle interface and its outputs back to SITL |
 | `hooks.patch` | the three edits ArduPilot needs to know the model: an entry in SITL's model table, the waf option `--cpvehicle=PATH`, and the link flags (22 lines) |
 | `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check) |
+| `imu_fidelity.sh` | one airframe flown at each IMU fidelity (I0-I3), all at once |
 | `build.sh`, `runspec.py` | vehicles to SITL binaries; resolving a vehicle name or TOML |
-| `examples/` | run files (`*.toml`), parameter files, mission checks (`fly_mission.py`, `fly_auto.py`) |
+| `examples/` | run files (`*.toml`), parameter files, mission checks (`fly_mission.py`, `fly_auto.py`, on the autopilot's clock: `mavclock.py`) |
 
 `build.sh` applies `hooks.patch` to the submodule's working tree and links
 `src/` into `libraries/SITL/`; the pinned commit stays upstream
@@ -29,6 +30,7 @@ runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/rover_noisy_imu.
 runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/rover_noisy_imu.toml --mission  # map, mission flies itself
 runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/rover_noisy_imu.toml --headless # no map: mission check, exit code
 runtime/hosts/ardupilot/run.sh rover_i2                                                          # any configs/NAME.toml
+runtime/hosts/ardupilot/run.sh rover --headless --instance 2   # SITL instance 2 (ports +20): several vehicles at once
 ```
 
 A run file is the vehicle plus how to run it:
@@ -77,9 +79,35 @@ IMU, GNSS antenna on the tail); each flies its mission check.
 | Magnetometer | ideal; orientation on rover/plane | no: SITL's compass from the model's attitude |
 | Barometer | ideal; position on rover/plane | no: SITL's barometer from the model's altitude |
 
-Speed: I0 runs at ~14x real time, I1/I2 at 3-9x, I3 at ~0.04x (it integrates
-the MEMS resonators), so I3 cannot run SITL in real time; `run.sh` reports the
-measured rate. The FastDyn host reads all of the model's sensors.
+Speed: I0 runs at 14-70x real time, I1/I2 at 3-9x, I3 at 0.04-0.1x (it
+integrates the MEMS resonators), so I3 cannot run SITL in real time; `run.sh`
+reports the measured rate. SITL then runs at the model's rate and the autopilot
+sees nothing different: the mission checks time out on the autopilot's clock,
+so an I3 vehicle flies the same checks, only slower. The FastDyn host reads all
+of the model's sensors.
+
+### IMU fidelity sweep
+
+```sh
+runtime/hosts/ardupilot/imu_fidelity.sh rover          # quad | rover | plane; levels 0 1 2 3 by default
+runtime/hosts/ardupilot/imu_fidelity.sh quad 0 1 2     # skip I3 (the quad's I3 flight takes ~35 min)
+```
+
+The airframe is `configs/KIND.toml`; level N adds the IMU of
+`configs/quad_iN.toml`, the same parameters for every airframe, so only the IMU
+differs. The run files go to `build/imu-fidelity/imu_KIND_iN.toml`. Measured
+(ArduPilot 4.6.2; I0-I2 at `--speedup 2`, I3 at its own rate):
+
+| | I0 ideal | I1 digital | I2 errors | I3 electromechanical |
+|---|---|---|---|---|
+| model rate (x real time) | quad 14, rover 70, plane 71 | 3.2, 9.3, 8.6 | 3.5, 8.5, 9.2 | 0.038, 0.105, 0.098 |
+| quad: hover drift / landed from home / max tilt | 0.03 m / 0.31 m / 17.3° | 0.02 / 0.32 / 17.3 | 0.03 / 0.32 / 17.4 | 0.02 / 0.31 / 17.2 (35 min) |
+| rover: worst cross-track / stopped from home | 0.64 m / 0.19 m | 0.64 / 0.23 | 0.62 / 0.25 | 0.63 / 0.22 (14 min) |
+| plane: worst cross-track / touchdown before aim / off centreline | 15.9 m / 32.3 m / 0.10 m | 16.1 / 32.1 / 0.09 | 16.1 / 32.2 / 0.11 | 16.1 / 32.0 / 0.09 (25 min) |
+
+All twelve pass. With these illustrative parameters (I2 noise 0.01 m/s² and
+0.001 rad/s, a 2.5 ms sample period) the autopilot's estimator absorbs the
+difference. `examples/*_noisy_imu.toml` use 5x the noise and 20x the bias.
 
 ## Build only
 

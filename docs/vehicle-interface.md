@@ -459,8 +459,10 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   contract.
 - Units are not exported by the pinned Rumoca.
 - Speed: the electromechanical IMU (I3) integrates the MEMS resonators and
-  runs at ~0.04x real time in a vehicle (I0 ~14x, I1/I2 3-9x), too slow for
-  real-time hosts such as SITL.
+  runs at 0.04-0.1x real time in a vehicle (I0 14-70x, I1/I2 3-9x). SITL
+  then runs at the model's rate: quad, rover and plane fly their missions at
+  I3 in 14-35 minutes (`runtime/hosts/ardupilot/imu_fidelity.sh`), but a host
+  that must keep real time cannot use it.
 - The plants' default Earth magnetic field input,
   `magneticField_w = {0, 20e-6, 45e-6}` T in NED, has no north component; a
   host that feeds the model's magnetometer to a compass-using autopilot would

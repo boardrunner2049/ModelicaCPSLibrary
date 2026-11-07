@@ -15,9 +15,10 @@ failed check.
 import argparse
 import math
 import sys
-import time
 
 from pymavlink import mavutil
+
+from mavclock import AutopilotClock
 
 MAV = mavutil.mavlink
 EARTH_RADIUS = 6378137.0
@@ -54,14 +55,15 @@ def main():
     p.add_argument("vehicle", choices=sorted(MISSIONS))
     p.add_argument("--connect", default="tcp:127.0.0.1:5760")
     p.add_argument("--home", default="40.414929,-86.932387")
-    p.add_argument("--timeout", type=float, default=900.0)
+    p.add_argument("--timeout", type=float, help="autopilot seconds", default=900.0)
     a = p.parse_args()
     lat0, lon0 = (float(x) for x in a.home.split(","))
     mission = MISSIONS[a.vehicle]
     limits = LIMITS[a.vehicle]
-    deadline = time.time() + a.timeout
 
     m = mavutil.mavlink_connection(a.connect, autoreconnect=True)
+    clock = AutopilotClock(m)
+    deadline = a.timeout  # autopilot seconds since boot
     m.wait_heartbeat(timeout=60)
     print(f"heartbeat from system {m.target_system}")
     m.mav.request_data_stream_send(m.target_system, m.target_component,
@@ -69,9 +71,9 @@ def main():
     state = {"attitude": 0.0, "reached": set(), "track": []}
 
     def pump(seconds):
-        end = time.time() + seconds
-        while time.time() < end:
-            msg = m.recv_match(blocking=True, timeout=0.5)
+        end = clock.now + seconds
+        while clock.now < end:
+            msg = clock.recv()
             if msg is None:
                 continue
             kind = msg.get_type()
@@ -104,8 +106,8 @@ def main():
         sys.exit(1)
 
     def wait_until(predicate, what, timeout):
-        end = min(time.time() + timeout, deadline)
-        while time.time() < end:
+        end = min(clock.now + timeout, deadline)
+        while clock.now < end:
             pump(0.5)
             if predicate():
                 return
@@ -123,11 +125,11 @@ def main():
     items = [(MAV.MAV_CMD_NAV_WAYPOINT, 0, 0, 0, 0)] + mission
     m.mav.mission_count_send(m.target_system, m.target_component, len(items))
     sent = set()
-    end = time.time() + 30
-    while time.time() < end:
-        msg = m.recv_match(type=["MISSION_REQUEST", "MISSION_REQUEST_INT", "MISSION_ACK"],
-                           blocking=True, timeout=1)
-        if msg is None:
+    end = clock.now + 30
+    while clock.now < end:
+        msg = clock.recv()
+        if msg is None or msg.get_type() not in ("MISSION_REQUEST", "MISSION_REQUEST_INT",
+                                                 "MISSION_ACK"):
             continue
         if msg.get_type() == "MISSION_ACK":
             if msg.type != MAV.MAV_MISSION_ACCEPTED:
@@ -148,9 +150,9 @@ def main():
     m.mav.command_long_send(m.target_system, m.target_component, MAV.MAV_CMD_MISSION_START,
                             0, 0, 0, 0, 0, 0, 0, 0)
     m.set_mode("AUTO")
-    end = time.time() + 180
+    end = clock.now + 180
     while not state.get("armed"):
-        if time.time() > end:
+        if clock.now > end:
             fail("could not arm within 180 s")
         m.mav.command_long_send(m.target_system, m.target_component,
                                 MAV.MAV_CMD_COMPONENT_ARM_DISARM, 0, 1, 0, 0, 0, 0, 0, 0)
@@ -162,10 +164,10 @@ def main():
         # Landing ends on the ground, rolled out to a stop on the last leg.
         wait_until(lambda: state.get("leg") == last and "hud" in state
                    and state["hud"].groundspeed < 0.5 and -state["local"].z < 0.5,
-                   "landing and rollout", deadline - time.time())
+                   "landing and rollout", deadline - clock.now)
         last_waypoint = last - 1
     else:
-        wait_until(lambda: last in state["reached"], f"mission item {last}", deadline - time.time())
+        wait_until(lambda: last in state["reached"], f"mission item {last}", deadline - clock.now)
         last_waypoint = last
     missing = [i for i in range(1, last_waypoint + 1) if i not in state["reached"]]
     if missing:
@@ -219,4 +221,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except TimeoutError as e:
+        print(f"FAILED: {e}")
+        sys.exit(1)
