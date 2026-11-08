@@ -8,6 +8,7 @@ model FixedWing "Conventional fixed-wing, vehicle interface v1: pwm[1..4] ailero
     "Initial CG height above its unloaded on-ground height; 0 starts on the runway";
   parameter Real start_speed_mps(unit = "m/s") = 0 "Initial forward (body x) speed, wings level";
   Vehicles.FixedWing.FixedWingWithSensors plant(
+    magneticField_w = {earth_field_north_T, earth_field_east_T, earth_field_down_T},
     p_start = {0, 0, -plant.cgHeight - start_altitude_m},
     v_start = {start_speed_mps, 0, 0},
     aileronCommand = 2 * commands.normalizedCommand[1] - 1,

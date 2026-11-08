@@ -24,6 +24,26 @@ index b1a54e45e3..782dfe5533 100644
          if cfg.options.enable_sfml_audio:
              if not cfg.check_SFML_Audio(env):
                  cfg.fatal("Failed to find SFML Audio libraries")
+diff --git a/libraries/AP_Baro/AP_Baro_SITL.cpp b/libraries/AP_Baro/AP_Baro_SITL.cpp
+index cd914632a3..721f173ad8 100644
+--- a/libraries/AP_Baro/AP_Baro_SITL.cpp
++++ b/libraries/AP_Baro/AP_Baro_SITL.cpp
+@@ -66,6 +66,15 @@ void AP_Baro_SITL::_timer()
+         return;
+     }
+ 
++    const auto &model = _sitl->state.model_sensors;
++    if (model.baro_valid) {
++        // the vehicle model's own barometer: its pressure and temperature
++        _recent_press = model.baro_pressure_pa;
++        _recent_temp = model.baro_temperature_c;
++        _has_sample = true;
++        return;
++    }
++
+     const auto drift_delta_t_ms = now - last_drift_delta_t_ms;
+     last_drift_delta_t_ms = now;
+     total_alt_drift += _sitl->baro[_instance].drift * drift_delta_t_ms * 0.001f;
 diff --git a/libraries/AP_HAL_SITL/SITL_cmdline.cpp b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
 index 042bb2ce7f..590bbbbed2 100644
 --- a/libraries/AP_HAL_SITL/SITL_cmdline.cpp
@@ -46,6 +66,89 @@ index 042bb2ce7f..590bbbbed2 100644
      { "blimp",              Blimp::create },
      { "novehicle",          NoVehicle::create },
  #if AP_SIM_STRATOBLIMP_ENABLED
+diff --git a/libraries/SITL/SIM_Aircraft.cpp b/libraries/SITL/SIM_Aircraft.cpp
+index 634334404b..525a61a9b3 100644
+--- a/libraries/SITL/SIM_Aircraft.cpp
++++ b/libraries/SITL/SIM_Aircraft.cpp
+@@ -402,6 +402,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
+     fdm.range = rangefinder_range();
+     memcpy(fdm.rcin, rcin, rcin_chan_count * sizeof(float));
+     fdm.bodyMagField = mag_bf;
++    fdm.model_sensors = model_sensors;
+ 
+     fdm.bodyMagField.rotate(sitl->imu_orientation);
+ 
+diff --git a/libraries/SITL/SIM_Aircraft.h b/libraries/SITL/SIM_Aircraft.h
+index a00424ce8b..e81880430c 100644
+--- a/libraries/SITL/SIM_Aircraft.h
++++ b/libraries/SITL/SIM_Aircraft.h
+@@ -242,6 +242,7 @@ protected:
+     float turbulence_vertical_speed;    // m/s
+ 
+     Vector3f mag_bf;  // local earth magnetic field vector in Gauss, earth frame
++    struct sitl_model_sensors model_sensors {};  // GPS/baro readings of the model, if it has them
+ 
+     uint64_t time_now_us;
+ 
+diff --git a/libraries/SITL/SIM_GPS.cpp b/libraries/SITL/SIM_GPS.cpp
+index d51521cf3b..31698fa5e7 100644
+--- a/libraries/SITL/SIM_GPS.cpp
++++ b/libraries/SITL/SIM_GPS.cpp
+@@ -312,9 +312,19 @@ void GPS::update()
+     double latitude =_sitl->state.latitude;
+     double longitude = _sitl->state.longitude;
+     float altitude = _sitl->state.altitude;
+-    const double speedN = _sitl->state.speedN;
+-    const double speedE = _sitl->state.speedE;
+-    const double speedD = _sitl->state.speedD;
++    double speedN = _sitl->state.speedN;
++    double speedE = _sitl->state.speedE;
++    double speedD = _sitl->state.speedD;
++    const auto &model = _sitl->state.model_sensors;
++    if (model.gps_valid) {
++        // the vehicle model's own GNSS receiver
++        latitude = model.gps_latitude;
++        longitude = model.gps_longitude;
++        altitude = model.gps_altitude;
++        speedN = model.gps_velocity_ned.x;
++        speedE = model.gps_velocity_ned.y;
++        speedD = model.gps_velocity_ned.z;
++    }
+     const uint32_t now_ms = AP_HAL::millis();
+ 
+     if (now_ms < 20000) {
+diff --git a/libraries/SITL/SITL.h b/libraries/SITL/SITL.h
+index d799945b96..fd91749ecc 100644
+--- a/libraries/SITL/SITL.h
++++ b/libraries/SITL/SITL.h
+@@ -53,6 +53,19 @@ class StratoBlimp;
+ class Glider;
+ class FlightAxis;
+ 
++// Sensor readings a vehicle model computes itself (SIM_CPVehicle). When
++// valid, the SITL GPS and barometer report them instead of simulating them
++// from the vehicle's truth.
++struct sitl_model_sensors {
++    bool gps_valid;
++    double gps_latitude, gps_longitude; // degrees
++    double gps_altitude;                // m, as sitl_fdm::altitude
++    Vector3f gps_velocity_ned;          // m/s
++    bool baro_valid;
++    float baro_pressure_pa;
++    float baro_temperature_c;
++};
++
+ struct sitl_fdm {
+     // this is the structure passed between FDM models and the main SITL code
+     uint64_t timestamp_us;
+@@ -77,6 +90,7 @@ struct sitl_fdm {
+     float  rcin[12];         // RC input 0..1
+     double range;           // rangefinder value
+     Vector3f bodyMagField;  // Truth XYZ magnetic field vector in body-frame. Includes motor interference. Units are milli-Gauss.
++    struct sitl_model_sensors model_sensors;
+     Vector3f angAccel; // Angular acceleration in degrees/s/s about the XYZ body axes
+ 
+     struct {
 diff --git a/wscript b/wscript
 index f400c74cdb..4024566c35 100644
 --- a/wscript

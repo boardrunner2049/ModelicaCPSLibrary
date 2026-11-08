@@ -13,9 +13,9 @@ here:
 | Path | What |
 |---|---|
 | `src/SIM_CPVehicle.{cpp,h}` | the SITL model: maps SITL servos, time and home to the vehicle interface and its outputs back to SITL |
-| `hooks.patch` | the three edits ArduPilot needs to know the model: an entry in SITL's model table, the waf option `--cpvehicle=PATH`, and the link flags (22 lines) |
+| `hooks.patch` | the edits ArduPilot needs: an entry in SITL's model table, the waf option `--cpvehicle=PATH` and the link flags; and `sitl_fdm::model_sensors`, through which SITL's GPS and barometer drivers report the model's own readings |
 | `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check); pick the parts in the browser with `tools/vehicle_builder` |
-| `fidelity.sh`, `fidelity.py` | one airframe flown with one part (IMU, propulsion) at each fidelity level, all at once |
+| `fidelity.sh`, `fidelity.py` | one airframe flown with one part (IMU, propulsion, sensors, actuators) at each fidelity level, all at once |
 | `build.sh`, `runspec.py` | vehicles to SITL binaries; resolving a vehicle name or TOML |
 | `examples/` | run files (`*.toml`), parameter files, mission checks (`fly_mission.py`, `fly_auto.py`, on the autopilot's clock: `mavclock.py`) |
 
@@ -70,14 +70,25 @@ Examples: `rover_noisy_imu.toml` (4 kg, I2 IMU mounted off the CG),
 `quad_noisy_imu.toml` (1.8 kg, I2 IMU), `plane_digital_imu.toml` (2.2 kg, I1
 IMU, GNSS antenna on the tail); each flies its mission check.
 
-### Sensors: what can be mixed, and what the autopilot reads
+### Parts: what can be mixed
 
-| Sensor | Selectable in the TOML | Reaches ArduPilot in SITL |
-|---|---|---|
-| IMU | `ideal`, `digital` (I1), `errors` (I2), `electromechanical` (I3), with parameters; mount on rover/plane | **yes**: gyro and accelerometer are the model's |
-| GNSS | ideal; antenna position on rover/plane | no: SITL's GPS simulation from the model's position |
-| Magnetometer | ideal; orientation on rover/plane | no: SITL's compass from the model's attitude |
-| Barometer | ideal; position on rover/plane | no: SITL's barometer from the model's altitude |
+Every sensor the autopilot reads is the model's.
+
+| Part | Levels (`[models]`) | Parameters | Vehicles |
+|---|---|---|---|
+| IMU | `imu.model`: `ideal` I0, `digital` I1, `errors` I2, `electromechanical` I3 | `[imu]`; mount `imuPosition_b`, `R_bImu` (rover/plane) | all |
+| Magnetometer | `magnetometer.model`: `ideal` M0, `sampled` M1 (soft/hard iron, noise, drift, quantization, latency) | `[magnetometer]`; `R_bMag` | all |
+| Barometer | `barometer.model`: `ideal` B0, `sampled` B1 (noise, drift, quantization, latency) | `[barometer]`; `barometerPosition_b` | all |
+| GNSS | `gnss.model`: `ideal` G0, `statistical` G1 (correlated noise, Gauss-Markov errors, epochs, latency) | `[gnss]`; `gnssPosition_b` | all |
+| Propulsion | `esc` + `motor`: P0-P4 | `[motor]`, `[esc]`, `[power]` | multirotor |
+| Drive | `drive`: `steady_state` D0, `dc_motor` D1 (winding inductance, gearing) | `supplyVoltage`, `gearRatio`, `motorInductance` | rover |
+| Steering | `steering`: `first_order` S0, `rate_limited` S1 | `maxSteerRate`, `steeringDeadband` | rover |
+| Control surfaces | `servos`: `first_order` S0, `rate_limited` S1 | `maxServoRate`, `servoDeadband` | fixed-wing |
+
+`examples/rover_all_sensors.toml` sets I2, M1, B1 and G1 at once. The
+barometer reads the ISA troposphere at its height, and the model's Earth field
+is ArduPilot's own (WMM tables at home), so its compass agrees with the
+autopilot's declination.
 
 Speed: I0 runs at 14-70x real time, I1/I2 at 3-9x, I3 at 0.04-0.1x (it
 integrates the MEMS resonators), so I3 cannot run SITL in real time; `run.sh`
@@ -99,9 +110,9 @@ The airframe is `configs/KIND.toml`; only the part differs. IMU level N takes
 the IMU of `configs/quad_iN.toml` (the same for every airframe), propulsion
 level N the ESC, motor and supply of `configs/quad_pN.toml`. The run files go
 to `build/fidelity/PART_KIND_LEVEL.toml`. Each level flies on its own SITL
-instance. The other parts have one level in a vehicle so far (GNSS,
-magnetometer, barometer: ideal; rotor: quadratic blade; rover and plane drive
-and servos: first-order models in the plant).
+instance. Also `magnetometer`, `barometer`, `gnss` (M/B/G 0 ideal, 1
+sampled), `drive`, `steering` (rover) and `servos` (plane), levels 0 and 1.
+The rotor has one level (quadratic blade).
 
 IMU, measured (ArduPilot 4.6.2; I0-I2 at `--speedup 2`, I3 at its own rate;
 model rates at rest):
@@ -130,6 +141,13 @@ build and conform, but resolve the motor commutation (and P4 the 20 kHz
 inverter) far below real time: after P3 armed, the autopilot's clock did not
 advance for 120 s and the check gave up (a mission would take hours); P4 was
 stopped after 80 minutes. They are for offline simulation, not SITL.
+
+Sensors and actuators, level 1 against level 0: all pass. The rover with
+every sampled sensor (`examples/rover_all_sensors.toml`, I2 M1 B1 G1) keeps
+within 0.98 m of its track and stops 0.45 m from home; GNSS G1 alone 0.73 m
+(rover), landed 0.8-1.0 m from home in three of three quad flights, touchdown
+28.2 m before the aim point (plane); S1 steering 0.57 m; D0 and D1 drive fly
+the same mission alike.
 
 ## Build only
 
@@ -186,14 +204,16 @@ lands. The models start facing north, so use home heading 0.
 | home | sets the model's geodetic origin (`lat0`, `lon0`, `ground_alt_wgs84`) before initialization. SITL has no geoid, so home altitude is used as the ellipsoid altitude. |
 | time | the model is advanced to SITL's `time_now_us + frame_time_us` (integer µs from start) every frame, in steps of at most 2 ms |
 
-- **Sensors.** The IMU is the model's (the IMU selected in its
-  configuration); SITL's `SIM_GYR*_RND`/`SIM_ACC*_RND` (default 0) would add
-  to it. GPS, compass and barometer are SITL's simulation from the model's
-  position and attitude; the model's GNSS, magnetometer and barometer outputs
-  are not used (the library has only ideal ones in a vehicle so far, and the
-  plants' default Earth field, `{0, 20e-6, 45e-6}` T in NED, has no north
-  component, so their compass would read ~90 degrees off). The FastDyn host
-  reads all of the model's sensors.
+- **Sensors.** Every sensor is the model's, at the levels its configuration
+  selects: IMU (`imu_v1`), compass (`magnetometer_v1`, SITL's `mag_bf`), GPS
+  (`gnss_v1`, through `sitl_fdm::model_sensors` into SITL's GPS driver, which
+  still applies its own `SIM_GPS*` lag and protocol) and barometer
+  (`barometer_v1`, pressure and temperature into SITL's barometer driver).
+  Before initialization the adapter sets the model's Earth field
+  (`earth_field_north_T`, `_east_T`, `_down_T`) from ArduPilot's World
+  Magnetic Model at home. A model without those parameters (built before
+  them) keeps SITL's compass; a model without a GNSS or barometer keeps
+  SITL's. SITL prints which sensors are the model's at start.
 - **Not modelled by the vehicle here.** Battery voltage is a constant
   `SIM_BATT_VOLTAGE`. Wind (`SIM_WIND_*`) is ignored and reported at start.
   Payloads and clamps are not supported.
@@ -231,6 +251,6 @@ full-scale deflections), rotate speed and a shorter flare (lift/drag ≈ 3).
 | | FastDyn | This prototype |
 |---|---|---|
 | Autopilot | firmware binary on an emulated board | native SITL build |
-| Sensors | the model's sensor outputs through emulated drivers | the model's IMU; SITL's GPS, compass and barometer from the model's truth |
+| Sensors | the model's sensor outputs through emulated drivers | the model's sensor outputs through SITL's drivers |
 | Clock | QEMU instruction count, 1 ms board tick | SITL frame loop (default 1200 Hz) |
 | Model steps | ≤ 2 ms per step at each timer tick | one step per SITL frame (≈ 0.83 ms) |

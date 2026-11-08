@@ -13,6 +13,11 @@ model FixedWingPlant "Conventional fixed-wing: aileron, elevator, rudder, tracto
   parameter SI.Angle maxElevator = 0.3491;
   parameter SI.Angle maxRudder = 0.3491;
   parameter SI.Time servoTimeConstant = 0.04 "First-order control-surface servos";
+  parameter Integer servoModel = 0
+    "0: first-order servos (S0); 1: first-order servos with rate limit and deadband (S1)"
+    annotation(Evaluate = true);
+  parameter SI.AngularVelocity maxServoRate = 7.0 "S1: surface rate limit (about 0.15 s per 60 degrees)";
+  parameter SI.Angle servoDeadband = 0.002 "S1: no motion while within this of the command";
   parameter SI.Force maxThrust = 30 "Static thrust at full throttle";
   parameter SI.Velocity propellerPitchSpeed = 60 "Axial airspeed at which thrust falls to zero";
   parameter SI.Time motorTimeConstant = 0.1 "Throttle to thrust lag";
@@ -76,12 +81,20 @@ model FixedWingPlant "Conventional fixed-wing: aileron, elevator, rudder, tracto
 protected
   SI.Velocity airVelocity_b[3];
 initial equation
+  assert(servoModel >= 0 and servoModel <= 1 and maxServoRate > 0 and servoDeadband >= 0,
+    "servoModel is 0 or 1, with a positive rate limit");
   assert(cgHeight > wheelRadius and noseWheelX > mainWheelX,
     "Gear geometry: hubs below the CG, nose wheel ahead of the main wheels");
 equation
-  der(aileron) = (maxAileron * noEvent(min(1, max(-1, aileronCommand))) - aileron) / servoTimeConstant;
-  der(elevator) = (maxElevator * noEvent(min(1, max(-1, elevatorCommand))) - elevator) / servoTimeConstant;
-  der(rudder) = (maxRudder * noEvent(min(1, max(-1, rudderCommand))) - rudder) / servoTimeConstant;
+  der(aileron) = if servoModel == 1 then Utilities.Math.rateLimitedLag(
+    maxAileron * noEvent(min(1, max(-1, aileronCommand))), aileron, servoTimeConstant, maxServoRate, servoDeadband)
+    else (maxAileron * noEvent(min(1, max(-1, aileronCommand))) - aileron) / servoTimeConstant;
+  der(elevator) = if servoModel == 1 then Utilities.Math.rateLimitedLag(
+    maxElevator * noEvent(min(1, max(-1, elevatorCommand))), elevator, servoTimeConstant, maxServoRate, servoDeadband)
+    else (maxElevator * noEvent(min(1, max(-1, elevatorCommand))) - elevator) / servoTimeConstant;
+  der(rudder) = if servoModel == 1 then Utilities.Math.rateLimitedLag(
+    maxRudder * noEvent(min(1, max(-1, rudderCommand))), rudder, servoTimeConstant, maxServoRate, servoDeadband)
+    else (maxRudder * noEvent(min(1, max(-1, rudderCommand))) - rudder) / servoTimeConstant;
   der(throttle) = (noEvent(min(1, max(0, throttleCommand))) - throttle) / motorTimeConstant;
 
   airVelocity_b = body.v_b - transpose(body.R_wb) * wind_w;

@@ -33,6 +33,12 @@ pub struct ResolvedFireConfig {
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub imu: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
+    pub magnetometer: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub barometer: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub gnss: Table,
+    #[serde(skip_serializing_if = "Table::is_empty")]
     pub acoustic: Table,
     /// Rover/fixed-wing plant modifiers; only the values the configuration sets.
     #[serde(skip_serializing_if = "Table::is_empty")]
@@ -589,6 +595,9 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         "interface",
         "acquisition",
         "imu",
+        "magnetometer",
+        "barometer",
+        "gnss",
         "vulnerabilities",
     ];
     table(&raw, &allowed, "config")?;
@@ -650,6 +659,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     let initial = resolve_initial(&section(root, "initial"))?;
     let interface = resolve_interface(&section(root, "interface"))?;
     let imu = crate::imu::resolve(&section(root, "imu"), &models)?;
+    let [magnetometer, barometer, gnss] = crate::sensors::resolve_all(root, &models)?;
     let acoustic = crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?;
     Ok(ResolvedFireConfig {
         schema_version: version,
@@ -668,6 +678,9 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         models,
         interface,
         imu,
+        magnetometer,
+        barometer,
+        gnss,
         acoustic,
         plant: Table::new(),
     })
@@ -701,17 +714,6 @@ pub(crate) fn model_name(root: &Table, default: &str) -> Result<String> {
 }
 
 /// Ideal-only sensors: `model = "ideal"` or the legacy `response = "ideal"`.
-pub(crate) fn ideal_sensor(raw: &Value, key: &str) -> Result<()> {
-    let v = table(raw, &["model", "response"], &format!("models.{key}"))?;
-    let selected: Vec<_> = v.values().collect();
-    if selected.len() != 1 || selected[0].as_str() != Some("ideal") {
-        return Err(format!(
-            "models.{key}: only the ideal model is supported (model = \"ideal\")"
-        ));
-    }
-    Ok(())
-}
-
 fn resolve_motor(raw: &Value, n: usize, voltage_driven: bool) -> Result<Table> {
     let fields = if voltage_driven {
         [("Kv", 1000. / 16.), ("tauOmega", 0.03), ("omega_start", 0.)]
@@ -1057,11 +1059,7 @@ fn resolve_models(raw: &Value) -> Result<Table> {
     if let Some(raw) = t.get("imu") {
         out.insert("imu".into(), Value::Table(crate::imu::selection(raw)?));
     }
-    for key in ["magnetometer", "gnss", "barometer"] {
-        if let Some(raw) = t.get(key) {
-            ideal_sensor(raw, key)?;
-        }
-    }
+    crate::sensors::select_all(&t, &mut out)?;
     Ok(out)
 }
 

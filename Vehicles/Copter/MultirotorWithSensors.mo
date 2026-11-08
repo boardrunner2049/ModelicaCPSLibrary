@@ -1,7 +1,8 @@
 within ModelicaCPSLibrary.Vehicles.Copter;
 model MultirotorWithSensors "Default ideal sensors with independently replaceable IMU; no protocol/firmware driver"
   extends MultirotorPlant;
-  input Real magneticField_w[3](each unit="T") = {0,20e-6,45e-6};
+  input Real magneticField_w[3](each unit="T") = {20.07e-6, -1.52e-6, 48.24e-6}
+    "Earth field at the local origin, NED (WMM at the default origin, West Lafayette)";
   input Real pressure(unit="Pa") = 101325 "Constant ambient pressure baseline [Pa]";
   input Real temperature(unit="K") = 288.15 "K";
   Systems.Sensing.SensorSuite sensors(

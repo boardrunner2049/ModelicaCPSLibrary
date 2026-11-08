@@ -1,6 +1,6 @@
 within ModelicaCPSLibrary.Systems.Sensing;
 
-model SensorSuite "Optional four-sensor assembly with independently replaceable IMU and GNSS"
+model SensorSuite "Four-sensor assembly with independently replaceable IMU, magnetometer, GNSS and barometer"
   parameter Real rImu_b[3] = zeros(3) "IMU displacement from total CG [m]";
   parameter Real R_bImu[3,3] = identity(3) "IMU frame to body";
   parameter Real R_bMag[3,3] = identity(3) "Magnetometer frame to body";
@@ -14,6 +14,8 @@ model SensorSuite "Optional four-sensor assembly with independently replaceable 
   parameter Real pressureBias = 0;
   parameter Real temperatureBias = 0;
   parameter Real altitudeBias = 0;
+  parameter Boolean altitudeDependentAtmosphere = true
+    "Barometer ambient pressure and temperature follow the ISA troposphere from pressure and temperature at the local origin";
   input Real p_w[3](each unit="m");
   input Real v_w[3](each unit="m/s");
   input Real R_wb[3,3](each unit="1");
@@ -22,17 +24,19 @@ model SensorSuite "Optional four-sensor assembly with independently replaceable 
   input Real alpha_b[3](each unit="rad/s2");
   input Real gravity_w[3](each unit="m/s2");
   input Real magneticField_w[3](each unit="T");
-  input Real pressure(unit="Pa") "Ambient pressure supplied by the environment [Pa]";
-  input Real temperature(unit="K") "Ambient temperature supplied by the environment [K]";
+  input Real pressure(unit="Pa") "Ambient pressure at the local origin (NED z = 0) [Pa]";
+  input Real temperature(unit="K") "Ambient temperature at the local origin [K]";
   output ModelicaCPSLibrary.Interfaces.SensorMeasurements measurements;
 
   replaceable model ImuModel = IMU.Sensor constrainedby IMU.PartialSensor;
   ImuModel imu( r_b=rImu_b, R_bs=R_bImu,
     accelBias=accelBias, gyroBias=gyroBias);
-  Magnetometer.Sensor magnetometer( R_bs=R_bMag, bias=magBias);
+  replaceable model MagnetometerModel = Magnetometer.Sensor constrainedby Magnetometer.PartialSensor;
+  MagnetometerModel magnetometer( R_bs=R_bMag, bias=magBias);
   replaceable model GnssModel = GNSS.Sensor constrainedby GNSS.PartialSensor;
   GnssModel gnss( positionBias=positionBias, velocityBias=velocityBias);
-  Barometer.Sensor barometer( pressureBias=pressureBias,
+  replaceable model BarometerModel = Barometer.Sensor constrainedby Barometer.PartialSensor;
+  BarometerModel barometer( pressureBias=pressureBias,
     temperatureBias=temperatureBias, altitudeBias=altitudeBias);
 protected
   Real barometerPosition_w[3];
@@ -49,8 +53,13 @@ equation
   gnss.velocity_w = v_w + R_wb * cross(omega_b, rGnss_b);
   barometerPosition_w = p_w + R_wb * rBarometer_b;
   barometerVelocity_w = v_w + R_wb * cross(omega_b, rBarometer_b);
-  barometer.ambientPressure = pressure;
-  barometer.ambientTemperature = temperature;
+  if altitudeDependentAtmosphere then
+    (barometer.ambientPressure, barometer.ambientTemperature) =
+      Worlds.Environment.troposphere(-barometerPosition_w[3], pressure, temperature);
+  else
+    barometer.ambientPressure = pressure;
+    barometer.ambientTemperature = temperature;
+  end if;
   barometer.altitude_w = -barometerPosition_w[3];
   barometer.climbRate_w = -barometerVelocity_w[3];
   measurements.acceleration = imu.acceleration;

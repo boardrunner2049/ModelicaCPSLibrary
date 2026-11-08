@@ -18,8 +18,19 @@ model RoverPlant "Four-wheel Ackermann rover: steered front wheels, rear open di
   parameter Real rollingResistance = 0.015;
   parameter SI.Angle maxSteerAngle = 0.45 "Equivalent single-track steer angle at full command";
   parameter SI.Time steeringTimeConstant = 0.08 "First-order steering servo";
+  parameter Integer steeringModel = 0
+    "0: first-order servo (S0); 1: first-order servo with rate limit and deadband (S1)"
+    annotation(Evaluate = true);
+  parameter SI.AngularVelocity maxSteerRate = 7.0 "S1: steering rate limit (about 0.15 s per 60 degrees)";
+  parameter SI.Angle steeringDeadband = 0.005 "S1: no motion while within this of the command";
   parameter SI.Torque motorStallTorque = 1.4 "Axle torque at zero speed and full command";
   parameter SI.AngularVelocity motorNoLoadSpeed = 182 "Axle speed at zero load and full command";
+  parameter Integer driveModel = 0
+    "0: steady-state DC motor torque line (D0); 1: DC motor with winding inductance (D1)"
+    annotation(Evaluate = true);
+  parameter SI.Voltage supplyVoltage = 7.4 "D1: battery voltage at full command";
+  parameter Real gearRatio = 10 "D1: motor turns per axle turn";
+  parameter SI.Inductance motorInductance = 2e-4 "D1: winding inductance";
   parameter SI.Inertia wheelInertia = 1.5e-3 "Per rear wheel, with its share of the reflected motor and gear inertia";
   parameter Real dragArea(unit = "m2") = 0.03 "Drag coefficient times frontal area";
   parameter SI.Density airDensity = 1.225;
@@ -61,6 +72,11 @@ model RoverPlant "Four-wheel Ackermann rover: steered front wheels, rear open di
     "Rear left, rear right spin";
   output SI.Angle wheelSteer[2] "Front left, front right (Ackermann)";
   output SI.Torque motorTorque "At the differential input (axle)";
+  output SI.Current motorCurrent(start = 0, fixed = driveModel == 1) "Winding current (D0: its steady state)";
+  final parameter Real motorConstant(unit = "N.m/A") = supplyVoltage / (gearRatio * motorNoLoadSpeed)
+    "D1 torque and back-EMF constant, from the no-load speed";
+  final parameter SI.Resistance motorResistance = gearRatio * motorConstant * supplyVoltage / motorStallTorque
+    "D1 winding resistance, from the stall torque";
   output Interfaces.VehicleState truth;
   output SI.Force force_b[3] "Sum of non-gravity loads";
   output SI.Torque moment_b[3] "Sum about CG";
@@ -72,19 +88,36 @@ protected
 initial equation
   assert(wheelbase > 0 and track > 0 and wheelRadius > 0 and cgHeight > wheelRadius,
     "Rover geometry must be positive with the CG above the hubs");
+  assert(steeringModel >= 0 and steeringModel <= 1 and driveModel >= 0 and driveModel <= 1,
+    "steeringModel and driveModel are 0 or 1");
+  assert(maxSteerRate > 0 and steeringDeadband >= 0 and supplyVoltage > 0 and gearRatio > 0
+    and motorInductance > 0, "Invalid steering or drive parameters");
   assert(maxSteerAngle > 0 and track / 2 * tan(maxSteerAngle) < wheelbase,
     "Ackermann geometry needs the inner wheel turn centre ahead of the rear axle");
 equation
   steering = noEvent(min(1, max(-1, steeringCommand)));
   throttle = noEvent(min(1, max(-1, throttleCommand)));
-  der(steerAngle) = (maxSteerAngle * steering - steerAngle) / steeringTimeConstant;
+  if steeringModel == 1 then
+    der(steerAngle) = Utilities.Math.rateLimitedLag(maxSteerAngle * steering, steerAngle,
+      steeringTimeConstant, maxSteerRate, steeringDeadband);
+  else
+    der(steerAngle) = (maxSteerAngle * steering - steerAngle) / steeringTimeConstant;
+  end if;
   // Ackermann: both front wheels point at the turn centre on the rear axle line.
   wheelSteer[1] = atan(wheelbase * tan(steerAngle) / (wheelbase + track / 2 * tan(steerAngle)));
   wheelSteer[2] = atan(wheelbase * tan(steerAngle) / (wheelbase - track / 2 * tan(steerAngle)));
 
   // Voltage-commanded DC motor through an open differential: equal torque to
   // both rear wheels, motor speed follows their mean. Zero command brakes.
-  motorTorque = motorStallTorque * (throttle - (wheelSpeed[1] + wheelSpeed[2]) / 2 / motorNoLoadSpeed);
+  if driveModel == 1 then
+    // Winding: L di/dt = V u - R i - k w_motor; torque at the axle k i N.
+    motorInductance * der(motorCurrent) = supplyVoltage * throttle - motorResistance * motorCurrent
+      - motorConstant * gearRatio * (wheelSpeed[1] + wheelSpeed[2]) / 2;
+    motorTorque = gearRatio * motorConstant * motorCurrent;
+  else
+    motorTorque = motorStallTorque * (throttle - (wheelSpeed[1] + wheelSpeed[2]) / 2 / motorNoLoadSpeed);
+    motorCurrent = motorTorque / (gearRatio * motorConstant);
+  end if;
   for i in 1:2 loop
     wheelInertia * der(wheelSpeed[i]) = motorTorque / 2 - wheels[2 + i].longitudinalForce * wheelRadius;
   end for;

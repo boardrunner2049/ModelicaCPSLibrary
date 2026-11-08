@@ -24,12 +24,14 @@
 #include <string.h>
 
 #include <SITL/SITL.h>
+#include <AP_Declination/AP_Declination.h>
 
 using namespace SITL;
 
 namespace {
-// What this host consumes. SITL simulates GPS, compass and barometer from
-// the truth itself, so the FMU's own sensor models are not used here.
+// What this host requires. The model's magnetometer, GNSS and barometer are
+// used when it has them (magnetometer_v1, gnss_v1, barometer_v1); otherwise
+// SITL simulates that sensor from the model's truth.
 const char *const required_capabilities[] = {
     "pwm_actuation_v1",
     "kinematic_state_v1",
@@ -132,12 +134,35 @@ void CPVehicle::start()
         (status = cpv_set_parameter(vehicle, "ground_alt_wgs84", home.alt * 0.01)) != CPV_OK) {
         fail("setting the geodetic origin", status);
     }
+    // The model's Earth field is SITL's (ArduPilot's World Magnetic Model
+    // tables) at home, so its magnetometer agrees with the autopilot's
+    // declination. Models without these parameters keep their own field.
+    const Vector3f field_ga = AP_Declination::get_earth_field_ga(home);
+    const char *const field_names[3] = {"earth_field_north_T", "earth_field_east_T",
+                                        "earth_field_down_T"};
+    bool field_set = true;
+    for (uint8_t i = 0; i < 3; i++) {
+        field_set = cpv_set_parameter(vehicle, field_names[i], field_ga[i] * 1.0e-4) == CPV_OK &&
+                    field_set;
+    }
     status = cpv_initialize(vehicle, 0.0);
     if (status != CPV_OK && status != CPV_WARNING) {
         fail("initialize", status);
     }
     start_time_us = time_now_us;
     started = true;
+    cpv_mag_t mag;
+    cpv_gnss_t gnss;
+    cpv_baro_t baro;
+    // A model whose Earth field SITL cannot set has its own, which need not
+    // agree with the autopilot's declination: SITL's compass is used then.
+    model_mag = field_set && cpv_get_mag(vehicle, &mag) < CPV_UNSUPPORTED;
+    model_gnss = cpv_get_gnss(vehicle, &gnss) < CPV_UNSUPPORTED;
+    model_baro = cpv_get_baro(vehicle, &baro) < CPV_UNSUPPORTED;
+    ::printf("cpvehicle: sensors from the model: IMU%s%s%s; Earth field %s\n",
+             model_mag ? ", magnetometer" : "", model_gnss ? ", GNSS" : "",
+             model_baro ? ", barometer" : "",
+             field_set ? "set from SITL's WMM at home" : "the model's own");
     if (!is_zero(sitl->wind_speed)) {
         ::printf("cpvehicle: SIM_WIND_SPD is ignored; the model provides no wind input\n");
     }
@@ -206,6 +231,47 @@ void CPVehicle::update(const struct sitl_input &input)
     update_position();
     time_advance();
     update_mag_field_bf();
+    read_model_sensors();
+}
+
+/*
+  The model's own magnetometer, GNSS and barometer, where it has them, replace
+  SITL's simulation of those sensors (SITL's SIM_MAG/SIM_GPS/SIM_BARO error
+  settings still apply on top where the drivers add them).
+ */
+void CPVehicle::read_model_sensors()
+{
+    cpv_status_t status;
+    if (model_mag) {
+        cpv_mag_t mag;
+        if ((status = cpv_get_mag(vehicle, &mag)) >= CPV_UNSUPPORTED) {
+            fail("read magnetometer", status);
+        }
+        // Gauss to SITL's milligauss, body FRD.
+        mag_bf = Vector3f(mag.field_frd_gauss[0], mag.field_frd_gauss[1],
+                          mag.field_frd_gauss[2]) * 1000.0f;
+    }
+    if (model_gnss) {
+        cpv_gnss_t gnss;
+        if ((status = cpv_get_gnss(vehicle, &gnss)) >= CPV_UNSUPPORTED) {
+            fail("read GNSS", status);
+        }
+        model_sensors.gps_valid = true;
+        model_sensors.gps_latitude = gnss.latitude_deg;
+        model_sensors.gps_longitude = gnss.longitude_deg;
+        model_sensors.gps_altitude = gnss.altitude_wgs84_m;
+        model_sensors.gps_velocity_ned = Vector3f(gnss.velocity_ned[0], gnss.velocity_ned[1],
+                                                  gnss.velocity_ned[2]);
+    }
+    if (model_baro) {
+        cpv_baro_t baro;
+        if ((status = cpv_get_baro(vehicle, &baro)) >= CPV_UNSUPPORTED) {
+            fail("read barometer", status);
+        }
+        model_sensors.baro_valid = true;
+        model_sensors.baro_pressure_pa = baro.pressure_pa;
+        model_sensors.baro_temperature_c = baro.temperature_c;
+    }
 }
 
 #endif  // AP_SIM_CPVEHICLE_ENABLED

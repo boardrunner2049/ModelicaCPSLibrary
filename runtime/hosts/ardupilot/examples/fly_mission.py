@@ -6,6 +6,10 @@ usage: fly_mission.py [--connect tcp:127.0.0.1:5760] [--alt 5] [--north 20]
 Waits for the EKF to accept GPS, arms in GUIDED, takes off, holds, flies
 north, comes back, lands, and checks altitude, position and disarm. Exits
 nonzero with the reason on the first failed check.
+
+Positions are the vehicle's truth (SITL's SIM_STATE) when SITL sends it, so
+the checks hold with the model's own GNSS, barometer and compass, whose
+errors the estimate carries.
 """
 import argparse
 import math
@@ -13,7 +17,7 @@ import sys
 
 from pymavlink import mavutil
 
-from mavclock import AutopilotClock
+from mavclock import AutopilotClock, Truth
 
 
 def main():
@@ -30,6 +34,7 @@ def main():
     print(f"heartbeat from system {m.target_system}")
     m.mav.request_data_stream_send(m.target_system, m.target_component,
                                    mavutil.mavlink.MAV_DATA_STREAM_ALL, 10, 1)
+    truth = Truth(m)
     state = {"tilt": 0.0}
 
     def pump(seconds):
@@ -39,6 +44,7 @@ def main():
             msg = clock.recv()
             if msg is None:
                 continue
+            truth.update(msg)
             kind = msg.get_type()
             if kind == "STATUSTEXT":
                 print(f"  [fc] {msg.text}")
@@ -46,7 +52,7 @@ def main():
                 state["tilt"] = max(state["tilt"], math.degrees(max(abs(msg.roll), abs(msg.pitch))))
             elif kind == "LOCAL_POSITION_NED":
                 last = msg
-                state["local"] = msg
+                state["local"] = truth.position(msg)
             elif kind == "EKF_STATUS_REPORT":
                 state["ekf_flags"] = msg.flags
             elif kind == "COMMAND_ACK":

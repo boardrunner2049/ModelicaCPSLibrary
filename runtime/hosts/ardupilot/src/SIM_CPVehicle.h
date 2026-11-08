@@ -61,11 +61,13 @@ public:
 
 private:
     void start();
+    void read_model_sensors();
     void fail(const char *what, cpv_status_t status) const;
 
     static constexpr uint8_t max_channels = 32;  // sitl_input.servos
     cpv_vehicle_t *vehicle;
     bool started;
+    bool model_mag = false, model_gnss = false, model_baro = false;  // the model has these sensors
     uint64_t start_time_us;
     size_t channel_count;
     int8_t channel_source[max_channels];  // SITL servo index per FMU pwm element, -1: none

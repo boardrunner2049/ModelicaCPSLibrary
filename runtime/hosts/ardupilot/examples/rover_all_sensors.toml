@@ -1,0 +1,62 @@
+# A rover whose autopilot reads only the model's sensors: a noisy IMU (I2),
+# a sampled magnetometer (M1), barometer (B1) and GNSS receiver (G1, 5 Hz,
+# one epoch of latency). Illustrative parameters, not a calibrated device.
+#   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/rover_all_sensors.toml --mission
+[sitl]
+speedup = 1
+
+[physics]
+schema_version = 3
+vehicle = "rover"
+model_name = "RoverAllSensors"
+
+[physics.plant]
+imuPosition_b = [0.08, 0.0, -0.03]
+gnssPosition_b = [-0.1, 0.0, -0.12]
+
+[physics.models.imu]
+model = "errors"
+[physics.imu]
+samplePeriod = 0.0025
+latencySamples = 1
+adcDecimation = 4
+fullScale = [156.9064, 156.9064, 156.9064, 34.9066, 34.9066, 34.9066]
+quantum = [0.0048, 0.0048, 0.0048, 0.0011, 0.0011, 0.0011]
+digitalTau = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002]
+analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+seed = 7
+streamId = 1
+noiseStd = [0.05, 0.05, 0.05, 0.005, 0.005, 0.005]
+biasStd = [0.02, 0.02, 0.02, 0.001, 0.001, 0.001]
+biasTau = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+
+[physics.models.magnetometer]
+model = "sampled"            # ideal (M0) | sampled (M1)
+[physics.magnetometer]
+samplePeriod = 0.01
+seed = 7
+noiseStd = [3e-7, 3e-7, 3e-7]          # T (3 mG)
+biasStd = [2e-7, 2e-7, 2e-7]
+quantum = [1.5e-7, 1.5e-7, 1.5e-7]     # T (1.5 mG)
+softIron = [[1.02, 0.01, 0.0], [0.01, 0.98, 0.0], [0.0, 0.0, 1.0]]
+
+[physics.models.barometer]
+model = "sampled"            # ideal (B0) | sampled (B1)
+[physics.barometer]
+samplePeriod = 0.02
+seed = 7
+pressureNoiseStd = 1.5                 # Pa (~0.13 m)
+pressureDriftStd = 3.0
+pressureDriftTau = 300.0
+pressureQuantum = 0.25
+temperatureNoiseStd = 0.05
+
+[physics.models.gnss]
+model = "statistical"        # ideal (G0) | statistical (G1)
+[physics.gnss]
+samplePeriod = 0.2
+latencySamples = 1
+seed = 7
+noiseFactor = [[0.3, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.3, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.6, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.05, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.05, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.1]]
+biasFactor = [[0.2, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.2, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.4, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+biasTau = [60.0, 60.0, 60.0, 10.0, 10.0, 10.0]

@@ -6,6 +6,7 @@ pub mod composition;
 pub mod config;
 pub mod imu;
 pub mod lower;
+pub mod sensors;
 pub mod vehicle;
 
 pub type Result<T> = std::result::Result<T, String>;

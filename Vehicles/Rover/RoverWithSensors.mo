@@ -7,7 +7,8 @@ model RoverWithSensors "Rover with the default ideal sensor suite; no protocol/f
   parameter Real R_bMag[3, 3] = identity(3) "Magnetometer frame to body";
   parameter Real gnssPosition_b[3](each unit = "m") = zeros(3) "Antenna, from the CG";
   parameter Real barometerPosition_b[3](each unit = "m") = zeros(3) "From the CG";
-  input Real magneticField_w[3](each unit = "T") = {0, 20e-6, 45e-6};
+  input Real magneticField_w[3](each unit = "T") = {20.07e-6, -1.52e-6, 48.24e-6}
+    "Earth field at the local origin, NED (WMM at the default origin, West Lafayette)";
   input Real pressure(unit = "Pa") = 101325 "Ambient pressure";
   input Real temperature(unit = "K") = 288.15;
   Systems.Sensing.SensorSuite sensors(rImu_b = imuPosition_b, R_bImu = R_bImu, R_bMag = R_bMag,

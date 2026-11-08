@@ -140,6 +140,14 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     let mut components = Vec::new();
     let (base, modifiers, command) = if vio {
         physical.insert(0, Modifier::Bind("geometry".into(), reference("geometry")));
+        physical.push(Modifier::Bind(
+            "magneticField_w".into(),
+            Value::Array(
+                ["north", "east", "down"]
+                    .map(|axis| reference(&format!("earth_field_{axis}_T")))
+                    .to_vec(),
+            ),
+        ));
         physical.push(Modifier::Bind("pressure".into(), Value::Real(101325.0)));
         physical.push(Modifier::Bind("temperature".into(), Value::Real(288.15)));
         // Vehicle interface external_wrench_v1: the host's wrench at the CG, body FRD.
@@ -183,7 +191,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             (
                 "magneticField_w",
                 "Modelica.Units.SI.MagneticFluxDensity",
-                vec![0., 20e-6, 45e-6],
+                vec![20.07e-6, -1.52e-6, 48.24e-6],
             ),
             ("pressure", "Modelica.Units.SI.Pressure", vec![101325.]),
             ("temperature", "Modelica.Units.SI.Temperature", vec![288.15]),
@@ -502,10 +510,16 @@ pub(crate) fn sensor_components(
 
 /// `sensors(...)` plant modifier for the selected IMU, or None for the default ideal suite.
 pub(crate) fn sensor_modifiers(c: &ResolvedFireConfig) -> Result<Option<Modifier>> {
-    if c.imu_model() == "ideal" && c.imu.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(Modifier::Nested("sensors".into(), imu_modifiers(c)?)))
+    let mut sensors = if c.imu_model() == "ideal" && c.imu.is_empty() {
+        Vec::new()
+    } else {
+        imu_modifiers(c)?
+    };
+    sensors.extend(crate::sensors::modifiers(
+        &c.models,
+        [&c.magnetometer, &c.barometer, &c.gnss],
+    )?);
+    Ok((!sensors.is_empty()).then(|| Modifier::Nested("sensors".into(), sensors)))
 }
 
 fn imu_modifiers(c: &ResolvedFireConfig) -> Result<Vec<Modifier>> {

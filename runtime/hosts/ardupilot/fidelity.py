@@ -13,6 +13,13 @@ The airframe is configs/KIND.toml. Only PART changes with LEVEL:
               three-phase PM motor with averaged commutation, P4 the same with
               a switching inverter: ESC, motor, power and rotor inertia of
               configs/quad_pN.toml. Multirotors only.
+  magnetometer, barometer, gnss
+              M0/B0/G0 ideal (the airframe's own), M1/B1/G1 sampled with noise,
+              drift and latency: the parameters of
+              runtime/hosts/ardupilot/examples/rover_all_sensors.toml.
+  drive, steering (rover), servos (fixed-wing)
+              D0/S0 the plant's first-order models, D1 DC motor with winding
+              inductance, S1 rate-limited servos (library default parameters).
 
 Parameters are the library's illustrative ones, not hardware calibration.
 The levels and their parameters are tools/vehicle_builder/parts.py's.
@@ -27,6 +34,12 @@ PARTS = {
     # part: (level prefix, levels, airframes)
     "imu": ("i", range(4), ("quad", "rover", "plane")),
     "propulsion": ("p", range(5), ("quad",)),
+    "magnetometer": ("m", range(2), ("quad", "rover", "plane")),
+    "barometer": ("b", range(2), ("quad", "rover", "plane")),
+    "gnss": ("g", range(2), ("quad", "rover", "plane")),
+    "drive": ("d", range(2), ("rover",)),
+    "steering": ("s", range(2), ("rover",)),
+    "servos": ("s", range(2), ("plane",)),
 }
 
 

@@ -60,13 +60,31 @@ case $KIND in
   fixed_wing) check=("$here/examples/fly_auto.py" plane) ;;
 esac
 
-work=${RUN_WORK:-$HOME/.cache/cpvehicle-run/$NAME}
+# One directory per instance: parallel runs of one vehicle keep their own EEPROM and logs.
+suffix=; [[ $instance == 0 ]] || suffix=-$instance
+work=${RUN_WORK:-$HOME/.cache/cpvehicle-run/$NAME$suffix}
 mkdir -p "$work" && cd "$work"
 "$ap/build/sitl/bin/$AUTOPILOT" --model "cpvehicle:$NAME" --defaults "$PARAMETERS" \
   --home "$HOME_LOCATION" --speedup "$speedup" -I"$instance" -w > sitl.log 2>&1 &
 sitl=$!
 pids=($sitl)
-trap 'kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null' EXIT
+# SITL can ignore SIGTERM while blocked on its MAVLink socket: escalate.
+# Keeps the script's exit status (the mission check's in --headless).
+cleanup() {
+  local status=$?
+  set +e
+  kill "${pids[@]}" 2>/dev/null
+  for _ in $(seq 20); do
+    local alive=
+    for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && alive=1; done
+    [[ -z $alive ]] && break
+    sleep 0.1
+  done
+  kill -9 "${pids[@]}" 2>/dev/null
+  wait 2>/dev/null
+  exit $status
+}
+trap cleanup EXIT
 sleep 2
 kill -0 $sitl 2>/dev/null || { cat sitl.log; exit 1; }
 grep -m1 'cpvehicle:' sitl.log

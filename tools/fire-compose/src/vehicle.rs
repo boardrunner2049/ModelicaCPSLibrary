@@ -44,6 +44,23 @@ pub struct Kind {
     records: &'static [(&'static str, &'static [&'static str])],
     /// [initial] keys and the modifier each sets: (key, target, shape, on the plant).
     initial: &'static [(&'static str, &'static str, Shape, bool)],
+    /// Actuator fidelity: `[models] KEY = "<model>"` sets the plant's level parameter.
+    pub actuators: &'static [Actuator],
+}
+
+/// One actuator's fidelity levels, selected with `[models] key = "<model>"`.
+pub struct Actuator {
+    pub key: &'static str,
+    /// Integer plant parameter holding the level.
+    pub parameter: &'static str,
+    /// (model, level, description, the [plant] parameters it adds), in level
+    /// order; the first is the default.
+    pub levels: &'static [(
+        &'static str,
+        &'static str,
+        &'static str,
+        &'static [&'static str],
+    )],
 }
 
 const MOUNTS: [(&str, Shape); 5] = [
@@ -82,8 +99,13 @@ pub const ROVER: Kind = Kind {
         ("rollingResistance", Shape::Nonnegative),
         ("maxSteerAngle", Shape::Positive),
         ("steeringTimeConstant", Shape::Positive),
+        ("maxSteerRate", Shape::Positive),
+        ("steeringDeadband", Shape::Nonnegative),
         ("motorStallTorque", Shape::Nonnegative),
         ("motorNoLoadSpeed", Shape::Positive),
+        ("supplyVoltage", Shape::Positive),
+        ("gearRatio", Shape::Positive),
+        ("motorInductance", Shape::Positive),
         ("wheelInertia", Shape::Positive),
         ("dragArea", Shape::Nonnegative),
         ("airDensity", Shape::Nonnegative),
@@ -91,6 +113,39 @@ pub const ROVER: Kind = Kind {
     ],
     records: &[],
     initial: &[("q_start", "q_start", Shape::Quaternion, true)],
+    actuators: &[
+        Actuator {
+            key: "drive",
+            parameter: "driveModel",
+            levels: &[
+                (
+                    "steady_state",
+                    "D0",
+                    "DC motor torque-speed line, no electrical dynamics",
+                    &[],
+                ),
+                (
+                    "dc_motor",
+                    "D1",
+                    "DC motor with winding inductance and gearing; same steady state as D0",
+                    &["supplyVoltage", "gearRatio", "motorInductance"],
+                ),
+            ],
+        },
+        Actuator {
+            key: "steering",
+            parameter: "steeringModel",
+            levels: &[
+                ("first_order", "S0", "first-order steering servo", &[]),
+                (
+                    "rate_limited",
+                    "S1",
+                    "first-order servo with a rate limit and deadband",
+                    &["maxSteerRate", "steeringDeadband"],
+                ),
+            ],
+        },
+    ],
 };
 
 pub const FIXED_WING: Kind = Kind {
@@ -108,6 +163,8 @@ pub const FIXED_WING: Kind = Kind {
         ("maxElevator", Shape::Positive),
         ("maxRudder", Shape::Positive),
         ("servoTimeConstant", Shape::Positive),
+        ("maxServoRate", Shape::Positive),
+        ("servoDeadband", Shape::Nonnegative),
         ("maxThrust", Shape::Nonnegative),
         ("propellerPitchSpeed", Shape::Positive),
         ("motorTimeConstant", Shape::Positive),
@@ -170,6 +227,24 @@ pub const FIXED_WING: Kind = Kind {
         ("speed", "start_speed_mps", Shape::Nonnegative, false),
         ("q_start", "q_start", Shape::Quaternion, true),
     ],
+    actuators: &[Actuator {
+        key: "servos",
+        parameter: "servoModel",
+        levels: &[
+            (
+                "first_order",
+                "S0",
+                "first-order control-surface servos",
+                &[],
+            ),
+            (
+                "rate_limited",
+                "S1",
+                "first-order servos with a rate limit and deadband",
+                &["maxServoRate", "servoDeadband"],
+            ),
+        ],
+    }],
 };
 
 pub const KINDS: [&Kind; 2] = [&ROVER, &FIXED_WING];
@@ -208,6 +283,14 @@ impl Kind {
             "records": self.records.iter()
                 .map(|(name, fields)| (name.to_string(), serde_json::json!(fields)))
                 .collect::<serde_json::Map<_, _>>(),
+            "actuators": self.actuators.iter()
+                .map(|a| serde_json::json!({
+                    "key": a.key,
+                    "levels": a.levels.iter()
+                        .map(|(model, level, about, parameters)| serde_json::json!({"model": model, "level": level, "description": about, "parameters": parameters}))
+                        .collect::<Vec<_>>(),
+                }))
+                .collect::<Vec<_>>(),
             "initial": self.initial.iter()
                 .map(|(key, _, shape, _)| serde_json::json!({"name": key, "shape": shape.name()}))
                 .collect::<Vec<_>>(),
@@ -272,7 +355,9 @@ fn resolve_initial(raw: &Toml, kind: &Kind) -> Result<Table> {
 }
 
 fn resolve_models(raw: &Toml, kind: &Kind) -> Result<Table> {
-    let t = table(raw, &["imu", "magnetometer", "gnss", "barometer"], "models").map_err(|e| {
+    let mut allowed = vec!["imu", "magnetometer", "gnss", "barometer"];
+    allowed.extend(kind.actuators.iter().map(|a| a.key));
+    let t = table(raw, &allowed, "models").map_err(|e| {
         format!(
             "{e} (a {} has no esc/motor/rotor selection; its drive is part of the plant, set in [plant])",
             kind.name
@@ -282,9 +367,22 @@ fn resolve_models(raw: &Toml, kind: &Kind) -> Result<Table> {
     if let Some(raw) = t.get("imu") {
         out.insert("imu".into(), Toml::Table(crate::imu::selection(raw)?));
     }
-    for key in ["magnetometer", "gnss", "barometer"] {
-        if let Some(raw) = t.get(key) {
-            crate::config::ideal_sensor(raw, key)?;
+    crate::sensors::select_all(t, &mut out)?;
+    for actuator in kind.actuators {
+        if let Some(value) = t.get(actuator.key) {
+            let name = value.as_str().unwrap_or("");
+            if !actuator.levels.iter().any(|(model, ..)| *model == name) {
+                return Err(format!(
+                    "models.{} must be {}",
+                    actuator.key,
+                    actuator
+                        .levels
+                        .iter()
+                        .map(|(model, level, ..)| format!("\"{model}\" ({level})"))
+                        .collect::<Vec<_>>()
+                        .join(" or ")
+                ));
+            }
         }
     }
     Ok(out)
@@ -305,6 +403,9 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
             "interface",
             "models",
             "imu",
+            "magnetometer",
+            "barometer",
+            "gnss",
             "vulnerabilities",
         ],
         "config",
@@ -315,6 +416,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
         )
     })?;
     let models = resolve_models(&section(root, "models"), kind)?;
+    let [magnetometer, barometer, gnss] = crate::sensors::resolve_all(root, &models)?;
     Ok(ResolvedFireConfig {
         schema_version: 3,
         acquisition: crate::config::acquisition(root)?,
@@ -336,6 +438,9 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
             false,
         )?,
         imu: crate::imu::resolve(&section(root, "imu"), &models)?,
+        magnetometer: magnetometer.clone(),
+        barometer: barometer.clone(),
+        gnss: gnss.clone(),
         acoustic: crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?,
         models,
         plant: resolve_plant(&section(root, "plant"), kind)?,
@@ -370,6 +475,21 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             ),
             _ => Modifier::Bind(key.clone(), literal(value)?),
         });
+    }
+    for actuator in kind.actuators {
+        if let Some(name) = c.models.get(actuator.key).and_then(Toml::as_str) {
+            let level = actuator
+                .levels
+                .iter()
+                .position(|(m, ..)| *m == name)
+                .unwrap();
+            if level > 0 {
+                plant.push(Modifier::Bind(
+                    actuator.parameter.into(),
+                    crate::composition::Value::Integer(level as i64),
+                ));
+            }
+        }
     }
     for (key, value) in &c.initial {
         let (_, target, _, on_plant) = kind.initial.iter().find(|(k, ..)| k == key).unwrap();
@@ -549,9 +669,10 @@ analogTau = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
                 "pwm_max must exceed pwm_min",
             ),
             (
-                "[models.gnss]\nmodel = \"statistical\"",
-                "only the ideal model",
+                "[models.gnss]\nmodel = \"rtk\"",
+                "models.gnss.model must be",
             ),
+            ("[gnss]\nnoiseFactor = [[1.0]]", "gnss model \"ideal\""),
         ] {
             let error = crate::config::parse(&format!(
                 "schema_version = 3\nvehicle = \"fixed_wing\"\n{body}\n"

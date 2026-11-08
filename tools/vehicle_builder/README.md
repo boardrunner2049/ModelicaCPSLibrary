@@ -14,8 +14,9 @@ Standard library only. The page shows, per airframe (quad, rover, plane):
 |---|---|---|
 | Airframe / plant | the airframe of `configs/quad.toml`, `rover.toml`, `plane.toml` | multirotor geometry, mass, rotor, landing gear; every rover/plane plant parameter and aero coefficient, with its Modelica default and description |
 | Propulsion (multirotor) | P0 first-order speed, P1 voltage first-order, P2 DC motor, P3 three-phase averaged, P4 three-phase switching | the level's motor, ESC and supply, starting from `configs/quad_pN.toml` |
+| Drive, steering (rover); control-surface servos (plane) | D0 steady-state / D1 DC motor; S0 first-order / S1 rate-limited | the level's plant parameters, with Modelica defaults |
 | IMU | I0 ideal, I1 digital, I2 errors, I3 electromechanical | every `[imu]` key the level accepts, starting from `configs/quad_iN.toml`; mount (rover/plane) |
-| GNSS, magnetometer, barometer | ideal (the only level that composes in a vehicle) | mounts (rover/plane) |
+| Magnetometer, barometer, GNSS | M0/B0/G0 ideal; M1/B1 sampled, G1 statistical | every key the level accepts, the sampled ones starting from `runtime/hosts/ardupilot/examples/rover_all_sensors.toml`; mounts (rover/plane) |
 
 Each level says how fast it runs in SITL; the slow ones (I3, P3, P4) are marked.
 Every edit is composed and checked by `fire-compose validate`; the run file
@@ -37,8 +38,9 @@ cross-origin POSTs.
 Nothing is restated here (`parts.py`):
 
 - `fire-compose catalog`: vehicle kinds and their configurable parameters,
-  the IMU models and the keys each accepts, the propulsion levels (ESC and
-  motor pairs). The composer's own tables, so the builder offers exactly what
+  the IMU, magnetometer, barometer and GNSS levels and the keys each
+  accepts, the propulsion levels (ESC and motor pairs) and the rover/plane
+  actuator levels. The composer's own tables, so the builder offers exactly what
   it accepts.
 - The Modelica plant classes: parameter defaults and descriptions.
 - `configs/`: the airframes and each level's example parameters

@@ -5,6 +5,7 @@ model Rover "Ackermann rover, vehicle interface v1: pwm[1] steering, pwm[3] thro
   extends VehicleInterface.PwmActuation(final nPwm = 4, pwm_min = 1000, pwm_max = 2000,
     pwm(each start = 1500));
   Vehicles.Rover.RoverWithSensors plant(
+    magneticField_w = {earth_field_north_T, earth_field_east_T, earth_field_down_T},
     steeringCommand = 2 * commands.normalizedCommand[1] - 1,
     throttleCommand = 2 * commands.normalizedCommand[3] - 1,
     externalForce_b = external_force_frd,

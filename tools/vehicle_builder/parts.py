@@ -56,12 +56,11 @@ IMU_ABOUT = {
     "errors": "digital, plus noise, bias drift, scale, misalignment and temperature",
     "electromechanical": "MEMS gyro and accelerometer resonator dynamics behind the ADC",
 }
-SENSOR_ABOUT = {
-    "gnss": "G0 ideal antenna position and velocity (G1 statistical: blocked by a Rumoca "
-            "discrete-loop bug inside vehicles; G2 needs satellite inputs)",
-    "magnetometer": "ideal mounted field (one level in the library)",
-    "barometer": "ideal pressure, temperature and altitude (one level in the library)",
-}
+# Example parameters of the sampled sensor levels (M1, B1, G1).
+SENSOR_EXAMPLE = ROOT / "runtime" / "hosts" / "ardupilot" / "examples" / "rover_all_sensors.toml"
+SENSOR_TITLE = {"gnss": "GNSS", "magnetometer": "Magnetometer", "barometer": "Barometer"}
+ACTUATOR_TITLE = {"drive": "Drive motor", "steering": "Steering servo",
+                  "servos": "Control-surface servos"}
 SENSOR_MOUNTS = {
     "imu": ["imuPosition_b", "R_bImu"],
     "gnss": ["gnssPosition_b"],
@@ -185,7 +184,10 @@ def catalog() -> dict:
                 return {"path": path, "value": "" if cur is None else literal(cur),
                         "default": default, "description": desc}
 
-            airframe = [field(["plant", p["name"]], p["name"]) for p in spec["plant_parameters"]]
+            actuator_parameters = {name for a in spec.get("actuators", [])
+                                   for level in a["levels"] for name in level["parameters"]}
+            airframe = [field(["plant", p["name"]], p["name"]) for p in spec["plant_parameters"]
+                        if p["name"] not in actuator_parameters]
             for record, fields in spec["records"].items():
                 rec = modelica_parameters(RECORD_FILES[record])
                 airframe += [{"path": ["plant", record, f], "value": "",
@@ -202,16 +204,41 @@ def catalog() -> dict:
                               "select": {}, "fields": airframe}]}]
         if kind == "multirotor":
             parts.append(propulsion_part(cc, doc))
+        else:
+            parts += [actuator_part(a, field) for a in spec.get("actuators", [])]
         parts.append(imu_part(cc, mounts.get("imu", [])))
-        for sensor in ("gnss", "magnetometer", "barometer"):
-            parts.append({"id": sensor, "title": sensor.upper() if sensor == "gnss"
-                          else sensor.capitalize(), "levels": [{
-                              "id": "ideal", "label": "ideal", "select": {},
-                              "description": SENSOR_ABOUT[sensor], "fields": []}],
-                          "fields": mounts.get(sensor, [])})
+        parts += [sensor_part(cc, sensor, mounts.get(sensor, []))
+                  for sensor in ("magnetometer", "barometer", "gnss")]
         airframes[name] = {"vehicle": kind, "model_name": doc.get("model_name", ""),
                            "parts": parts}
     return {"airframes": airframes}
+
+
+def actuator_part(actuator: dict, field) -> dict:
+    """A rover/plane actuator: its levels and the plant parameters each adds."""
+    levels = [{"id": l["level"], "label": f"{l['level']} {l['model'].replace('_', ' ')}",
+               "description": l["description"] + ".",
+               "select": {f"models.{actuator['key']}": l["model"]},
+               "fields": [field(["plant", name], name) for name in l["parameters"]]}
+              for l in actuator["levels"]]
+    return {"id": actuator["key"], "title": ACTUATOR_TITLE.get(actuator["key"], actuator["key"]),
+            "levels": levels}
+
+
+def sensor_part(cc: dict, sensor: str, mounts: list[dict]) -> dict:
+    """Magnetometer, barometer or GNSS: levels from the composer, example values
+    of the sampled levels from SENSOR_EXAMPLE."""
+    example = tomllib.loads(SENSOR_EXAMPLE.read_text())["physics"].get(sensor, {})
+    levels = []
+    for spec in cc["models"][sensor]:
+        sampled = spec["model"] != cc["models"][sensor][0]["model"]
+        values = example if sampled else {}
+        fields = [{"path": [sensor, k], "value": literal(values[k]) if k in values else "",
+                   "default": "library default", "description": ""} for k in spec["keys"]]
+        levels.append({"id": spec["level"], "label": f"{spec['level']} {spec['model']}",
+                       "description": spec["description"] + ".",
+                       "select": {f"models.{sensor}.model": spec["model"]}, "fields": fields})
+    return {"id": sensor, "title": SENSOR_TITLE[sensor], "levels": levels, "fields": mounts}
 
 
 def imu_part(cc: dict, mounts: list[dict]) -> dict:
@@ -292,8 +319,23 @@ def run_file_text(run: dict, header: str = "") -> str:
 
 
 def apply_level(doc: dict, part: str, level: int) -> dict:
-    """configs airframe + one part at a level (the levels' example parameters)."""
+    """configs airframe + one part at a level (the levels' example parameters).
+
+    imu (0-3), propulsion (0-4, multirotor), magnetometer/barometer/gnss (0-1),
+    drive/steering (0-1, rover), servos (0-1, fixed-wing).
+    """
     doc = copy.deepcopy(doc)
+    if part in SENSOR_TITLE and level:
+        cc = compose_catalog()
+        doc.setdefault("models", {})[part] = {"model": cc["models"][part][level]["model"]}
+        doc[part] = tomllib.loads(SENSOR_EXAMPLE.read_text())["physics"][part]
+        return doc
+    if part in ACTUATOR_TITLE:
+        cc = compose_catalog()
+        actuator = next(a for a in cc["vehicles"][doc.get("vehicle", "multirotor")].get("actuators", [])
+                        if a["key"] == part)
+        doc.setdefault("models", {})[part] = actuator["levels"][level]["model"]
+        return doc
     if part == "imu" and level:
         src = load_config(f"quad_i{level}")
         doc.setdefault("models", {})["imu"] = src["models"]["imu"]

@@ -3,9 +3,13 @@
 #
 #   runtime/hosts/ardupilot/fidelity.sh PART KIND [LEVEL...]
 #
-#   imu         quad | rover | plane   levels 0-3 (I0 ideal .. I3 electromechanical)
-#   propulsion  quad                   levels 0-4 (P0 first-order speed .. P4 switching
-#                                                  three-phase PM motor)
+#   imu          quad | rover | plane   levels 0-3 (I0 ideal .. I3 electromechanical)
+#   propulsion   quad                   levels 0-4 (P0 first-order speed .. P4 switching
+#                                                   three-phase PM motor)
+#   magnetometer, barometer, gnss
+#                quad | rover | plane   levels 0-1 (ideal, sampled)
+#   drive, steering  rover              levels 0-1 (first-order, DC motor / rate-limited)
+#   servos       plane                  levels 0-1 (first-order, rate-limited)
 #
 # The airframe is configs/KIND.toml; only PART differs (fidelity.py). The run
 # files go to build/fidelity/PART_KIND_LEVEL.toml. Every level flies the vehicle
@@ -21,9 +25,10 @@ kind=${2:?usage: fidelity.sh PART KIND [LEVEL...]}
 shift 2
 levels=("$@")
 if ((${#levels[@]} == 0)); then
-  case $part in imu) levels=(0 1 2 3) ;; propulsion) levels=(0 1 2 3 4) ;; *) levels=(0) ;; esac
+  case $part in imu) levels=(0 1 2 3) ;; propulsion) levels=(0 1 2 3 4) ;; *) levels=(0 1) ;; esac
 fi
-prefix=${part:0:1}
+prefix=$(python3 -c "import sys; sys.path.insert(0, '$here'); import fidelity; print(fidelity.PARTS['$part'][0])" 2>/dev/null) ||
+  { echo "unknown part $part" >&2; exit 2; }
 out=$root/build/fidelity
 mkdir -p "$out"
 

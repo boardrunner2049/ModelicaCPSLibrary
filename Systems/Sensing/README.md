@@ -365,3 +365,19 @@ validation of GNSS/range hardware or proposed flow models is claimed.
   [AFBR](https://github.com/PX4/PX4-Autopilot/blob/ae4fd97df876b5dbb0def67e46c6f0ec7e63213a/src/drivers/distance_sensor/broadcom/afbrs50/AFBRS50.cpp),
   [flow publisher](https://github.com/PX4/PX4-Autopilot/blob/ae4fd97df876b5dbb0def67e46c6f0ec7e63213a/src/drivers/uavcannode/Publishers/FlowMeasurement.hpp)
   and [range publisher](https://github.com/PX4/PX4-Autopilot/blob/ae4fd97df876b5dbb0def67e46c6f0ec7e63213a/src/drivers/uavcannode/Publishers/RangeSensorMeasurement.hpp).
+
+## Magnetometer and barometer levels
+
+| Level | Class | Behaviour |
+|---|---|---|
+| M0 | `Magnetometer.Sensor` | Mounted Earth field plus a hard-iron offset, continuous |
+| M1 | `Magnetometer.SampledSensor` | Sampled (`samplePeriod`, `latencySamples`): `softIron*field + bias`, white noise, Gauss-Markov bias drift, quantization and clipping per axis |
+| B0 | `Barometer.Sensor` | Ambient pressure and temperature at the sensor, continuous |
+| B1 | `Barometer.SampledSensor` | Sampled: pressure white noise, Gauss-Markov drift and quantization, temperature noise and quantization; the reported altitude carries the pressure error as a height error through the local density |
+
+Both are replaceable in `SensorSuite` (`MagnetometerModel`, `BarometerModel`)
+like the IMU and GNSS, and deliver through `SampledDelivery`. With
+`altitudeDependentAtmosphere = true` (default) the suite gives the barometer
+the ISA troposphere (`Worlds.Environment.troposphere`) at its height, from the
+suite's `pressure` and `temperature`, which hold at the local origin.
+Parameters are illustrative.

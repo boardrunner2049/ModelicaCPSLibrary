@@ -11,6 +11,10 @@ Uploads the mission, waits for the EKF to use GPS, arms, flies it in AUTO
 and checks every waypoint, the cross-track error on each leg, attitude
 limits and the final position. Exits nonzero with the reason on the first
 failed check.
+
+Positions are the vehicle's truth (SITL's SIM_STATE) when SITL sends it, so
+the checks hold with the model's own GNSS, barometer and compass, whose
+errors the estimate carries.
 """
 import argparse
 import math
@@ -18,7 +22,7 @@ import sys
 
 from pymavlink import mavutil
 
-from mavclock import AutopilotClock
+from mavclock import AutopilotClock, Truth
 
 MAV = mavutil.mavlink
 EARTH_RADIUS = 6378137.0
@@ -68,6 +72,7 @@ def main():
     print(f"heartbeat from system {m.target_system}")
     m.mav.request_data_stream_send(m.target_system, m.target_component,
                                    MAV.MAV_DATA_STREAM_ALL, 10, 1)
+    truth = Truth(m)
     state = {"attitude": 0.0, "reached": set(), "track": []}
 
     def pump(seconds):
@@ -76,6 +81,7 @@ def main():
             msg = clock.recv()
             if msg is None:
                 continue
+            truth.update(msg)
             kind = msg.get_type()
             if kind == "STATUSTEXT":
                 print(f"  [fc] {msg.text}")
@@ -83,9 +89,9 @@ def main():
                 state["attitude"] = max(state["attitude"],
                                         math.degrees(max(abs(msg.roll), abs(msg.pitch))))
             elif kind == "LOCAL_POSITION_NED":
-                state["local"] = msg
+                pos = state["local"] = truth.position(msg)
                 if state.get("armed"):
-                    state["track"].append((state.get("leg", 0), msg.x, msg.y, -msg.z))
+                    state["track"].append((state.get("leg", 0), pos.x, pos.y, -pos.z))
             elif kind == "GLOBAL_POSITION_INT":
                 state["global"] = msg
             elif kind == "VFR_HUD":

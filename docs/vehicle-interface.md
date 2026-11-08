@@ -35,8 +35,11 @@ conforming models; the checker decides.
 
 ## 1. Status
 
-Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
-`rumoca-bitcode-v1`), the binary `tools/fmi/bin/rumoca`.
+Pinned for this version: Rumoca `7b5f9ffc` (github.com/Arslan8/rumoca,
+`rumoca-bitcode-v1`), the binary `tools/fmi/bin/rumoca`. It needs `e29e5c6e`
+(a sampled sensor inside a vehicle, GNSS G1 among them) and `7b5f9ffc`
+(two same-named functions in one model, e.g. `IMU.normalDraw` with
+`Sensing.normalDraw`).
 
 | Vehicle or host | Designed | Implemented | Tested |
 |---|---|---|---|
@@ -44,7 +47,7 @@ Pinned for this version: Rumoca `e32964fc` (github.com/Arslan8/rumoca,
 | FastDyn `FastDyn.Copter` FMU as built by FastDyn today | yes | legacy profile | checker and runtime conformance (legacy) |
 | FastDyn `Copter`/`Rover`/`Plane` migrated to these partials | yes | no | no |
 | CP Models rover (`Exports.FMU.Rover`) and fixed-wing (`Exports.FMU.FixedWing`) | yes | yes | known-answer tests (§6), ArduRover and ArduPlane SITL missions |
-| Vehicle configuration in TOML (§4): multirotor, rover, fixed-wing; IMU I0–I3 | yes | yes | composer tests; `configs/rover.toml`, `configs/plane.toml` bit-identical to the exports; `configs/rover_i2.toml` (I2 IMU) through conformance and an ArduRover mission |
+| Vehicle configuration in TOML (§4): multirotor, rover, fixed-wing; IMU I0–I3, magnetometer M0/M1, barometer B0/B1, GNSS G0/G1, rover drive D0/D1 and steering S0/S1, plane servos S0/S1 | yes | yes | composer tests; `configs/rover.toml`, `configs/plane.toml` bit-identical to the exports; `configs/rover_i2.toml` (I2 IMU) through conformance and an ArduRover mission |
 | FastDyn host adapter (planned as a device model) | yes | no | no |
 | ArduPilot SITL host (`runtime/hosts/ardupilot`, upstream ArduPilot pinned as a submodule) | prototype | prototype on ArduPilot `Copter-4.6.2` | in two launches each: ArduCopter flies the quad through a guided mission (takeoff, hold, 20 m waypoint, land); ArduRover drives the rover around a 20 m AUTO square; ArduPlane takes the fixed-wing off a runway, around a 50 m circuit and lands it in AUTO |
 | PX4 SITL, Gazebo, Isaac Sim hosts | design targets | no | no |
@@ -129,9 +132,14 @@ Physical truth, never a measurement.
 
 ### `magnetometer_v1`
 
-| Field | Shape | Unit | Frame |
-|---|---|---|---|
-| `mag` | `[3]` | Gauss (1 G = 1e-4 T) | body FRD |
+| Field | Shape | Unit | Frame | Required |
+|---|---|---|---|---|
+| `mag` | `[3]` | Gauss (1 G = 1e-4 T) | body FRD | yes |
+| `earth_field_north_T`, `earth_field_east_T`, `earth_field_down_T` | parameters | T | NED | no |
+
+The Earth field parameters let a host make the model's field its own (the
+ArduPilot host sets them from the autopilot's World Magnetic Model at home,
+so the model's compass and the autopilot's declination agree).
 
 ### `gnss_v1`
 
@@ -222,7 +230,13 @@ Every kind takes `[interface]` (`pwm_min`, `pwm_max`, `lat0`, `lon0`,
 `ground_alt_wgs84`, `earth_radius_m`) and the sensor selection:
 `[models.imu] model = "ideal" | "digital" | "errors" | "electromechanical"`
 (I0–I3, parameters in `[imu]`, see `Systems/Sensing/IMU/README.md`);
-magnetometer, GNSS and barometer are ideal (`[models.gnss] model = "ideal"`);
+`[models.magnetometer] model = "ideal" | "sampled"` (M0/M1),
+`[models.barometer] model = "ideal" | "sampled"` (B0/B1) and
+`[models.gnss] model = "ideal" | "statistical"` (G0/G1), each with its
+parameters in `[magnetometer]`, `[barometer]`, `[gnss]`; a rover also takes
+`[models] drive = "steady_state" | "dc_motor"` and
+`steering = "first_order" | "rate_limited"`, a fixed-wing
+`servos = "first_order" | "rate_limited"`;
 `[vulnerabilities.acoustic]` as for a multirotor. A rover or fixed-wing
 configuration lists only what it changes and everything else keeps its
 Modelica default, so `configs/rover.toml` and `configs/plane.toml` compose the
@@ -448,12 +462,11 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   aileron/elevator/throttle/rudder plane; remap outputs in the firmware, e.g.
   ArduPilot `SERVOn_FUNCTION`) and their drives are fixed plant equations;
   skid-steer, elevon and V-tail variants are not modelled.
-- Sensor selection covers the IMU (I0–I3). GNSS G1/G2
-  (`GNSS.StatisticalSensor`, `ObservableSensor`) and the range sensor exist in
-  the library but are not selectable: G1 inside a vehicle model fails to
-  compile with the pinned Rumoca ("same-tick discrete producers form an
-  algebraic loop" in `SampledDelivery`; it compiles standalone, e.g.
-  `Tests.GnssStatistical`), and a range sensor needs a contract capability. Their parameters are representative (the plane's aerodynamics are
+- GNSS G2 (`GNSS.ObservableSensor`, needs satellite-state inputs) and the
+  range sensor are in the library but not selectable in a vehicle; a range
+  sensor needs a contract capability. The fixed-wing propeller has one level
+  (thrust lag); the multirotor rotor one (quadratic blade). Sensor and
+  actuator parameters are illustrative, not identified devices. Their parameters are representative (the plane's aerodynamics are
   the published last_letter Skywalker 2013 coefficients), not identified from
   a real vehicle; mass, inertia, tyre and gear values are estimates.
 - `Wheels.CompliantWheel`, `Airframe.StabilityDerivatives` and the two plants
@@ -471,10 +484,10 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   that must keep real time cannot use it. Multirotor propulsion P3/P4
   (three-phase PM motor, averaged or switching inverter) run at ~0.01x and
   below 0.001x with the motors running; P0-P2 at ~12x.
-- The plants' default Earth magnetic field input,
-  `magneticField_w = {0, 20e-6, 45e-6}` T in NED, has no north component; a
-  host that feeds the model's magnetometer to a compass-using autopilot would
-  see headings about 90 degrees off. The ArduPilot host uses SITL's compass.
+- The Earth field is one constant vector over the local area (default: the
+  World Magnetic Model at the default origin, set by a host through
+  `earth_field_north_T`, `_east_T`, `_down_T`); the atmosphere is the ISA
+  troposphere from the pressure and temperature at the origin.
 - Contact coupling, wind and other environment inputs beyond the external
   wrench are future capabilities.
 - Linking models (`CPV_MODELS`) needs GNU binutils (`ld -r`, `objcopy`) and is

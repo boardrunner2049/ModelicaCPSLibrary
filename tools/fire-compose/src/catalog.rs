@@ -2,7 +2,7 @@
 //! configurable parameters, and the models available for each part. Frontends
 //! (tools/vehicle_builder) read it with `fire-compose catalog`, so they offer
 //! exactly what the composer accepts.
-use crate::{config, imu, vehicle};
+use crate::{config, imu, sensors, vehicle};
 use serde_json::{json, Value};
 
 pub fn catalog() -> Value {
@@ -38,11 +38,22 @@ pub fn catalog() -> Value {
             "imu": imu,
             "propulsion": propulsion,
             "rotor": config::ROTORS,
-            "gnss": ["ideal"],
-            "magnetometer": ["ideal"],
-            "barometer": ["ideal"],
+            "magnetometer": sensor_levels(&sensors::MAGNETOMETER),
+            "barometer": sensor_levels(&sensors::BAROMETER),
+            "gnss": sensor_levels(&sensors::GNSS),
         },
     })
+}
+
+fn sensor_levels(sensor: &sensors::Sensor) -> Vec<Value> {
+    sensor
+        .levels
+        .iter()
+        .map(|l| {
+            json!({"level": l.level, "model": l.model, "description": l.description,
+                   "keys": sensor.keys(l.model)})
+        })
+        .collect()
 }
 
 #[cfg(test)]
