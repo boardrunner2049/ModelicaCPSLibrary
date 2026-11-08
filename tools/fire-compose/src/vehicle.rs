@@ -174,6 +174,47 @@ pub const FIXED_WING: Kind = Kind {
 
 pub const KINDS: [&Kind; 2] = [&ROVER, &FIXED_WING];
 
+impl Shape {
+    fn name(self) -> &'static str {
+        match self {
+            Shape::Real => "real",
+            Shape::Positive => "positive",
+            Shape::Nonnegative => "nonnegative",
+            Shape::Vec3 => "vec3",
+            Shape::Rotation => "rotation",
+            Shape::Inertia => "inertia",
+            Shape::Quaternion => "quaternion",
+        }
+    }
+}
+
+impl Kind {
+    /// The configurable surface of this kind, for `fire-compose catalog`.
+    pub fn describe(&self) -> serde_json::Value {
+        let mounts: Vec<&str> = MOUNTS.iter().map(|m| m.0).collect();
+        serde_json::json!({
+            "export": self.export,
+            "plant": self.plant,
+            "default_model_name": self.default_model_name,
+            "pwm": [self.pwm.0, self.pwm.1],
+            "parts": ["airframe", "imu", "gnss", "magnetometer", "barometer"],
+            "plant_parameters": self.parameters.iter()
+                .filter(|p| !mounts.contains(&p.0))
+                .map(|(name, shape)| serde_json::json!({"name": name, "shape": shape.name()}))
+                .collect::<Vec<_>>(),
+            "mounts": MOUNTS.iter()
+                .map(|(name, shape)| serde_json::json!({"name": name, "shape": shape.name()}))
+                .collect::<Vec<_>>(),
+            "records": self.records.iter()
+                .map(|(name, fields)| (name.to_string(), serde_json::json!(fields)))
+                .collect::<serde_json::Map<_, _>>(),
+            "initial": self.initial.iter()
+                .map(|(key, _, shape, _)| serde_json::json!({"name": key, "shape": shape.name()}))
+                .collect::<Vec<_>>(),
+        })
+    }
+}
+
 pub fn kind(name: &str) -> Result<&'static Kind> {
     KINDS
         .into_iter()

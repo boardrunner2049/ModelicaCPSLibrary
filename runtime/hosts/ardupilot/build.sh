@@ -52,7 +52,7 @@ for target in "${vehicles[@]}"; do
   python3 tools/vehicle_interface/build_vehicle_fmu.py "$CONFIG" "$out/$NAME.fmu" --if-changed \
     ${TABLE:+--table "$TABLE"} > /dev/null
   (cd tools/vehicle_interface && python3 -m cp_vehicle_interface prepare "$out/$NAME.fmu" "$out/$NAME" \
-     --shim "$NAME" --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1 | head -1)
+     --shim "$NAME" --require pwm_actuation_v1 --require kinematic_state_v1 --require imu_v1 | sed -n 1p)
 done
 models=("$out"/*/shim)
 echo "== linked: $(for m in "${models[@]}"; do basename "$(dirname "$m")"; done | tr '\n' ' ')"

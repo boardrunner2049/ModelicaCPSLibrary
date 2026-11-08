@@ -1,6 +1,7 @@
 //! FIRE configuration frontend. Modelica semantics remain owned by the compiler.
 pub mod acoustic;
 pub mod artifact;
+pub mod catalog;
 pub mod composition;
 pub mod config;
 pub mod imu;

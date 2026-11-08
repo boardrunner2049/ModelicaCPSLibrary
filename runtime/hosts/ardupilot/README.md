@@ -14,8 +14,8 @@ here:
 |---|---|
 | `src/SIM_CPVehicle.{cpp,h}` | the SITL model: maps SITL servos, time and home to the vehicle interface and its outputs back to SITL |
 | `hooks.patch` | the three edits ArduPilot needs to know the model: an entry in SITL's model table, the waf option `--cpvehicle=PATH`, and the link flags (22 lines) |
-| `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check) |
-| `imu_fidelity.sh` | one airframe flown at each IMU fidelity (I0-I3), all at once |
+| `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check); pick the parts in the browser with `tools/vehicle_builder` |
+| `fidelity.sh`, `fidelity.py` | one airframe flown with one part (IMU, propulsion) at each fidelity level, all at once |
 | `build.sh`, `runspec.py` | vehicles to SITL binaries; resolving a vehicle name or TOML |
 | `examples/` | run files (`*.toml`), parameter files, mission checks (`fly_mission.py`, `fly_auto.py`, on the autopilot's clock: `mavclock.py`) |
 
@@ -81,22 +81,30 @@ IMU, GNSS antenna on the tail); each flies its mission check.
 
 Speed: I0 runs at 14-70x real time, I1/I2 at 3-9x, I3 at 0.04-0.1x (it
 integrates the MEMS resonators), so I3 cannot run SITL in real time; `run.sh`
-reports the measured rate. SITL then runs at the model's rate and the autopilot
+reports the rate it measures with every PWM channel at 1500 µs (motors running;
+at rest a model can be much faster). SITL then runs at the model's rate and the autopilot
 sees nothing different: the mission checks time out on the autopilot's clock,
 so an I3 vehicle flies the same checks, only slower. The FastDyn host reads all
 of the model's sensors.
 
-### IMU fidelity sweep
+### Fidelity sweeps
 
 ```sh
-runtime/hosts/ardupilot/imu_fidelity.sh rover          # quad | rover | plane; levels 0 1 2 3 by default
-runtime/hosts/ardupilot/imu_fidelity.sh quad 0 1 2     # skip I3 (the quad's I3 flight takes ~35 min)
+runtime/hosts/ardupilot/fidelity.sh imu rover            # quad | rover | plane; levels 0 1 2 3 by default
+runtime/hosts/ardupilot/fidelity.sh imu quad 0 1 2       # skip I3 (the quad's I3 flight takes ~35 min)
+runtime/hosts/ardupilot/fidelity.sh propulsion quad 0 1 2
 ```
 
-The airframe is `configs/KIND.toml`; level N adds the IMU of
-`configs/quad_iN.toml`, the same parameters for every airframe, so only the IMU
-differs. The run files go to `build/imu-fidelity/imu_KIND_iN.toml`. Measured
-(ArduPilot 4.6.2; I0-I2 at `--speedup 2`, I3 at its own rate):
+The airframe is `configs/KIND.toml`; only the part differs. IMU level N takes
+the IMU of `configs/quad_iN.toml` (the same for every airframe), propulsion
+level N the ESC, motor and supply of `configs/quad_pN.toml`. The run files go
+to `build/fidelity/PART_KIND_LEVEL.toml`. Each level flies on its own SITL
+instance. The other parts have one level in a vehicle so far (GNSS,
+magnetometer, barometer: ideal; rotor: quadratic blade; rover and plane drive
+and servos: first-order models in the plant).
+
+IMU, measured (ArduPilot 4.6.2; I0-I2 at `--speedup 2`, I3 at its own rate;
+model rates at rest):
 
 | | I0 ideal | I1 digital | I2 errors | I3 electromechanical |
 |---|---|---|---|---|
@@ -108,6 +116,20 @@ differs. The run files go to `build/imu-fidelity/imu_KIND_iN.toml`. Measured
 All twelve pass. With these illustrative parameters (I2 noise 0.01 m/s² and
 0.001 rad/s, a 2.5 ms sample period) the autopilot's estimator absorbs the
 difference. `examples/*_noisy_imu.toml` use 5x the noise and 20x the bias.
+
+Propulsion on the quad, measured (`--speedup 2` where the model allows;
+model rates with the motors running):
+
+| | P0 first-order speed | P1 voltage, first-order | P2 DC motor | P3 three-phase, averaged | P4 three-phase, switching |
+|---|---|---|---|---|---|
+| model rate (x real time) | 11.9 | 13.7 | 12.4 | 0.007-0.019 | below 0.001 |
+| hover drift / landed from home / max tilt | 0.02 m / 0.23 m / 17.4° | 0.02 / 0.22 / 17.4 | 0.01 / 0.25 / 20.4 | not flown | not flown |
+
+P0-P2 pass. P2's winding dynamics show (tilt 20.4° against 17.4°). P3 and P4
+build and conform, but resolve the motor commutation (and P4 the 20 kHz
+inverter) far below real time: after P3 armed, the autopilot's clock did not
+advance for 120 s and the check gave up (a mission would take hours); P4 was
+stopped after 80 minutes. They are for offline simulation, not SITL.
 
 ## Build only
 

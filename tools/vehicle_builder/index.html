@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Builder</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5b6676; --line: #dde2e9;
+  --accent: #2357c6; --accent-ink: #ffffff; --ok: #1d7a46; --bad: #b3261e; --warn: #8a5a00;
+  --code: #f0f2f6; --chip: #eef2fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --panel: #1a1f27; --ink: #e5e9f0; --muted: #9aa5b5; --line: #2c333f;
+    --accent: #7aa2ff; --accent-ink: #0d1117; --ok: #5cc98a; --bad: #ff8a80; --warn: #e3b55a;
+    --code: #141920; --chip: #232b3a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; }
+header span { color: var(--muted); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 18px;
+  padding: 18px 20px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 14px; }
+h2 { font-size: 15px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.tag { font-size: 12px; font-weight: 500; color: var(--muted); }
+button[aria-pressed="true"] .tag { color: inherit; opacity: .8; }
+.airframes { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+button, .seg button { font: inherit; border: 1px solid var(--line); background: var(--panel);
+  color: var(--ink); border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+.seg button[aria-pressed="true"], .airframes button[aria-pressed="true"] {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+.about { color: var(--muted); margin: 2px 0 6px; }
+.slow { color: var(--warn); }
+details { margin-top: 4px; }
+summary { cursor: pointer; color: var(--accent); user-select: none; }
+.filter { width: 100%; margin: 8px 0 4px; }
+table.fields { width: 100%; border-collapse: collapse; margin-top: 4px; }
+table.fields td { border-top: 1px solid var(--line); padding: 5px 4px; vertical-align: top; }
+table.fields td.key { width: 34%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; word-break: break-all; }
+table.fields td.key small { display: block; font-family: system-ui, sans-serif; color: var(--muted);
+  font-size: 12px; word-break: normal; }
+table.fields tr.changed td.key { color: var(--accent); }
+input[type=text], input[type=number], select { font: inherit; width: 100%; padding: 5px 7px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+table.fields input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.side { position: sticky; top: 12px; align-self: start; }
+@media (max-width: 900px) { .side { position: static; } }
+.status { padding: 8px 10px; border-radius: 7px; background: var(--code); margin-bottom: 8px;
+  word-break: break-word; }
+.status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+pre { background: var(--code); border-radius: 7px; padding: 10px; margin: 0; overflow: auto;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 38vh; }
+pre.log { max-height: 34vh; white-space: pre-wrap; word-break: break-all; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
+.row label, .full label { display: block; color: var(--muted); font-size: 12px; }
+.full { margin: 6px 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.actions select { width: auto; }
+.msg { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vehicle Builder</h1>
+  <span>Pick a vehicle's parts from CP Models, then fly it in ArduPilot SITL.</span>
+</header>
+<main>
+  <div id="parts"><section class="card">Loading the catalog…</section></div>
+  <div class="side">
+    <section class="card">
+      <h2>Run file</h2>
+      <div id="status" class="status">…</div>
+      <pre id="toml"></pre>
+      <div class="full"><label for="save-path">Save as</label>
+        <input type="text" id="save-path" placeholder="~/vehicles/my_vehicle.toml"></div>
+      <div class="actions"><button id="save">Save</button><span id="save-msg" class="msg"></span></div>
+    </section>
+    <section class="card">
+      <h2>Fly in ArduPilot SITL</h2>
+      <div class="row">
+        <div><label for="sitl-name">SITL name</label><input type="text" id="sitl-name"></div>
+        <div><label for="sitl-speedup">Speedup</label>
+          <input type="number" id="sitl-speedup" min="0.1" step="0.5" value="1"></div>
+      </div>
+      <div class="full"><label for="sitl-home">Home: lat, lon, alt (m), heading (deg)</label>
+        <input type="text" id="sitl-home" value="40.414929, -86.932387, 149.0, 0.0"></div>
+      <div class="actions">
+        <select id="mode" aria-label="Run mode">
+          <option value="mission">Map, mission flies itself</option>
+          <option value="map">Map, you fly (MAV&gt; in the log)</option>
+          <option value="headless">Headless mission check</option>
+        </select>
+        <button id="fly" class="primary">Build &amp; fly</button>
+        <button id="stop" disabled>Stop</button>
+      </div>
+      <p class="msg" id="fly-msg">Builds the vehicle (about a minute when it changed), then
+        starts SITL. The map opens on the display of the machine running the builder.</p>
+      <pre id="log" class="log" hidden></pre>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let catalog = null;
+const state = { airframe: "quad", model_name: "", levels: {}, values: {} };
+let initial = {};        // dotted path -> starting value text of the current fields
+let run = null, pollTimer = null, checkTimer = null;
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null) e.append(k);
+  return e;
+}
+const frame = () => catalog.airframes[state.airframe];
+const level = (part) => part.levels.find((l) => l.id === state.levels[part.id]) || part.levels[0];
+const fieldsOf = (part) => [...level(part).fields, ...(part.fields || [])];
+const dotted = (f) => f.path.join(".");
+
+function pickAirframe(name) {
+  state.airframe = name;
+  state.levels = {};
+  state.values = {};
+  initial = {};
+  for (const part of frame().parts) {
+    state.levels[part.id] = part.levels[0].id;
+    for (const f of fieldsOf(part)) initial[dotted(f)] = state.values[dotted(f)] = f.value;
+  }
+  state.model_name = "";
+  $("sitl-name").value = "my_" + name;
+  render();
+}
+
+function pickLevel(part, id) {
+  for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
+  state.levels[part.id] = id;
+  for (const f of level(part).fields) initial[dotted(f)] = state.values[dotted(f)] = f.value;
+  render();
+}
+
+function fieldTable(part) {
+  const fields = fieldsOf(part);
+  if (!fields.length) return null;
+  const rows = fields.map((f) => {
+    const key = dotted(f);
+    const input = el("input", { type: "text", value: state.values[key] ?? "",
+      placeholder: !f.default || f.default === "library default" ? "library default" : `default: ${f.default}`,
+      "aria-label": key, spellcheck: "false" });
+    const tr = el("tr", { "data-key": key.toLowerCase() + " " + (f.description || "").toLowerCase() },
+      el("td", { class: "key" }, key, f.description ? el("small", {}, f.description) : null),
+      el("td", {}, input));
+    const mark = () => tr.classList.toggle("changed", (state.values[key] ?? "") !== (initial[key] ?? ""));
+    input.addEventListener("input", () => { state.values[key] = input.value; mark(); scheduleCheck(); });
+    mark();
+    return tr;
+  });
+  const table = el("table", { class: "fields" }, el("tbody", {}, rows));
+  const filter = fields.length > 12 ? el("input", { type: "text", class: "filter",
+    placeholder: "Filter parameters", "aria-label": "Filter parameters",
+    oninput: (e) => { const q = e.target.value.toLowerCase();
+      for (const tr of rows) tr.hidden = !tr.dataset.key.includes(q); } }) : null;
+  const changed = fields.filter((f) => (state.values[dotted(f)] ?? "") !== (initial[dotted(f)] ?? "")).length;
+  return el("details", { open: part.id !== "airframe" && fields.length <= 12 ? true : false },
+    el("summary", {}, `Parameters (${fields.length}${changed ? `, ${changed} changed` : ""})`),
+    filter, table);
+}
+
+function render() {
+  const fr = frame();
+  const cards = [el("section", { class: "card" },
+    el("h2", {}, "Vehicle"),
+    el("div", { class: "airframes" }, Object.entries(catalog.airframes).map(([name, a]) =>
+      el("button", { "aria-pressed": String(name === state.airframe),
+        onclick: () => pickAirframe(name) }, `${name} `, el("span", { class: "tag" }, a.vehicle)))),
+    el("div", { class: "full" }, el("label", { for: "model-name" }, "Modelica model name"),
+      el("input", { type: "text", id: "model-name", value: state.model_name,
+        placeholder: "from the SITL name, e.g. my_quad -> MyQuad",
+        oninput: (e) => { state.model_name = e.target.value; scheduleCheck(); } })))];
+  for (const part of fr.parts) {
+    const lv = level(part);
+    const slow = /0\.0\d|hours|not practical/.test(lv.description);
+    cards.push(el("section", { class: "card" },
+      el("h2", {}, part.title, el("span", { class: "tag" },
+        part.levels.length > 1 ? `${part.levels.length} levels` : "")),
+      part.levels.length > 1 ? el("div", { class: "seg", role: "group", "aria-label": part.title },
+        part.levels.map((l) => el("button", { "aria-pressed": String(l.id === lv.id),
+          onclick: () => pickLevel(part, l.id) }, l.label))) : null,
+      el("p", { class: "about" + (slow ? " slow" : "") }, lv.description),
+      fieldTable(part)));
+  }
+  $("parts").replaceChildren(...cards);
+  scheduleCheck(0);
+}
+
+function choice() {
+  const home = $("sitl-home").value.split(",").map((s) => parseFloat(s.trim()));
+  const sitl = { name: $("sitl-name").value.trim(), speedup: parseFloat($("sitl-speedup").value) || 1 };
+  if (home.length === 4 && home.every(Number.isFinite)) sitl.home = home;
+  const values = {};
+  for (const [k, v] of Object.entries(state.values)) if (v !== "") values[k] = v;
+  return { airframe: state.airframe, model_name: state.model_name, levels: state.levels, values, sitl };
+}
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  return r.json();
+}
+
+function scheduleCheck(delay = 300) {
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(async () => {
+    const r = await post("/api/check", { choice: choice() });
+    const s = $("status");
+    s.className = "status " + (r.ok ? "ok" : "bad");
+    s.textContent = r.ok ? `✓ ${r.message}` : `✗ ${r.message}`;
+    $("toml").textContent = r.toml || "";
+    $("fly").disabled = !r.ok || (run && run.running);
+  }, delay);
+}
+
+async function save(overwrite = false) {
+  const r = await post("/api/save", { choice: choice(), path: $("save-path").value.trim(), overwrite });
+  if (r.exists && confirm(`${r.message}. Replace it?`)) return save(true);
+  $("save-msg").textContent = r.message;
+}
+
+async function fly() {
+  const r = await post("/api/fly", { choice: choice(), mode: $("mode").value });
+  if (!r.ok) { $("fly-msg").textContent = r.message; return; }
+  $("fly-msg").textContent = `Running ${r.path} on SITL instance ${r.instance}.`;
+  run = { id: r.id, next: 0, running: true };
+  $("log").hidden = false;
+  $("log").textContent = "";
+  $("fly").disabled = true;
+  $("stop").disabled = false;
+  poll();
+}
+
+async function poll() {
+  clearTimeout(pollTimer);
+  if (!run) return;
+  const r = await (await fetch(`/api/runs/${run.id}?from=${run.next}`)).json();
+  const log = $("log");
+  const atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
+  if (r.lines.length) log.textContent += r.lines.join("\n") + "\n";
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  run.next = r.next;
+  run.running = r.running;
+  if (r.running) pollTimer = setTimeout(poll, 1000);
+  else { $("stop").disabled = true; scheduleCheck(0); }
+}
+
+$("save").addEventListener("click", () => save());
+$("fly").addEventListener("click", fly);
+$("stop").addEventListener("click", () => run && post(`/api/runs/${run.id}/stop`, {}));
+for (const id of ["sitl-name", "sitl-speedup", "sitl-home"]) $(id).addEventListener("input", () => scheduleCheck());
+
+fetch("/api/catalog").then((r) => r.json()).then((c) => {
+  catalog = c;
+  const asked = new URLSearchParams(location.search).get("airframe");
+  pickAirframe(asked in c.airframes ? asked : "quad");
+})
+  .catch((e) => { $("parts").textContent = "Could not load the catalog: " + e; });
+</script>
+</body>
+</html>

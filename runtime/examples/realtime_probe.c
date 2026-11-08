@@ -1,7 +1,11 @@
 /* How fast a linked vehicle model runs: steps it at a host's frame rate and
  * reports simulated seconds per wall-clock second.
  *
- *   cpv_realtime NAME [FRAME_HZ]     (default 1200 Hz, ArduPilot SITL's rate)
+ *   cpv_realtime NAME [FRAME_HZ] [PWM_US]
+ *
+ * FRAME_HZ defaults to 1200 (ArduPilot SITL's rate). PWM_US, if given, holds
+ * every PWM channel there (motors running); otherwise the model's start values
+ * apply (usually motors stopped), which can be much faster.
  *
  * Steps for at most 0.5 s of simulated time or 3 s of wall time, whichever
  * comes first. Prints "NAME FACTOR" (FACTOR < 1: slower than real time).
@@ -20,7 +24,7 @@ static double now(void) {
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    fprintf(stderr, "usage: cpv_realtime NAME [FRAME_HZ]\n");
+    fprintf(stderr, "usage: cpv_realtime NAME [FRAME_HZ] [PWM_US]\n");
     return 2;
   }
   const double hz = argc > 2 ? atof(argv[2]) : 1200.0;
@@ -38,6 +42,9 @@ int main(int argc, char **argv) {
     fprintf(stderr, "cpv_realtime: %s\n", vehicle ? cpv_last_error(vehicle) : error);
     return 1;
   }
+  if (argc > 3)
+    for (size_t c = 0; c < cpv_pwm_count(vehicle); c++)
+      cpv_set_pwm(vehicle, c, atof(argv[3]));
   const double start = now();
   double simulated = 0, reached = 0;
   for (long k = 1; simulated < 0.5 && now() - start < 3.0; k++) {

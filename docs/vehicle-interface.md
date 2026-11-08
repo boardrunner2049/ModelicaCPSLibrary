@@ -232,6 +232,12 @@ Modelica parameter declarations. The rover's drive and the plane's propeller
 are part of their plants (set their parameters in `[plant]`); there is no
 esc/motor/rotor selection for them.
 
+`fire-compose catalog` prints all of this as JSON: the vehicle kinds and
+their parameters, the IMU models with the `[imu]` keys each accepts, and the
+propulsion levels. `tools/vehicle_builder` (a browser page) builds a
+configuration from it part by part, checks every edit with
+`fire-compose validate`, and can fly the result in ArduPilot SITL.
+
 A host configuration can carry the physics as one of its tables, as FastDyn's
 `[FMU.models.NAME.physics]` does; `--table` names it (TOML dotted-key syntax),
 so one file can describe both the firmware run and the vehicle.
@@ -461,8 +467,10 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
 - Speed: the electromechanical IMU (I3) integrates the MEMS resonators and
   runs at 0.04-0.1x real time in a vehicle (I0 14-70x, I1/I2 3-9x). SITL
   then runs at the model's rate: quad, rover and plane fly their missions at
-  I3 in 14-35 minutes (`runtime/hosts/ardupilot/imu_fidelity.sh`), but a host
-  that must keep real time cannot use it.
+  I3 in 14-35 minutes (`runtime/hosts/ardupilot/fidelity.sh`), but a host
+  that must keep real time cannot use it. Multirotor propulsion P3/P4
+  (three-phase PM motor, averaged or switching inverter) run at ~0.01x and
+  below 0.001x with the motors running; P0-P2 at ~12x.
 - The plants' default Earth magnetic field input,
   `magneticField_w = {0, 20e-6, 45e-6}` T in NED, has no north component; a
   host that feeds the model's magnetometer to a compass-using autopilot would

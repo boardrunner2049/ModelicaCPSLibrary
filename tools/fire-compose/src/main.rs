@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use fire_compose::{artifact, config, Result};
+use fire_compose::{artifact, catalog, config, Result};
 use std::{fs, path::PathBuf, process::Command};
 
 #[derive(Parser)]
@@ -24,6 +24,8 @@ enum Action {
     },
     /// Emit generated Modelica and a provenance manifest.
     Emit(Generate),
+    /// Print what a configuration can select (vehicle kinds, parameters, part models) as JSON.
+    Catalog,
     /// Emit and run OpenModelica checkModel; this does not simulate an FMU.
     Check {
         #[command(flatten)]
@@ -95,6 +97,12 @@ fn run() -> Result<()> {
             } else {
                 println!("Configuration valid: {}", c.model_name);
             }
+        }
+        Action::Catalog => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&catalog::catalog()).unwrap()
+            );
         }
         Action::Emit(args) => {
             let (model, manifest, _, _) = generate(&args)?;

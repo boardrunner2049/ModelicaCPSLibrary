@@ -1033,28 +1033,9 @@ fn resolve_models(raw: &Value) -> Result<Table> {
     )?;
     let mut out = t.clone();
     for (key, default, supported) in [
-        (
-            "esc",
-            "pass_through",
-            &[
-                "pass_through",
-                "average_voltage",
-                "average_unidirectional",
-                "average_three_phase",
-                "switching_three_phase",
-            ][..],
-        ),
-        (
-            "motor",
-            "first_order_speed",
-            &[
-                "first_order_speed",
-                "first_order_voltage_to_speed",
-                "dynamic_dc_equivalent",
-                "three_phase_pm",
-            ][..],
-        ),
-        ("rotor", "quadratic_blade", &["quadratic_blade"][..]),
+        ("esc", "pass_through", &ESCS[..]),
+        ("motor", "first_order_speed", &MOTORS[..]),
+        ("rotor", "quadratic_blade", &ROTORS[..]),
     ] {
         let selected = out
             .entry(key)
@@ -1067,16 +1048,10 @@ fn resolve_models(raw: &Value) -> Result<Table> {
         }
     }
     let pair = (out["esc"].as_str().unwrap(), out["motor"].as_str().unwrap());
-    if !matches!(
-        pair,
-        ("pass_through", "first_order_speed")
-            | ("average_voltage", "first_order_voltage_to_speed")
-            | ("average_unidirectional", "dynamic_dc_equivalent")
-            | (
-                "average_three_phase" | "switching_three_phase",
-                "three_phase_pm"
-            )
-    ) {
+    if !PROPULSION
+        .iter()
+        .any(|&(_, esc, motor, _)| (esc, motor) == pair)
+    {
         return Err("models: incompatible ESC/motor combination; use pass_through/first_order_speed, average_voltage/first_order_voltage_to_speed, average_unidirectional/dynamic_dc_equivalent, or average_three_phase|switching_three_phase/three_phase_pm".into());
     }
     if let Some(raw) = t.get("imu") {
@@ -1089,6 +1064,55 @@ fn resolve_models(raw: &Value) -> Result<Table> {
     }
     Ok(out)
 }
+
+/// Multirotor propulsion fidelity levels: (level, ESC, motor, description).
+/// Each ESC model drives exactly the motor model of its level.
+pub const PROPULSION: [(&str, &str, &str, &str); 5] = [
+    (
+        "P0",
+        "pass_through",
+        "first_order_speed",
+        "PWM sets the rotor speed through a first-order lag",
+    ),
+    (
+        "P1",
+        "average_voltage",
+        "first_order_voltage_to_speed",
+        "averaged ESC voltage; first-order voltage-to-speed motor",
+    ),
+    (
+        "P2",
+        "average_unidirectional",
+        "dynamic_dc_equivalent",
+        "averaged ESC; DC motor with winding current and back-EMF",
+    ),
+    (
+        "P3",
+        "average_three_phase",
+        "three_phase_pm",
+        "averaged six-step inverter; three-phase PM motor",
+    ),
+    (
+        "P4",
+        "switching_three_phase",
+        "three_phase_pm",
+        "switching six-step inverter (PWM, diodes); three-phase PM motor",
+    ),
+];
+pub const ESCS: [&str; 5] = [
+    PROPULSION[0].1,
+    PROPULSION[1].1,
+    PROPULSION[2].1,
+    PROPULSION[3].1,
+    PROPULSION[4].1,
+];
+pub const MOTORS: [&str; 4] = [
+    PROPULSION[0].2,
+    PROPULSION[1].2,
+    PROPULSION[2].2,
+    PROPULSION[3].2,
+];
+pub const ROTORS: [&str; 1] = ["quadratic_blade"];
 
 fn resolve_interface(raw: &Value) -> Result<Table> {
     resolve_interface_with(raw, 1100., 1900., true)

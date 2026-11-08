@@ -26,6 +26,11 @@ pub const ACOUSTIC: &[&str] = &[
     "quadraticGain",
 ];
 
+/// Current IMU fidelity levels I0-I3, in order.
+pub const MODELS: [&str; 4] = ["ideal", "digital", "errors", "electromechanical"];
+/// Legacy compositions, still accepted.
+pub const LEGACY_MODELS: [&str; 3] = ["statistical", "device", "acoustic"];
+
 pub fn selection(raw: &Value) -> Result<Table> {
     let t = table(raw, &["model", "response"], "models.imu")?;
     if t.contains_key("response") {
@@ -38,17 +43,7 @@ pub fn selection(raw: &Value) -> Result<Table> {
         )]));
     }
     let name = t.get("model").and_then(Value::as_str).unwrap_or("");
-    if ![
-        "ideal",
-        "digital",
-        "errors",
-        "electromechanical",
-        "statistical",
-        "device",
-        "acoustic",
-    ]
-    .contains(&name)
-    {
+    if !MODELS.contains(&name) && !LEGACY_MODELS.contains(&name) {
         return Err("models.imu.model must be ideal, digital, errors, electromechanical (legacy: statistical, device, acoustic)".into());
     }
     Ok(t.clone())
@@ -92,13 +87,8 @@ impl ResolvedFireConfig {
     }
 }
 
-pub fn resolve(raw: &Value, models: &Table) -> Result<Table> {
-    let model = models
-        .get("imu")
-        .and_then(Value::as_table)
-        .and_then(|t| t.get("model"))
-        .and_then(Value::as_str)
-        .unwrap_or("ideal");
+/// The [imu] keys an IMU model accepts and the ones it requires.
+pub fn keys(model: &str) -> (Vec<&'static str>, Vec<&'static str>) {
     let mut allowed = if model == "digital" {
         Vec::new()
     } else {
@@ -128,7 +118,6 @@ pub fn resolve(raw: &Value, models: &Table) -> Result<Table> {
     if model == "electromechanical" {
         allowed.extend(["gyroPhysics", "accelPhysics"]);
     }
-    let t = table(raw, &allowed, "imu")?;
     let mut required = Vec::new();
     if model != "ideal" {
         required.push("samplePeriod");
@@ -153,6 +142,18 @@ pub fn resolve(raw: &Value, models: &Table) -> Result<Table> {
     if model == "electromechanical" {
         required.extend(["gyroPhysics", "accelPhysics"]);
     }
+    (allowed, required)
+}
+
+pub fn resolve(raw: &Value, models: &Table) -> Result<Table> {
+    let model = models
+        .get("imu")
+        .and_then(Value::as_table)
+        .and_then(|t| t.get("model"))
+        .and_then(Value::as_str)
+        .unwrap_or("ideal");
+    let (allowed, required) = keys(model);
+    let t = table(raw, &allowed, "imu")?;
     for key in required {
         if !t.contains_key(key) {
             return Err(format!("{model} IMU requires explicit imu.{key}"));

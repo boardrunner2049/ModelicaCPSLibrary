@@ -41,8 +41,9 @@ if [[ -n $build ]]; then
     echo "build failed; run $here/build.sh $target to see why" >&2; exit 1; }
 fi
 
-# The vehicle's speed bounds SITL's: SITL waits for the model every frame.
-rate=$("$root/build/runtime-release/cpv_realtime" "$NAME" | awk '{print $2}')
+# The vehicle's speed bounds SITL's: SITL waits for the model every frame. Measured
+# with every PWM channel at 1500 us (motors running), slower than at rest.
+rate=$("$root/build/runtime-release/cpv_realtime" "$NAME" 1200 1500 2>/dev/null | awk '{print $2}')
 if awk -v r="$rate" -v s="$speedup" 'BEGIN { exit !(r < s) }'; then
   echo "WARNING: $NAME runs at ${rate}x real time, below --speedup $speedup: SITL runs at" \
        "most that fast. Sampled IMUs cost speed; an electromechanical IMU (kHz MEMS" \
@@ -72,7 +73,9 @@ grep -m1 'cpvehicle:' sitl.log
 echo "SITL log: $work/sitl.log"
 
 if [[ -n $headless ]]; then
-  "$python" -W ignore "${check[@]}" --connect tcp:127.0.0.1:$port
+  "$python" -u -W ignore "${check[@]}" --connect tcp:127.0.0.1:$port &
+  pids+=($!)
+  wait $!
   exit
 fi
 mavproxy=${MAVPROXY:-$root/build/venv-gcs/bin/mavproxy.py}
