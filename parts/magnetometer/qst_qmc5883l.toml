@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "QST QMC5883L"
+kind = "magnetometer"
+manufacturer = "QST"
+source = "QMC5883L 3-Axis Magnetic Sensor Datasheet, QST-PD-B002-22 Rev B, https://www.qstcorp.com/upload/pdf/202512/13-52-04%20QMC5883L%20Datasheet%20Rev.%20B.pdf"
+notes = "Noise is quoted at ±2 G; the ±8 G range (what autopilots configure) has 3000 LSB/G. Cross-axis is 0.1 %/G with a 1 G cross field."
+full_scale_gauss = 8.0                # ±8 G (Table 2)
+full_scale_options_gauss = [2.0, 8.0]
+resolution_mgauss = 0.333             # 3000 LSB/G at ±8 G (Table 2)
+rms_noise_mgauss = 2.0                # field resolution, std of 100 samples, ±2 G
+rms_noise_setting = "±2 G, std of 100 samples"
+adc_bits = 16
+odr_max_hz = 200                      # 3-axis continuous
+offset_mgauss = 10.0                  # ±
+sensitivity_tempco_pct_per_c = 0.05   # ±
+linearity_pct = 0.1                   # % FS, ±2 G
+cross_axis_pct = 0.1                  # 0.1 %/G, 1 G cross field

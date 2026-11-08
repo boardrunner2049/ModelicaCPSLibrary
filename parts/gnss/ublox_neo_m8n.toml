@@ -1,0 +1,20 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "u-blox NEO-M8N"
+kind = "gnss"
+manufacturer = "u-blox"
+source = "NEO-M8 u-blox M8 concurrent GNSS modules Data sheet, UBX-15031086 R14, 30-Sep-2025, https://content.u-blox.com/sites/default/files/NEO-M8-FW3_DataSheet_UBX-15031086.pdf"
+notes = "Figures for the default GPS+GLONASS configuration and the NEO-M8N variant. Single-GNSS CEP: GPS 2.5 m, GLONASS 4 m, BeiDou 3 m, Galileo 3 m."
+horizontal_cep_m = 2.5             # p6 Table 1, GPS & GLONASS; CEP 50 %, 24 h static, -130 dBm, > 6 SVs
+horizontal_cep_sbas_m = 2.0        # p6 Table 1, GPS & GLONASS with SBAS
+velocity_accuracy_mps = 0.05       # p6, 50 % at 30 m/s
+heading_accuracy_deg = 0.3         # p6, 50 % at 30 m/s
+nav_rate_max_hz = 5                # p6, NEO-M8N, GPS & GLONASS
+nav_rate_max_single_gnss_hz = 10   # p6, NEO-M8N, one GNSS
+time_pulse_accuracy_ns = 30        # p6, RMS
+cold_start_s = 26                  # p6, NEO-M8N/Q, GPS & GLONASS, -130 dBm
+hot_start_s = 1                    # p6, NEO-M8N/Q
+tracking_sensitivity_dbm = -167    # p6, good external LNA
+max_dynamics_g = 4                 # p6, Airborne < 4 g platform
+max_velocity_mps = 500
+max_altitude_m = 50000
+concurrent_gnss = 3                # GPS + Galileo + GLONASS or BeiDou

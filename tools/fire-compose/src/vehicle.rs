@@ -444,6 +444,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
         acoustic: crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?,
         models,
         plant: resolve_plant(&section(root, "plant"), kind)?,
+        parts: Vec::new(),
     })
 }
 

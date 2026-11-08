@@ -159,6 +159,31 @@ def table_fields(doc: dict, path: tuple = ()) -> list[dict]:
     return out
 
 
+def devices(cc: dict, kind: str, levels: list[str]) -> list[dict]:
+    """Real parts of one sensor kind (parts/KIND/*.toml) and, per level, the
+    parameters the composer derives from each datasheet (`fire-compose part`)."""
+    out = []
+    for p in cc.get("parts", {}).get(kind, []):
+        per_level = {}
+        for level in levels:
+            r = subprocess.run([str(compose_binary()), "part", kind, p["id"], "--level", level, "--json"],
+                               capture_output=True, text=True)
+            if r.returncode:
+                continue
+            rep = json.loads(r.stdout)
+            per_level[level] = {
+                "values": {k: (v["value"] if isinstance(v["value"], str) else literal(v["value"]))
+                           for k, v in rep["parameters"].items()},
+                "how": {k: v["how"] + (f" [{', '.join(v['from'])}]" if v["from"] else "")
+                        for k, v in rep["parameters"].items()},
+                "assumed": rep["assumed"],
+                "not_represented": rep["not_represented"],
+                "not_stated": rep["not_stated"],
+            }
+        out.append({**p, "levels": per_level})
+    return out
+
+
 # --- catalog -----------------------------------------------------------------
 
 def catalog() -> dict:
@@ -238,7 +263,8 @@ def sensor_part(cc: dict, sensor: str, mounts: list[dict]) -> dict:
         levels.append({"id": spec["level"], "label": f"{spec['level']} {spec['model']}",
                        "description": spec["description"] + ".",
                        "select": {f"models.{sensor}.model": spec["model"]}, "fields": fields})
-    return {"id": sensor, "title": SENSOR_TITLE[sensor], "levels": levels, "fields": mounts}
+    return {"id": sensor, "title": SENSOR_TITLE[sensor], "levels": levels, "fields": mounts,
+            "devices": devices(cc, sensor, [lv["id"] for lv in levels])}
 
 
 def imu_part(cc: dict, mounts: list[dict]) -> dict:
@@ -254,7 +280,8 @@ def imu_part(cc: dict, mounts: list[dict]) -> dict:
                        "description": f"{IMU_ABOUT.get(spec['model'], '')}. "
                                       f"Speed: {SPEED[spec['level']]}.",
                        "select": {"models.imu.model": spec["model"]}, "fields": fields})
-    return {"id": "imu", "title": "IMU", "levels": levels, "fields": mounts}
+    return {"id": "imu", "title": "IMU", "levels": levels, "fields": mounts,
+            "devices": devices(cc, "imu", [lv["id"] for lv in levels])}
 
 
 def propulsion_part(cc: dict, base: dict) -> dict:
@@ -278,7 +305,10 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
     """A builder choice -> (run file document, physics document).
 
     choice = {"airframe": "quad", "model_name": "...", "levels": {part: level},
-              "values": {"plant.mass": "4.0", ...}, "sitl": {...}}
+              "devices": {part: device id}, "values": {"plant.mass": "4.0", ...}, "sitl": {...}}
+
+    A part with a device names it ([models.KIND] part, level): the composer
+    fills the level's parameters from the datasheet, and values set here win.
     """
     cat = cat or catalog()
     frame = cat["airframes"][choice["airframe"]]
@@ -293,8 +323,13 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
     for part in frame["parts"]:
         level = next((lv for lv in part["levels"]
                       if lv["id"] == choice.get("levels", {}).get(part["id"])), part["levels"][0])
-        for dotted, value in level["select"].items():
-            put(physics, dotted.split("."), value)
+        device = choice.get("devices", {}).get(part["id"])
+        if device and any(d["id"] == device for d in part.get("devices", [])):
+            put(physics, ["models", part["id"], "part"], device)
+            put(physics, ["models", part["id"], "level"], level["id"])
+        else:
+            for dotted, value in level["select"].items():
+                put(physics, dotted.split("."), value)
         allowed |= {".".join(f["path"]) for f in level["fields"] + part.get("fields", [])}
     for dotted, text in choice.get("values", {}).items():
         if dotted not in allowed:

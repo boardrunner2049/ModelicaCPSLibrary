@@ -83,6 +83,15 @@ This is source composition, not arbitrary contract-aware RBC linking.
 `check` runs OpenModelica checkModel and translateModel. Use `tools/probe_export.py`
 for actual FMI 2.0 CS generation/stepping. Neither proves Rumoca/FastDyn firmware integration.
 
+## Real parts
+
+`[models.KIND] part = "..."` (imu, gnss, barometer, magnetometer) names a real
+device from `parts/` instead of a model: the composer selects the level and
+fills `[KIND]` from the device's datasheet figures, explicit keys winning, and
+records what it derived, assumed and could not represent in `config.parts`.
+`fire-compose part KIND [ID]` lists the devices or shows one's conversion. See
+`parts/README.md`.
+
 ## IMU fidelity v2 and independent acoustics
 
 Use `[models.imu] model="ideal"|"digital"|"errors"|"electromechanical"` for I0–I3.

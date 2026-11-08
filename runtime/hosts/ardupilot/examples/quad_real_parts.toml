@@ -1,0 +1,50 @@
+# The quad with real sensor parts: each [models.X] names a part (parts/X/*.toml,
+# datasheet figures) and the composer fills that sensor's level from the
+# datasheet. A Pixhawk 6C-like set: ICM-42688-P IMU, MS5611 barometer, IST8310
+# magnetometer, and a NEO-M9N GNSS receiver.
+#   tools/fire-compose/target/debug/fire-compose part gnss neo_m9n   # what a part becomes
+#   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/quad_real_parts.toml --mission
+[sitl]
+speedup = 1
+
+[physics]
+schema_version = 3
+model_name = "QuadRealParts"
+
+[physics.geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
+
+[physics.mass]
+mode = "aggregate"
+[physics.mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[physics.initial]
+p_start = [0.0, 0.0, -0.12]
+q_start = [0.7071067811865476, 0.0, 0.0, 0.7071067811865476]
+
+[physics.landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[physics.models.imu]
+part = "tdk_icm42688p"        # I2 (errors) by default; level = "I1" for the deterministic readout
+[physics.imu]
+seed = 3                      # explicit keys win over the part's
+
+[physics.models.barometer]
+part = "te_ms5611"            # B1
+
+[physics.models.magnetometer]
+part = "isentek_ist8310"      # M1
+
+[physics.models.gnss]
+part = "ublox_neo_m9n"        # G1

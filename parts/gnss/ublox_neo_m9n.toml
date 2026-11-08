@@ -1,0 +1,19 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "u-blox NEO-M9N"
+kind = "gnss"
+manufacturer = "u-blox"
+source = "NEO-M9N-00B Standard precision GNSS module Data sheet, UBX-19014285 R08, 09-Oct-2025, https://content.u-blox.com/sites/default/files/NEO-M9N-00B_DataSheet_UBX-19014285.pdf"
+notes = "The CEP is stated without test conditions. Single-GNSS CEP: GPS 2.0 m, GLONASS 4.0 m, BeiDou 3.0 m, Galileo 3.0 m."
+horizontal_cep_m = 2.0             # p4 Table 1, GPS+GLO+GAL+BDS, PVT
+velocity_accuracy_mps = 0.05       # p4, 50 % at 30 m/s
+heading_accuracy_deg = 0.3         # p4, dynamic heading, 50 % at 30 m/s
+nav_rate_max_hz = 25               # p4 Table 1, GPS+GLO+GAL+BDS, PVT
+nav_rate_max_single_gnss_hz = 25   # p5 Table 2
+time_pulse_accuracy_ns = 30        # p4, RMS
+cold_start_s = 24                  # p4 Table 1, -130 dBm
+hot_start_s = 2
+tracking_sensitivity_dbm = -167
+max_dynamics_g = 4                 # Airborne 4 g platform
+max_velocity_mps = 500
+max_altitude_m = 80000
+concurrent_gnss = 4

@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Bosch BMP388"
+kind = "barometer"
+manufacturer = "Bosch Sensortec"
+source = "BMP388 Datasheet, BST-BMP388-DS001-07 rev 1.7, November 2020, https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp388-ds001.pdf"
+notes = "B1 has no IIR filter, so the unfiltered figures are used. With the on-chip IIR at its heaviest: 0.03 Pa RMS noise, 0.016 Pa resolution (Table 2)."
+pressure_range_pa = [30000, 125000]           # Table 2, p7
+pressure_rms_noise_pa = 1.2                   # Vp,full: full bandwidth, highest resolution (Table 2, p8)
+pressure_rms_noise_mode = "highest resolution (osr_p x32, osr_t x2), IIR off; 69.46 ms per conversion"
+pressure_rms_noise_fast_pa = 6.6              # Table 8, ultra low power, IIR off
+pressure_rms_noise_fast_mode = "ultra low power (osr_p x1, osr_t x1), IIR off; 200 Hz"
+pressure_resolution_pa = 0.085                # x32 without IIR: 21 bit / 0.085 Pa (Table 6, p14)
+relative_accuracy_pa = 8                      # ±, 900..1100 hPa, 25..40 C
+absolute_accuracy_pa = 50                     # ±, 300..1100 hPa, -20..65 C
+temperature_coefficient_offset_pa_per_k = 0.75 # ±, 0..55 C
+long_term_stability_pa_per_year = 33          # ±0.33 hPa / 12 months
+solder_drift_pa = 100                         # < ±1.0 hPa
+temperature_accuracy_c = 0.5                  # ±, 0..65 C
+temperature_resolution_c = 0.0025             # osr_t x2
+odr_max_hz = 200                              # osr x1
+conversion_time_lowest_noise_ms = 69.46       # typ, x32/x2

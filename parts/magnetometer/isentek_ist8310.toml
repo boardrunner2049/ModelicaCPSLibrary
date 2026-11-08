@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "iSentek IST8310"
+kind = "magnetometer"
+manufacturer = "iSentek"
+source = "IST8310 Datasheet, Version 1.8, 2025-11-25, https://assets.isentek.com/public/documents/datasheet/HFH0n8I7hQ-IST8310_Datasheet_V1.8_Web.pdf"
+notes = "No RMS noise is stated. Range ±1600 uT on X/Y, ±2500 uT on Z; X/Y saturate first. Low-noise averaging limits the rate to 166 Hz (v1.2)."
+full_scale_gauss = 16.0               # ±1600 uT, X/Y (p8)
+resolution_mgauss = 3.0               # 0.3 uT/LSB (p8)
+adc_bits = 16                         # 14 or 16 bit output (p3)
+odr_max_hz = 200                      # 3-axis (p8)
+offset_mgauss = 3.0                   # zero-gauss offset, RMS ±0.3 uT (p9)
+offset_tempco_mgauss_per_c = 0.24     # 0.024 uT/C (p9)
+sensitivity_tempco_pct_per_c = 0.016  # ±, -40..85 C (p9)
+linearity_pct = 1.0                   # % FS, X typ (Y, Z 0.1)

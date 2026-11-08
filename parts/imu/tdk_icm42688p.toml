@@ -1,0 +1,32 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "TDK InvenSense ICM-42688-P"
+kind = "imu"
+manufacturer = "TDK InvenSense"
+source = "ICM-42688-P Datasheet, DS-000347 Revision 1.9, 11/12/2024, https://invensense.tdk.com/products/motion-tracking/6-axis/icm-42688-p/"
+notes = "Typical values at VDD = VDDIO = 1.8 V, 25 C. Offsets and cross-axis are board-level."
+gyro_full_scale_dps = 2000                  # Table 1, p11
+gyro_full_scale_options_dps = [15.625, 31.25, 62.5, 125, 250, 500, 1000, 2000]
+accel_full_scale_g = 16                     # Table 2, p12
+accel_full_scale_options_g = [2, 4, 8, 16]
+gyro_adc_bits = 16
+accel_adc_bits = 16
+gyro_noise_density_dps_rthz = 0.0028        # @ 10 Hz
+gyro_rms_noise_dps = 0.028                  # 100 Hz bandwidth
+accel_noise_density_ug_rthz = 65            # X/Y @ 10 Hz
+accel_noise_density_z_ug_rthz = 70          # Z @ 10 Hz
+accel_rms_noise_mg = 0.65                   # X/Y, 100 Hz bandwidth
+gyro_zero_rate_offset_dps = 0.5             # ±, board-level, 25 C
+gyro_zero_rate_tempco_dps_per_c = 0.005     # ±, 0..70 C
+accel_zero_g_offset_mg = 20                 # ±, board-level
+accel_zero_g_tempco_mg_per_c = 0.15         # ±, -40..85 C
+gyro_sensitivity_tolerance_pct = 0.5        # ±
+accel_sensitivity_tolerance_pct = 0.5       # ±
+gyro_sensitivity_tempco_pct_per_c = 0.005   # ±, 0..70 C
+accel_sensitivity_tempco_pct_per_c = 0.005  # ±, -40..85 C
+gyro_cross_axis_pct = 1.25                  # ±, board-level
+accel_cross_axis_pct = 1                    # ±, board-level
+gyro_nonlinearity_pct = 0.1
+accel_nonlinearity_pct = 0.1
+gyro_mechanical_frequency_khz = 27          # 25..29 kHz
+gyro_odr_max_hz = 32000
+accel_odr_max_hz = 32000

@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "TE Connectivity MS5611-01BA03"
+kind = "barometer"
+manufacturer = "TE Connectivity (Measurement Specialties)"
+source = "MS5611-01BA03 Barometric Pressure Sensor data sheet, ENG_DS_MS5611-01BA03_B3, 06/2017, https://www.te.com/usa-en/product-MS561101BA03-50.datasheet.pdf"
+notes = "No relative-accuracy specification, so no drift is derived. Absolute error band ±1.5 mbar at 25 C; ±2.0 mbar 0..50 C. A pressure and a temperature conversion together take two conversion times."
+pressure_range_pa = [1000, 120000]            # p4, extended range
+pressure_rms_noise_pa = 1.2                   # 0.012 mbar RMS @ OSR 4096 (p4)
+pressure_rms_noise_mode = "OSR 4096; 8.22 ms per conversion"
+pressure_rms_noise_fast_pa = 6.5              # 0.065 mbar @ OSR 256 (p4)
+pressure_rms_noise_fast_mode = "OSR 256; 0.54 ms per conversion"
+pressure_resolution_pa = 1                    # output in 0.01 mbar (p8)
+absolute_accuracy_pa = 150                    # ±1.5 mbar, 25 C, 700..1100 mbar
+long_term_stability_pa_per_year = 100         # ±1 mbar/yr
+temperature_accuracy_c = 0.8                  # ±, 25 C
+temperature_resolution_c = 0.01               # output in 0.01 C
+conversion_time_lowest_noise_ms = 16.44       # 2 x 8.22 ms: pressure and temperature at OSR 4096

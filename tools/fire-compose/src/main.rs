@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use fire_compose::{artifact, catalog, config, Result};
+use fire_compose::{artifact, catalog, config, parts, Result};
 use std::{fs, path::PathBuf, process::Command};
 
 #[derive(Parser)]
@@ -26,6 +26,27 @@ enum Action {
     Emit(Generate),
     /// Print what a configuration can select (vehicle kinds, parameters, part models) as JSON.
     Catalog,
+    /// Show what a real part (parts/KIND/*.toml) becomes at a level: the
+    /// parameters, the figures each came from, and what the level cannot represent.
+    Part {
+        /// imu, gnss, barometer or magnetometer
+        kind: String,
+        /// A part id, name or path; omit to list the parts of KIND.
+        part: Option<String>,
+        #[arg(long)]
+        level: Option<String>,
+        #[arg(long)]
+        mode: Option<String>,
+        /// none or draw
+        #[arg(long)]
+        tolerances: Option<String>,
+        /// Explicit [KIND] values, as TOML (e.g. 'samplePeriod = 0.1')
+        #[arg(long)]
+        set: Option<String>,
+        /// The report as JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Emit and run OpenModelica checkModel; this does not simulate an FMU.
     Check {
         #[command(flatten)]
@@ -103,6 +124,38 @@ fn run() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&catalog::catalog()).unwrap()
             );
+        }
+        Action::Part {
+            kind,
+            part,
+            level,
+            mode,
+            tolerances,
+            set,
+            json,
+        } => {
+            let Some(part) = part else {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&parts::catalog()[&kind]).unwrap()
+                );
+                return Ok(());
+            };
+            let mut sel = toml::map::Map::new();
+            sel.insert("part".into(), toml::Value::String(part));
+            for (k, v) in [("level", level), ("mode", mode), ("tolerances", tolerances)] {
+                if let Some(v) = v {
+                    sel.insert(k.into(), toml::Value::String(v));
+                }
+            }
+            let explicit: toml::map::Map<String, toml::Value> =
+                toml::from_str(set.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+            let (_, _, report) = parts::resolve(&kind, &sel, &explicit)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+            } else {
+                print!("{}", parts::summary(&report));
+            }
         }
         Action::Emit(args) => {
             let (model, manifest, _, _) = generate(&args)?;

@@ -68,6 +68,9 @@ pre.log { max-height: 34vh; white-space: pre-wrap; word-break: break-all; }
 .full { margin: 6px 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 .actions select { width: auto; }
+.device { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin: 8px 0 4px; }
+.device label { color: var(--muted); font-size: 13px; }
+ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
 .msg { color: var(--muted); font-size: 13px; }
 </style>
 </head>
@@ -115,7 +118,7 @@ pre.log { max-height: 34vh; white-space: pre-wrap; word-break: break-all; }
 "use strict";
 const $ = (id) => document.getElementById(id);
 let catalog = null;
-const state = { airframe: "quad", model_name: "", levels: {}, values: {} };
+const state = { airframe: "quad", model_name: "", levels: {}, devices: {}, values: {} };
 let initial = {};        // dotted path -> starting value text of the current fields
 let run = null, pollTimer = null, checkTimer = null;
 
@@ -133,10 +136,14 @@ const frame = () => catalog.airframes[state.airframe];
 const level = (part) => part.levels.find((l) => l.id === state.levels[part.id]) || part.levels[0];
 const fieldsOf = (part) => [...level(part).fields, ...(part.fields || [])];
 const dotted = (f) => f.path.join(".");
+const device = (part) => (part.devices || []).find((d) => d.id === state.devices[part.id]) || null;
+// What the selected device fills at the selected level: {values, how, assumed, not_represented, not_stated}.
+const fromDevice = (part) => { const d = device(part); return d ? d.levels[level(part).id] || null : null; };
 
 function pickAirframe(name) {
   state.airframe = name;
   state.levels = {};
+  state.devices = {};
   state.values = {};
   initial = {};
   for (const part of frame().parts) {
@@ -148,11 +155,53 @@ function pickAirframe(name) {
   render();
 }
 
+function startLevel(part) {
+  // A device fills its level from the datasheet: the fields start empty and
+  // only what is typed overrides it.
+  for (const f of level(part).fields) initial[dotted(f)] = state.values[dotted(f)] = device(part) ? "" : f.value;
+}
+
 function pickLevel(part, id) {
   for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
   state.levels[part.id] = id;
-  for (const f of level(part).fields) initial[dotted(f)] = state.values[dotted(f)] = f.value;
+  startLevel(part);
   render();
+}
+
+function pickDevice(part, id) {
+  for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
+  if (id) state.devices[part.id] = id; else delete state.devices[part.id];
+  const d = device(part);
+  if (d) {
+    const best = d.default_level in d.levels ? d.default_level : Object.keys(d.levels).pop();
+    state.levels[part.id] = best;
+  }
+  startLevel(part);
+  render();
+}
+
+function deviceBlock(part) {
+  if (!(part.devices || []).length) return null;
+  const d = device(part), info = fromDevice(part);
+  const select = el("select", { "aria-label": `${part.title} device`,
+      onchange: (e) => pickDevice(part, e.target.value) },
+    el("option", { value: "" }, "Generic: set the parameters below"),
+    part.devices.map((x) => el("option", { value: x.id, selected: x.id === state.devices[part.id] },
+      `${x.name}`)));
+  const out = [el("div", { class: "device" }, el("label", {}, "Device"), select)];
+  if (d && info) {
+    const gaps = [...Object.entries(info.not_stated).map(([k, v]) => `${k}: ${v}`),
+                  ...Object.entries(info.not_represented).map(([k, v]) => `${k}: ${v}`)];
+    out.push(el("p", { class: "about" }, `${d.source}`));
+    if (info.assumed.length || gaps.length)
+      out.push(el("details", {}, el("summary", {},
+        `What ${level(part).id} leaves out or assumes (${gaps.length + info.assumed.length})`),
+        el("ul", { class: "gaps" }, [...info.assumed.map((a) => el("li", {}, "assumed: " + a)),
+                                     ...gaps.map((g) => el("li", {}, g))])));
+  } else if (d) {
+    out.push(el("p", { class: "about slow" }, `${d.name} has no conversion to ${level(part).id}.`));
+  }
+  return out;
 }
 
 function fieldTable(part) {
@@ -160,8 +209,12 @@ function fieldTable(part) {
   if (!fields.length) return null;
   const rows = fields.map((f) => {
     const key = dotted(f);
+    const dev = fromDevice(part), name = f.path[f.path.length - 1];
+    const fromSheet = dev && f.path.length === 2 && f.path[0] === part.id ? dev.values[name] : undefined;
     const input = el("input", { type: "text", value: state.values[key] ?? "",
-      placeholder: !f.default || f.default === "library default" ? "library default" : `default: ${f.default}`,
+      placeholder: fromSheet !== undefined ? `from the part: ${fromSheet}` :
+        !f.default || f.default === "library default" ? "library default" : `default: ${f.default}`,
+      title: fromSheet !== undefined ? dev.how[name] : null,
       "aria-label": key, spellcheck: "false" });
     const tr = el("tr", { "data-key": key.toLowerCase() + " " + (f.description || "").toLowerCase() },
       el("td", { class: "key" }, key, f.description ? el("small", {}, f.description) : null),
@@ -203,6 +256,7 @@ function render() {
         part.levels.map((l) => el("button", { "aria-pressed": String(l.id === lv.id),
           onclick: () => pickLevel(part, l.id) }, l.label))) : null,
       el("p", { class: "about" + (slow ? " slow" : "") }, lv.description),
+      deviceBlock(part),
       fieldTable(part)));
   }
   $("parts").replaceChildren(...cards);
@@ -215,7 +269,8 @@ function choice() {
   if (home.length === 4 && home.every(Number.isFinite)) sitl.home = home;
   const values = {};
   for (const [k, v] of Object.entries(state.values)) if (v !== "") values[k] = v;
-  return { airframe: state.airframe, model_name: state.model_name, levels: state.levels, values, sitl };
+  return { airframe: state.airframe, model_name: state.model_name, levels: state.levels,
+           devices: state.devices, values, sitl };
 }
 
 async function post(url, body) {
@@ -275,8 +330,12 @@ for (const id of ["sitl-name", "sitl-speedup", "sitl-home"]) $(id).addEventListe
 
 fetch("/api/catalog").then((r) => r.json()).then((c) => {
   catalog = c;
-  const asked = new URLSearchParams(location.search).get("airframe");
+  const q = new URLSearchParams(location.search);
+  const asked = q.get("airframe");
   pickAirframe(asked in c.airframes ? asked : "quad");
+  // ?gnss=ublox_neo_m9n&imu=tdk_icm42688p: start with those devices.
+  for (const part of frame().parts)
+    if ((part.devices || []).some((d) => d.id === q.get(part.id))) pickDevice(part, q.get(part.id));
 })
   .catch((e) => { $("parts").textContent = "Could not load the catalog: " + e; });
 </script>

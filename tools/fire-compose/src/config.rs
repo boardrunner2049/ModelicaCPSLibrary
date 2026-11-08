@@ -43,6 +43,10 @@ pub struct ResolvedFireConfig {
     /// Rover/fixed-wing plant modifiers; only the values the configuration sets.
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub plant: Table,
+    /// Real parts named in [models] (crate::parts): what each filled, from
+    /// which datasheet figures, and what its level cannot represent.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<serde_json::Value>,
 }
 
 impl ResolvedFireConfig {
@@ -558,6 +562,14 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         }
         raw = selected.clone();
     }
+    let (expanded, parts) =
+        crate::parts::expand(raw.as_table().ok_or("configuration must be a table")?)?;
+    let mut c = resolve_root(Value::Table(expanded))?;
+    c.parts = parts;
+    Ok(c)
+}
+
+fn resolve_root(raw: Value) -> Result<ResolvedFireConfig> {
     let root = raw.as_table().ok_or("configuration must be a table")?;
     let version = root
         .get("schema_version")
@@ -683,6 +695,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         gnss,
         acoustic,
         plant: Table::new(),
+        parts: Vec::new(),
     })
 }
 

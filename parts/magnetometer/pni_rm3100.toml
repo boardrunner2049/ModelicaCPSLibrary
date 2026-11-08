@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "PNI RM3100"
+kind = "magnetometer"
+manufacturer = "PNI Sensor"
+source = "RM3100 & RM2100 Sensor Suite User Manual, Doc 1017252 R07, June 2016 (pnicorp.com, behind a form)"
+notes = "Range ±800 uT in the manual (the product page says ±1100 uT). Noise and resolution at cycle count 200. Noise density 1.2 nT/rtHz at the maximum single-axis rate."
+full_scale_gauss = 8.0                # ±800 uT (Table 3-1)
+resolution_mgauss = 0.13              # 13 nT at cycle count 200
+rms_noise_mgauss = 0.15               # 15 nT at cycle count 200
+rms_noise_setting = "cycle count 200"
+adc_bits = 24                         # result registers (a cycle counter, not an ADC)
+odr_max_hz = 533                      # 1600 Hz single-axis at cycle count 50, divided by 3 (Table 3-1 note)
+odr_at_noise_hz = 146.7               # 440 Hz single-axis at cycle count 200, divided by 3 (Table 3-1 note)
+linearity_pct = 0.5                   # over ±200 uT

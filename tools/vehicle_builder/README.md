@@ -18,6 +18,13 @@ Standard library only. The page shows, per airframe (quad, rover, plane):
 | IMU | I0 ideal, I1 digital, I2 errors, I3 electromechanical | every `[imu]` key the level accepts, starting from `configs/quad_iN.toml`; mount (rover/plane) |
 | Magnetometer, barometer, GNSS | M0/B0/G0 ideal; M1/B1 sampled, G1 statistical | every key the level accepts, the sampled ones starting from `runtime/hosts/ardupilot/examples/rover_all_sensors.toml`; mounts (rover/plane) |
 
+Each sensor also offers real **devices** (`parts/`: a u-blox NEO-M9N, an
+ICM-42688-P, ...). Picking one selects its level and fills the parameters from
+its datasheet; the fields then show the part's values as placeholders and only
+what you type overrides them. "What the level leaves out or assumes" lists the
+datasheet figures the level cannot represent. `?gnss=ublox_neo_m9n&imu=tdk_icm42688p`
+in the URL starts with those devices.
+
 Each level says how fast it runs in SITL; the slow ones (I3, P3, P4) are marked.
 Every edit is composed and checked by `fire-compose validate`; the run file
 (`[sitl]` and `[physics]`, as `runtime/hosts/ardupilot/run.sh` takes it) is

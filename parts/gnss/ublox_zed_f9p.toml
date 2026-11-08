@@ -1,0 +1,26 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "u-blox ZED-F9P"
+kind = "gnss"
+manufacturer = "u-blox"
+source = "ZED-F9P-04B High precision GNSS module Data sheet, UBX-21044850 R05, 21-Mar-2024, https://content.u-blox.com/sites/default/files/ZED-F9P-04B_DataSheet_UBX-21044850.pdf"
+notes = "PPP-RTK (Table 4): SPARTN < 0.06 m horizontal CEP, CLAS 0.04 m; not modelled as a mode. Moving-base heading 0.4 deg."
+horizontal_cep_m = 1.5             # p5 Table 3, PVT, GPS+GLO+GAL+BDS, 24 h static
+horizontal_cep_sbas_m = 1.0        # p5 Table 3, SBAS
+horizontal_cep_rtk_m = 0.01        # p5 Table 3, RTK, 1 km baseline
+rtk_ppm = 1                        # p5 Table 3, "+1 ppm", baselines up to 20 km
+vertical_median_m = 2.0            # p5 Table 3, PVT vertical (median)
+vertical_median_sbas_m = 1.5       # p5 Table 3, SBAS vertical (median)
+vertical_rtk_m = 0.01              # p5 Table 3, RTK vertical (median), + 1 ppm
+velocity_accuracy_mps = 0.05       # p4 Table 1, 50 % at 30 m/s
+heading_accuracy_deg = 0.3         # p4 Table 1, 50 % at 30 m/s
+nav_rate_max_hz = 9                # p4 Table 2, PVT, GPS+GLO+GAL+BDS
+nav_rate_max_rtk_hz = 7            # p4 Table 2, RTK, GPS+GLO+GAL+BDS
+nav_rate_max_single_gnss_hz = 25   # p4 Table 2, PVT, GPS only
+time_pulse_accuracy_ns = 30
+cold_start_s = 25
+hot_start_s = 2
+tracking_sensitivity_dbm = -167
+max_dynamics_g = 4
+max_velocity_mps = 500
+max_altitude_m = 80000
+concurrent_gnss = 4
