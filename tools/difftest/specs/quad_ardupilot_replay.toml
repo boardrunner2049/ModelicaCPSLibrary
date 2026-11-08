@@ -1,0 +1,42 @@
+# The same motor commands into two physics, open loop: ArduPilot's own X quad
+# flies the mission (A); its servo outputs, frame by frame, drive the CP Models
+# quad with no autopilot (B). How long B follows A is how alike the two
+# airframes respond (thrust and torque per command, inertia, drag). A
+# multirotor is unstable open loop, so B departs eventually in any case.
+title = "Quad: CP Models driven by ArduPilot SITL's motor commands"
+
+[a]
+name = "ArduPilot SITL X quad"
+[a.sitl]
+model = "x"
+vehicle = "copter"
+parameters = ["third_party/ardupilot/Tools/autotest/default_params/copter.parm",
+              "ardupilot_quad_x.parm"]
+speedup = 2
+instance = 12
+
+[b.replay]
+model = "quad"
+inputs = "a"
+
+[compare]
+align = "command"       # the first motor command that changes: the motors start
+rate = 200
+
+# Four nearly equal commands on a level airframe: B should stay level, as A
+# does, through liftoff (about 2 s after the motors start). Fails today: the
+# CP Models quad picks up ~0.38 rad/s about a diagonal while its landing gear
+# unloads, and keeps it once airborne (no autopilot to stop it).
+[[check]]
+channel = "roll"
+tol = 0.1
+hold = 3.0
+[[check]]
+channel = "pitch"
+tol = 0.1
+hold = 3.0
+# Thrust per command: B's height stays within 0.5 m of A's.
+[[check]]
+channel = "pos_d"
+tol = 0.5
+hold = 3.0

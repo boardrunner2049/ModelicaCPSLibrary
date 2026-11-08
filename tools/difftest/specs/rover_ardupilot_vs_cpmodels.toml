@@ -1,0 +1,30 @@
+# The same autopilot and mission on two physics: ArduPilot's own SITL rover (A)
+# and the CP Models rover (B), closed loop, from the moment each starts moving.
+title = "Rover: ArduPilot SITL physics vs CP Models, same mission"
+
+[a]
+name = "ArduPilot SITL rover"
+[a.sitl]
+model = "rover"
+vehicle = "rover"
+speedup = 2
+instance = 8
+
+[b]
+name = "CP Models rover"
+[b.sitl]
+config = "configs/rover.toml"
+speedup = 2
+instance = 9
+
+[compare]
+align = "motion"
+xcorr = "pos_n"
+max_shift = 5.0
+rate = 50
+
+# Two runs that each keep within the mission check's 1.5 m of every leg are
+# within 3 m of each other's track.
+[[check]]
+channel = "path"
+max = 3.0

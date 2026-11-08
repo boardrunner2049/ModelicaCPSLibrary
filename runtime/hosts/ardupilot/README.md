@@ -13,7 +13,7 @@ here:
 | Path | What |
 |---|---|
 | `src/SIM_CPVehicle.{cpp,h}` | the SITL model: maps SITL servos, time and home to the vehicle interface and its outputs back to SITL |
-| `hooks.patch` | the edits ArduPilot needs: an entry in SITL's model table, the waf option `--cpvehicle=PATH` and the link flags; and `sitl_fdm::model_sensors`, through which SITL's GPS and barometer drivers report the model's own readings |
+| `hooks.patch` | the edits ArduPilot needs: an entry in SITL's model table, the waf option `--cpvehicle=PATH` and the link flags; `sitl_fdm::model_sensors`, through which SITL's GPS and barometer drivers report the model's own readings; and `SITL_TRACE=FILE`, every physics frame's servo outputs and truth state as a trace, for any physics backend (`tools/difftest`) |
 | `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check); pick the parts in the browser with `tools/vehicle_builder` |
 | `fidelity.sh`, `fidelity.py` | one airframe flown with one part (IMU, propulsion, sensors, actuators) at each fidelity level, all at once |
 | `build.sh`, `runspec.py` | vehicles to SITL binaries; resolving a vehicle name or TOML |
@@ -148,6 +148,9 @@ within 0.98 m of its track and stops 0.45 m from home; GNSS G1 alone 0.73 m
 (rover), landed 0.8-1.0 m from home in three of three quad flights, touchdown
 28.2 m before the aim point (plane); S1 steering 0.57 m; D0 and D1 drive fly
 the same mission alike.
+
+To compare a vehicle with ArduPilot's own SITL physics, or with itself
+driven open loop, see `tools/difftest`.
 
 ## Build only
 

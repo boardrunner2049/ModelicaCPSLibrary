@@ -67,7 +67,7 @@ index 042bb2ce7f..590bbbbed2 100644
      { "novehicle",          NoVehicle::create },
  #if AP_SIM_STRATOBLIMP_ENABLED
 diff --git a/libraries/SITL/SIM_Aircraft.cpp b/libraries/SITL/SIM_Aircraft.cpp
-index 634334404b..525a61a9b3 100644
+index 634334404b..dd6bc25a31 100644
 --- a/libraries/SITL/SIM_Aircraft.cpp
 +++ b/libraries/SITL/SIM_Aircraft.cpp
 @@ -402,6 +402,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
@@ -78,11 +78,95 @@ index 634334404b..525a61a9b3 100644
  
      fdm.bodyMagField.rotate(sitl->imu_orientation);
  
+@@ -669,12 +670,73 @@ void Aircraft::update_model(const struct sitl_input &input)
+ {
+     local_ground_level = 0.0f;
+     if (sitl != nullptr) {
++        write_trace(input);
+         update(input);
+     } else {
+         time_advance();
+     }
+ }
+ 
++/*
++  A row per frame, before the frame is simulated: the state at its start and
++  the servo outputs held over it. Any physics backend, the same columns.
++ */
++void Aircraft::write_trace(const struct sitl_input &input)
++{
++    static FILE *trace;
++    static bool opened;
++    static uint32_t every = 1, frames;
++    if (!opened) {
++        opened = true;
++        const char *path = getenv("SITL_TRACE");
++        if (path == nullptr || path[0] == '\0') {
++            return;
++        }
++        trace = fopen(path, "w");
++        if (trace == nullptr) {
++            AP_HAL::panic("SITL_TRACE: cannot write %s", path);
++        }
++        const char *n = getenv("SITL_TRACE_EVERY");
++        if (n != nullptr && atoi(n) > 0) {
++            every = atoi(n);
++        }
++        fprintf(trace, "# source: ardupilot-sitl\n# model: %s\n# frame_rate_hz: %.1f\n",
++                frame != nullptr ? frame : "", rate_hz);
++        fprintf(trace, "t,pos_n,pos_e,pos_d,vel_n,vel_e,vel_d,qw,qx,qy,qz,roll,pitch,yaw,"
++                "rate_x,rate_y,rate_z,accel_x,accel_y,accel_z");
++        for (uint8_t i = 0; i < 16; i++) {
++            fprintf(trace, ",pwm%u", unsigned(i + 1));
++        }
++        fprintf(trace, "\n");
++    }
++    if (trace == nullptr || frames++ % every != 0) {
++        return;
++    }
++    if (frames == 1) {
++        // No backend has run yet: there is no state, only the commands.
++        fprintf(trace, "%.6f%s", time_now_us * 1.0e-6, ",,,,,,,,,,,,,,,,,,,");
++        for (uint8_t i = 0; i < 16; i++) {
++            fprintf(trace, ",%u", unsigned(input.servos[i]));
++        }
++        fprintf(trace, "\n");
++        return;
++    }
++    const Vector3d pos = get_position_relhome();
++    Quaternion q;
++    q.from_rotation_matrix(dcm);
++    float roll, pitch, yaw;
++    dcm.to_euler(&roll, &pitch, &yaw);
++    fprintf(trace, "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.8f,%.8f,%.8f,%.8f,%.7f,%.7f,%.7f,"
++            "%.7f,%.7f,%.7f,%.6f,%.6f,%.6f",
++            time_now_us * 1.0e-6, pos.x, pos.y, pos.z, velocity_ef.x, velocity_ef.y, velocity_ef.z,
++            q.q1, q.q2, q.q3, q.q4, roll, pitch, yaw, gyro.x, gyro.y, gyro.z,
++            accel_body.x, accel_body.y, accel_body.z);
++    for (uint8_t i = 0; i < 16; i++) {
++        fprintf(trace, ",%u", unsigned(input.servos[i]));
++    }
++    fprintf(trace, "\n");
++}
++
+ /*
+   update the simulation attitude and relative position
+  */
 diff --git a/libraries/SITL/SIM_Aircraft.h b/libraries/SITL/SIM_Aircraft.h
-index a00424ce8b..e81880430c 100644
+index a00424ce8b..67037586c3 100644
 --- a/libraries/SITL/SIM_Aircraft.h
 +++ b/libraries/SITL/SIM_Aircraft.h
-@@ -242,6 +242,7 @@ protected:
+@@ -89,6 +89,9 @@ public:
+     virtual void update(const struct sitl_input &input) = 0;
+ 
+     void update_model(const struct sitl_input &input);
++    // SITL_TRACE=FILE: every physics frame's inputs and truth state as CSV
++    // (tools/difftest trace columns); SITL_TRACE_EVERY=N keeps every Nth frame.
++    void write_trace(const struct sitl_input &input);
+ 
+     void update_home();
+ 
+@@ -242,6 +245,7 @@ protected:
      float turbulence_vertical_speed;    // m/s
  
      Vector3f mag_bf;  // local earth magnetic field vector in Gauss, earth frame

@@ -88,6 +88,8 @@ add_executable(cpv_realtime examples/realtime_probe.c)
 target_link_libraries(cpv_realtime PRIVATE cpvehicle_static)
 add_executable(cpv_sensors examples/sensor_probe.c)
 target_link_libraries(cpv_sensors PRIVATE cpvehicle_static)
+add_executable(cpv_replay examples/trace_replay.c)
+target_link_libraries(cpv_replay PRIVATE cpvehicle_static m)
 
 include(CTest)
 if(BUILD_TESTING)

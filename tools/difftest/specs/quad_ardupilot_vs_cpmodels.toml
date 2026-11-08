@@ -1,0 +1,39 @@
+# The same autopilot and mission on two physics: ArduPilot's own SITL quad (A)
+# and the CP Models quad (B). Closed loop: each run is stabilized by its own
+# autopilot, so their timing differs; the track (path) and the flight's shape
+# are compared, from takeoff.
+title = "Quad: ArduPilot SITL physics vs CP Models, same mission"
+
+[a]
+name = "ArduPilot SITL quad"
+[a.sitl]
+model = "x"             # ArduPilot's X quad, as the CP Models quad
+vehicle = "copter"
+parameters = ["third_party/ardupilot/Tools/autotest/default_params/copter.parm",
+              "ardupilot_quad_x.parm"]
+speedup = 2
+
+[b]
+name = "CP Models quad"
+[b.sitl]
+config = "configs/quad.toml"
+speedup = 2
+
+[compare]
+align = "takeoff"
+xcorr = "pos_d"         # the climbs line up
+max_shift = 5.0
+rate = 50
+
+[[check]]
+channel = "path"        # B's track is A's, whatever the timing
+max = 2.0
+[[check]]
+channel = "pos_d"
+rmse = 1.0
+# Fails today: the CP Models quad starts facing east whatever SITL's home
+# heading (MultirotorPlant q_start), ArduPilot's quad faces the home heading
+# (north), so yaw differs by 90 deg until the first waypoint turns both.
+[[check]]
+channel = "attitude"
+rmse = 0.1

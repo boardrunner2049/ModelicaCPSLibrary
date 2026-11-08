@@ -1,0 +1,3 @@
+# ArduPilot's own SITL quad as an X frame, motor numbering as the CP Models quad's.
+FRAME_CLASS 1
+FRAME_TYPE  1

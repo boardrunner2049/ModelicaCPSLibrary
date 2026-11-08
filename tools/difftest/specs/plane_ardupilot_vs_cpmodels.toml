@@ -1,0 +1,28 @@
+# The same autopilot and mission on two physics: ArduPilot's own SITL plane (A)
+# and the CP Models plane (B), closed loop, from the start of the takeoff roll.
+title = "Plane: ArduPilot SITL physics vs CP Models, same mission"
+
+[a]
+name = "ArduPilot SITL plane"
+[a.sitl]
+model = "plane"
+vehicle = "plane"
+speedup = 2
+instance = 10
+
+[b]
+name = "CP Models plane"
+[b.sitl]
+config = "configs/plane.toml"
+speedup = 2
+instance = 11
+
+[compare]
+align = "motion"
+rate = 20
+
+# Two runs that each keep within the mission check's 25 m of every leg are
+# within 50 m of each other's track.
+[[check]]
+channel = "path"
+max = 50.0

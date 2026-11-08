@@ -1,0 +1,34 @@
+# Self-consistency of the chain: the CP Models quad flown in SITL (A), and the
+# same model driven open loop, outside SITL, by A's own servo outputs (B).
+# Same model, same commands at the same frame times: any difference is the
+# host (the adapter, the recorder, cpv_replay), not physics.
+title = "CP Models quad: SITL vs open-loop replay of its own commands"
+
+[a.sitl]
+config = "configs/quad.toml"
+speedup = 2
+
+[b.replay]
+model = "quad"
+inputs = "a"
+
+[compare]
+align = "start"
+rate = 100
+
+# Numerical noise only (the traces' printed precision).
+[[check]]
+channel = "position"
+max = 1e-4
+[[check]]
+channel = "vel_*"
+max = 1e-4
+[[check]]
+channel = "attitude"
+max = 1e-5
+[[check]]
+channel = "accel_*"
+max = 1e-4
+[[check]]
+channel = "pwm*"
+max = 0
