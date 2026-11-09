@@ -100,7 +100,23 @@ ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--mut
 .garage { position: relative; background: radial-gradient(ellipse at 50% 40%, var(--g-stage-a), var(--g-stage-b));
   border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
 @media (min-width: 901px) and (min-height: 820px) { .garage { position: sticky; top: 0; z-index: 2; } }
-.g-svg { display: block; width: 100%; height: clamp(190px, 30vh, 300px); }
+.g-svg { display: block; width: 100%; height: clamp(170px, 27vh, 280px); }
+.g-shelf { display: flex; gap: 8px; padding: 8px 10px; overflow-x: auto; scroll-behavior: smooth;
+  border-top: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 82%, transparent); }
+.g-shelf[hidden] { display: none; }
+.g-card { flex: 0 0 196px; text-align: left; display: flex; flex-direction: column; gap: 3px;
+  padding: 8px 10px; border-radius: 9px; background: var(--panel); position: relative; }
+.g-card strong { font-size: 13px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; padding-right: 54px; }
+.g-card em { position: absolute; top: 8px; right: 8px; font: 600 10.5px system-ui, sans-serif;
+  font-style: normal; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.g-card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; font-size: 12px; }
+.g-card dt { color: var(--muted); }
+.g-card dd { margin: 0; font-variant-numeric: tabular-nums; }
+.g-card:hover { border-color: var(--accent); }
+.g-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.g-card[aria-pressed="true"] em { color: var(--accent); }
 .g-caption { position: absolute; left: 14px; top: 10px; max-width: 60%; pointer-events: none;
   display: flex; flex-direction: column; gap: 1px; text-shadow: 0 1px 0 var(--g-stage-a); }
 .g-caption strong { font-size: 16px; letter-spacing: .01em; }
@@ -444,7 +460,8 @@ function garageInfo() {
       if (o) (picked[p.id] = picked[p.id] || {})[k] = o.name;
     }
   }
-  return { airframe: state.airframe, parts: frame().parts, levels, devices, picked };
+  return { airframe: state.airframe, parts: frame().parts, levels, devices, picked,
+           chosen: { devices: state.devices, slots: state.slots } };
 }
 
 function markCard() {
@@ -467,6 +484,10 @@ Garage.mount($("garage"), (key) => {
   markCard();
   const card = document.querySelector(`#parts section.card[data-part="${key.split(".")[0]}"]`);
   if (card && key !== "overview") card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}, (partId, slot, id) => {
+  // A card on the garage's shelf: install that part.
+  const part = frame().parts.find((p) => p.id === partId);
+  if (slot) pickSlot(part, slot, id); else pickDevice(part, id);
 });
 
 function choice() {

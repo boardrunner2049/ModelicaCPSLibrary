@@ -180,7 +180,7 @@ def devices(cc: dict, kind: str, levels: list[str]) -> list[dict]:
                 "not_represented": rep["not_represented"],
                 "not_stated": rep["not_stated"],
             }
-        out.append({**p, "levels": per_level})
+        out.append({**p, "levels": per_level, "stats": stats(kind, p["id"])})
     return out
 
 
@@ -239,6 +239,49 @@ def catalog() -> dict:
     return {"airframes": airframes}
 
 
+# Headline figures of a real part, for the builder's part cards: (label,
+# format, datasheet keys). A figure whose keys a part does not state is left out.
+STATS = {
+    "motor": [("KV", "{} rpm/V", "kv_rpm_per_v"), ("Cells", "{}-{}S", "cells_min cells_max"),
+              ("Max thrust", "{} g", "max_thrust_g"), ("Mass", "{} g", "weight_g")],
+    "propeller": [("Size", "{} x {} in", "diameter_in pitch_in"), ("Max", "{} rpm", "max_rpm"),
+                  ("Mass", "{} oz", "mass_oz")],
+    "battery": [("Pack", "{}S{}P", "cells_series cells_parallel"), ("Capacity", "{} mAh", "capacity_mah"),
+                ("Discharge", "{}C", "c_rating_continuous"), ("Mass", "{} g", "weight_g")],
+    "esc": [("Current", "{} A ({} A burst)", "current_continuous_a current_burst_a"),
+            ("Cells", "{}-{}S", "cells_min cells_max"), ("Mass", "{} g", "weight_g")],
+    "servo": [("Speed", "{} s/60° at {} V", "speed_s_per_60deg speed_at_v"),
+              ("Torque", "{} kg·cm", "torque_kgcm"), ("Mass", "{} g", "weight_g")],
+    "gearmotor": [("Gearing", "{}:1", "gear_ratio"),
+                  ("No load", "{} rpm at {} V", "no_load_speed_rpm rated_voltage_v"),
+                  ("Stall", "{} kg·cm", "stall_torque_kgcm"), ("Mass", "{} g", "weight_g")],
+    "imu": [("Gyro noise", "{} °/s/√Hz", "gyro_noise_density_dps_rthz"),
+            ("Accel noise", "{} µg/√Hz", "accel_noise_density_ug_rthz"),
+            ("Range", "±{} °/s, ±{} g", "gyro_full_scale_dps accel_full_scale_g")],
+    "magnetometer": [("Range", "±{} G", "full_scale_gauss"), ("Noise", "{} mG RMS", "rms_noise_mgauss"),
+                     ("Resolution", "{} mG", "resolution_mgauss"), ("Rate", "{} Hz", "odr_max_hz")],
+    "barometer": [("Noise", "{} Pa RMS", "pressure_rms_noise_pa"),
+                  ("Relative", "±{} Pa", "relative_accuracy_pa"), ("Rate", "{} Hz", "odr_max_hz")],
+    "gnss": [("Position", "{} m CEP", "horizontal_cep_m"), ("Velocity", "{} m/s", "velocity_accuracy_mps"),
+             ("Rate", "{} Hz", "nav_rate_max_hz"), ("Cold start", "{} s", "cold_start_s")],
+}
+
+
+def stats(kind: str, part_id: str) -> list[list[str]]:
+    """[[label, text], ...] of a part (parts/KIND/ID.toml), per STATS."""
+    path = ROOT / "parts" / kind / f"{part_id}.toml"
+    if not path.exists():
+        return []
+    with open(path, "rb") as f:
+        sheet = tomllib.load(f)
+    out = []
+    for label, fmt, keys in STATS.get(kind, []):
+        values = [sheet.get(k) for k in keys.split()]
+        if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+            out.append([label, fmt.format(*(f"{v:g}" for v in values))])
+    return out
+
+
 # Real powertrain parts each actuator can be assembled from: (slot key, title,
 # part kind). The composer converts them (fire-compose src/powertrain.rs).
 SLOTS = {
@@ -253,7 +296,8 @@ SLOTS = {
 def slots(cc: dict, part: str) -> list[dict]:
     """The device pickers of an actuator: each slot's parts from the catalog."""
     return [{"key": key, "title": title,
-             "options": [{"id": p["id"], "name": p["name"], "source": p["source"]}
+             "options": [{"id": p["id"], "name": p["name"], "source": p["source"],
+                          "stats": stats(kind, p["id"])}
                          for p in cc.get("parts", {}).get(kind, [])]}
             for key, title, kind in SLOTS.get(part, [])]
 

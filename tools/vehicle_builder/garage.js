@@ -7,7 +7,7 @@
 const Garage = (() => {
   const NS = "http://www.w3.org/2000/svg";
   const VIEW = [0, 0, 800, 420];
-  let svg, caption, chips, onPick = () => {}, view = VIEW.slice(), anim = 0;
+  let svg, caption, chips, shelf, onPick = () => {}, onChoose = () => {}, view = VIEW.slice(), anim = 0;
   let focusKey = "overview", info = null;
 
   // --- what the picks say about the drawing ----------------------------------
@@ -165,6 +165,62 @@ const Garage = (() => {
     for (const c of chips.querySelectorAll("button"))
       c.setAttribute("aria-pressed", String(c.dataset.focus === focusKey));
     showCaption();
+    showShelf();
+  }
+
+  // The shelf: the real parts that fit the focused part, as cards with their
+  // headline figures; the installed one marked. Picking one installs it.
+  function card(title, rows, pressed, act, badge) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "g-card";
+    b.setAttribute("aria-pressed", String(pressed));
+    const name = Object.assign(document.createElement("strong"), { textContent: title });
+    b.append(name);
+    if (badge) b.append(Object.assign(document.createElement("em"), { textContent: badge }));
+    const dl = document.createElement("dl");
+    for (const [k, v] of rows) {
+      if (k) dl.append(Object.assign(document.createElement("dt"), { textContent: k }));
+      dl.append(Object.assign(document.createElement("dd"), { textContent: v }));
+    }
+    b.append(dl);
+    b.addEventListener("click", act);
+    return b;
+  }
+
+  function showShelf() {
+    const [partId, slotKey] = focusKey.split(".");
+    const p = info && info.parts.find((x) => x.id === partId);
+    const slots = p ? (p.slots || []).filter((x) => x.options.length) : [];
+    let cards = [];
+    const generic = (pressed, act) => card("Generic", [["", "set the parameters yourself"]], pressed, act,
+                                           pressed ? "installed" : "");
+    if (!p) {
+      cards = [];
+    } else if (slots.length > 1 && !slotKey) {
+      // An assembly (propulsion, drive): one card per slot, to go to it.
+      cards = slots.map((sl) => {
+        const id = info.chosen.slots[p.id]?.[sl.key];
+        const o = sl.options.find((x) => x.id === id);
+        return card(sl.title, o ? [["", o.name]] : [["", "generic"]], false,
+                    () => { focus(`${p.id}.${sl.key}`); onPick(`${p.id}.${sl.key}`); }, "choose ›");
+      });
+    } else if (slots.length) {
+      const sl = slots.find((x) => x.key === slotKey) || slots[0];
+      const picked = info.chosen.slots[p.id]?.[sl.key] || "";
+      cards = [generic(!picked, () => onChoose(p.id, sl.key, "")),
+               ...sl.options.map((o) => card(o.name, o.stats || [], o.id === picked,
+                 () => onChoose(p.id, sl.key, o.id), o.id === picked ? "installed" : ""))];
+    } else if ((p.devices || []).length) {
+      const picked = info.chosen.devices[p.id] || "";
+      cards = [generic(!picked, () => onChoose(p.id, null, "")),
+               ...p.devices.map((d) => card(d.name, d.stats || [], d.id === picked,
+                 () => onChoose(p.id, null, d.id), d.id === picked ? "installed" : ""))];
+    }
+    shelf.hidden = !cards.length;
+    shelf.replaceChildren(...cards);
+    const on = shelf.querySelector('[aria-pressed="true"]');
+    if (on) shelf.scrollLeft = Math.max(0, on.offsetLeft - shelf.clientWidth / 2 + on.clientWidth / 2);
   }
 
   function showCaption() {
@@ -211,13 +267,17 @@ const Garage = (() => {
   }
 
   // --- the page's side ---------------------------------------------------------------
-  function mount(stage, pick) {
+  function mount(stage, pick, choose) {
     onPick = pick;
+    onChoose = choose;
     stage.innerHTML = `<svg class="g-svg" viewBox="${VIEW.join(" ")}" role="img" aria-label="The vehicle"></svg>` +
-      `<div class="g-caption" aria-live="polite"></div><div class="g-chips" role="toolbar" aria-label="Parts"></div>`;
+      `<div class="g-caption" aria-live="polite"></div>` +
+      `<div class="g-shelf" role="group" aria-label="Real parts" hidden></div>` +
+      `<div class="g-chips" role="toolbar" aria-label="Parts"></div>`;
     svg = stage.querySelector("svg");
     caption = stage.querySelector(".g-caption");
     chips = stage.querySelector(".g-chips");
+    shelf = stage.querySelector(".g-shelf");
     new ResizeObserver(() => { if (info) { cancelAnimationFrame(anim); view = frameOf(focusKey);
       svg.setAttribute("viewBox", view.join(" ")); } }).observe(svg);
     svg.addEventListener("click", (e) => {
@@ -229,7 +289,7 @@ const Garage = (() => {
   }
 
   // info: {airframe, parts, levels: {id: level}, devices: {id: name},
-  //        picked: {part: {slot: name}}}
+  //        picked: {part: {slot: name}}, chosen: {devices: {part: id}, slots: {part: {slot: id}}}}
   function update(next) {
     const changedFrame = !info || info.airframe !== next.airframe;
     info = next;

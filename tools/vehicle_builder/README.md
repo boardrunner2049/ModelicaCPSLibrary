@@ -23,6 +23,11 @@ above). Picking a part, by its card, one of its pickers, the buttons under
 the drawing or the part itself, moves the camera onto it and lights it, and
 the caption says its level and the device picked. The drawing follows the
 parts: propeller diameter, motor size, battery cells and capacity.
+Under the drawing, the **shelf** offers the real parts that fit the focused
+part (the sensors' devices, a motor, propeller, battery or ESC, a servo, a
+gearmotor), each with its headline datasheet figures (`parts.py` `STATS`);
+picking one installs it, as its card's picker does. For an assembly
+(propulsion, drive) the shelf shows each slot and what is installed in it.
 `?focus=propulsion.propeller` (or `imu`, `gnss`, `steering`, ...) opens on a part.
 
 Each sensor also offers real **devices** (`parts/`: a u-blox NEO-M9N, an
