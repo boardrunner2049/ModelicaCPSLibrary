@@ -22,12 +22,12 @@ The airframe is configs/KIND.toml. Only PART changes with LEVEL:
               inductance, S1 rate-limited servos (library default parameters).
 
 Parameters are the library's illustrative ones, not hardware calibration.
-The levels and their parameters are tools/vehicle_builder/parts.py's.
+The levels and their parameters are tools/compose/parts.py's.
 """
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools" / "vehicle_builder"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools" / "compose"))
 import parts  # noqa: E402
 
 PARTS = {

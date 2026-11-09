@@ -1,6 +1,6 @@
 //! What a configuration can select, as data: vehicle kinds with their
 //! configurable parameters, and the models available for each part. Frontends
-//! (tools/vehicle_builder) read it with `fire-compose catalog`, so they offer
+//! (tools/compose) read it with `fire-compose catalog`, so they offer
 //! exactly what the composer accepts.
 use crate::{config, imu, parts, sensors, vehicle};
 use serde_json::{json, Value};

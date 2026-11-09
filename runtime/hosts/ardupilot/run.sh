@@ -104,5 +104,9 @@ if [[ -n $mission ]]; then
   pids+=($!)
   echo "mission check: $work/mission.log"
 fi
-"$mavproxy" --master tcp:127.0.0.1:$port --map --console --out udp:127.0.0.1:$gcs \
+# RUN_NO_CONSOLE=1: no console window; its messages (arming, pre-arm checks,
+# modes) print with the MAV> prompt instead, for a caller that is the terminal.
+console=(--console)
+[[ -n ${RUN_NO_CONSOLE:-} ]] && console=()
+"$mavproxy" --master tcp:127.0.0.1:$port --map "${console[@]}" --out udp:127.0.0.1:$gcs \
   --out udp:127.0.0.1:$check_port --state-basedir "$work" ${RUN_NONINTERACTIVE:+--non-interactive}

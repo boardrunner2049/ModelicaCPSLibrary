@@ -14,7 +14,7 @@ here:
 |---|---|
 | `src/SIM_CPVehicle.{cpp,h}` | the SITL model: maps SITL servos, time and home to the vehicle interface and its outputs back to SITL |
 | `hooks.patch` | the edits ArduPilot needs: an entry in SITL's model table, the waf option `--cpvehicle=PATH` and the link flags; `sitl_fdm::model_sensors`, through which SITL's GPS and barometer drivers report the model's own readings; and `SITL_TRACE=FILE`, every physics frame's servo outputs and truth state as a trace, for any physics backend (`tools/difftest`) |
-| `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check); pick the parts in the browser with `tools/vehicle_builder` |
+| `run.sh` | **one TOML in, vehicle generated, flying in SITL** (map, or headless mission check); pick the parts in the browser with Compose (`tools/compose`) |
 | `fidelity.sh`, `fidelity.py` | one airframe flown with one part (IMU, propulsion, sensors, actuators) at each fidelity level, all at once |
 | `build.sh`, `runspec.py` | vehicles to SITL binaries; resolving a vehicle name or TOML |
 | `examples/` | run files (`*.toml`), parameter files, mission checks (`fly_mission.py`, `fly_auto.py`, on the autopilot's clock: `mavclock.py`) |

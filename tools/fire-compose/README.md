@@ -22,7 +22,7 @@ cargo run --locked --offline --manifest-path tools/fire-compose/Cargo.toml -- ca
 
 `catalog` prints what a configuration can select as JSON (vehicle kinds and
 their parameters, IMU models and the `[imu]` keys each accepts, propulsion
-levels P0-P4); `tools/vehicle_builder` is a browser frontend built on it.
+levels P0-P4); `tools/compose` (Compose) is a browser frontend built on it.
 
 Only `schema_version=3` is accepted. World is NED; body/chassis is FRD. Presets preserve
 previous physical rotor/mount order and East-facing initial heading. Explicit numeric

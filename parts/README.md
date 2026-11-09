@@ -30,7 +30,7 @@ tools/fire-compose/target/debug/fire-compose part barometer bmp388 --tolerances 
 ```
 
 The same report goes into the composed model's manifest (`config.parts`), and
-the vehicle builder offers the devices under each sensor.
+Compose (`tools/compose`) offers the devices under each sensor.
 
 ## The conversions
 

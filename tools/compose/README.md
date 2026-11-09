@@ -1,10 +1,10 @@
-# Vehicle builder
+# Compose
 
 Pick a vehicle's parts from CP Models in the browser, get its TOML, and fly it
 in ArduPilot SITL.
 
 ```sh
-python3 tools/vehicle_builder/server.py            # http://127.0.0.1:8765
+python3 tools/compose/server.py            # http://127.0.0.1:8765
 ssh -L 8765:127.0.0.1:8765 HOST                     # from another machine, then open the same URL
 ```
 
@@ -48,10 +48,22 @@ Each level says how fast it runs in SITL; the slow ones (I3, P3, P4) are marked.
 Every edit is composed and checked by `fire-compose validate`; the run file
 (`[sitl]` and `[physics]`, as `runtime/hosts/ardupilot/run.sh` takes it) is
 shown as you go. An empty parameter keeps the Modelica default. **Save** writes
-it anywhere. **Build & fly** writes `build/vehicle-builder/NAME.toml` and runs
+it anywhere. **Build & fly** writes `build/compose/NAME.toml` and runs
 `run.sh` on it: map with the mission flying itself, map for you to fly, or a
-headless mission check; its output streams into the page and **Stop** ends the
-build, SITL and MAVProxy. The map opens on the display of the machine running
+headless mission check. **Stop** ends the build, SITL and MAVProxy.
+
+The **terminal** opens at the bottom of the window as soon as you press Build
+& fly and shows everything the run prints, raw, as it comes (the build,
+SITL, MAVProxy and the autopilot's messages: arming, pre-arm checks, modes).
+Its **SITL log** and **Mission log** tabs show those files raw. Its command
+line is MAVProxy's `MAV>` prompt (↑/↓ for history), with buttons for the
+usual commands (Guided, Arm, Take off, Auto, RTL, Land, Disarm); what you send
+is shown in its own colour and marked sent. MAVProxy runs without its console
+window here (`RUN_NO_CONSOLE=1`), so its messages come to the terminal. The
+terminal has its own colours: Midnight, Matrix, Amber, Solarized, Dracula,
+Paper, or **Custom** (pick background, output, command, note and hint
+colours); text size, height (drag its top edge) and folding are remembered in
+the browser; `?terminal=amber` picks a scheme for one page. The map opens on the display of the machine running
 the server. Building needs what `run.sh` needs on PATH (see
 `runtime/hosts/ardupilot/README.md`). Runs at the same time use separate SITL
 instances. `?airframe=rover` opens on an airframe.

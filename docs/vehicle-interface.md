@@ -248,7 +248,7 @@ esc/motor/rotor selection for them.
 
 `fire-compose catalog` prints all of this as JSON: the vehicle kinds and
 their parameters, the IMU models with the `[imu]` keys each accepts, and the
-propulsion levels. `tools/vehicle_builder` (a browser page) builds a
+propulsion levels. `tools/compose` (Compose, a browser page) builds a
 configuration from it part by part, checks every edit with
 `fire-compose validate`, and can fly the result in ArduPilot SITL.
 

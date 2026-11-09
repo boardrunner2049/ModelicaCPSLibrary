@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vehicle Builder</title>
+<title>Compose</title>
 <style>
 :root {
   color-scheme: light;
@@ -95,6 +95,51 @@ ul.checks { margin: 6px 0; padding-left: 18px; font-size: 13px; font-family: ui-
 ul.checks li.warn { color: var(--bad, #b42318); }
 ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
 .msg { color: var(--muted); font-size: 13px; }
+/* The run terminal: its own colours (terminal.js). */
+.term { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--t-height, 42vh);
+  display: flex; flex-direction: column; background: var(--t-bg); color: var(--t-fg);
+  border-top: 1px solid color-mix(in srgb, var(--t-fg) 25%, transparent); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); }
+.term.collapsed { height: auto; }
+.term.collapsed > :not(.t-tabs):not(.t-grip) { display: none; }
+body.docked main { padding-bottom: calc(var(--t-height, 42vh) + 16px); }
+body.docked.collapsed main { padding-bottom: 56px; }
+.t-grip { height: 6px; cursor: ns-resize; flex: none; touch-action: none; }
+.t-grip:hover { background: color-mix(in srgb, var(--t-fg) 20%, transparent); }
+.t-title { font: 600 12px system-ui, sans-serif; padding: 0 8px 0 4px; color: var(--t-sys); }
+.term[hidden] { display: none; }
+.t-tabs { display: flex; align-items: center; gap: 2px; padding: 5px 6px;
+  background: color-mix(in srgb, var(--t-fg) 7%, var(--t-bg)); flex-wrap: wrap; }
+.t-tabs button, .t-tabs select, .t-custom button { font: 12px system-ui, sans-serif; color: var(--t-fg);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 8px; width: auto; }
+.t-tabs button[aria-selected="true"] { border-color: color-mix(in srgb, var(--t-fg) 35%, transparent);
+  background: color-mix(in srgb, var(--t-fg) 10%, var(--t-bg)); }
+.t-tabs button:disabled { opacity: .35; }
+.t-tabs select { background: var(--t-bg); border-color: color-mix(in srgb, var(--t-fg) 25%, transparent); }
+.t-gap { flex: 1; }
+.t-custom { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 6px 10px; font-size: 12px; }
+.t-custom[hidden] { display: none; }
+.t-custom label { display: flex; align-items: center; gap: 5px; }
+.t-custom input[type=color] { width: 26px; height: 22px; padding: 0; border: 0; background: none; }
+.t-screen { margin: 0; border-radius: 0; background: transparent; color: var(--t-fg); flex: 1; min-height: 0;
+  max-height: none; overflow: auto; padding: 8px 10px; white-space: pre-wrap; word-break: break-all;
+  font: var(--t-size)/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.t-screen[hidden] { display: none; }
+.t-screen .t-cmd { color: var(--t-cmd); font-weight: 700; }
+.t-screen .t-cmd::before { content: "› "; }
+.t-screen .t-sys { color: var(--t-sys); }
+.t-prompt { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--t-fg) 15%, transparent); }
+.t-prompt[hidden], .t-quick[hidden] { display: none; }
+.t-ps { color: var(--t-cmd); font: 700 var(--t-size) ui-monospace, monospace; }
+.t-prompt input { flex: 1; background: transparent; border: 0; color: var(--t-cmd); outline: none;
+  font: var(--t-size) ui-monospace, SFMono-Regular, Menlo, monospace; padding: 3px 0; caret-color: var(--t-cmd); }
+.t-prompt input::placeholder { color: var(--t-dim); }
+.t-quick { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 10px 6px; }
+.t-quick button { font: 12px ui-monospace, monospace; color: var(--t-fg); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--t-fg) 28%, transparent); border-radius: 6px; padding: 2px 8px; }
+.t-quick button:hover { border-color: var(--t-cmd); color: var(--t-cmd); }
+.t-note { padding: 0 10px 6px; font: 11.5px ui-monospace, monospace; color: var(--t-dim); min-height: 6px; }
+.t-note.ok { color: var(--t-cmd); } .t-note.bad { color: #ff7b72; }
 
 /* The garage: the vehicle, the camera on the picked part. */
 .garage { position: relative; background: radial-gradient(ellipse at 50% 40%, var(--g-stage-a), var(--g-stage-b));
@@ -163,7 +208,7 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
 </head>
 <body>
 <header>
-  <h1>Vehicle Builder</h1>
+  <h1>Compose</h1>
   <span>Pick a vehicle's parts from CP Models, then fly it in ArduPilot SITL.</span>
   <div class="theme" role="group" aria-label="Theme">
     <button type="button" data-theme="auto">Auto</button>
@@ -197,15 +242,18 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
       <div class="actions">
         <select id="mode" aria-label="Run mode">
           <option value="mission">Map, mission flies itself</option>
-          <option value="map">Map, you fly (MAV&gt; in the log)</option>
+          <option value="map">Map, you fly (from the terminal)</option>
           <option value="headless">Headless mission check</option>
         </select>
         <button id="fly" class="primary">Build &amp; fly</button>
         <button id="stop" disabled>Stop</button>
+        <button id="show-terminal" type="button" hidden>Terminal</button>
       </div>
       <p class="msg" id="fly-msg">Builds the vehicle (about a minute when it changed), then
-        starts SITL. The map opens on the display of the machine running the builder.</p>
-      <pre id="log" class="log" hidden></pre>
+        starts SITL. The map opens on the display of the machine running the builder; the
+        terminal docked at the bottom shows everything the run prints, and its command line is
+        MAVProxy's MAV&gt; prompt (arm, modes, takeoff).</p>
+      <div id="terminal" hidden></div>
     </section>
   </div>
 </main>
@@ -213,7 +261,7 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
 // The theme: auto follows the system; light or dark is remembered in this browser.
 (() => {
   let saved = "auto";
-  try { saved = localStorage.getItem("vehicle-builder-theme") || "auto"; } catch (e) { /* no storage */ }
+  try { saved = localStorage.getItem("compose-theme") || "auto"; } catch (e) { /* no storage */ }
   // ?theme=dark (or light, auto): this page only, not remembered.
   const asked = new URLSearchParams(location.search).get("theme");
   if (["auto", "light", "dark"].includes(asked)) saved = asked;
@@ -227,11 +275,12 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
   for (const b of document.querySelectorAll(".theme button"))
     b.addEventListener("click", () => {
       apply(b.dataset.theme);
-      try { localStorage.setItem("vehicle-builder-theme", b.dataset.theme); } catch (e) { /* no storage */ }
+      try { localStorage.setItem("compose-theme", b.dataset.theme); } catch (e) { /* no storage */ }
     });
 })();
 </script>
 <script src="/garage.js"></script>
+<script src="/terminal.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -526,30 +575,73 @@ async function save(overwrite = false) {
   $("save-msg").textContent = r.message;
 }
 
+// What MAVProxy is typed for each kind: the terminal's quick buttons.
+const QUICK = {
+  copter: [["Guided", "mode guided"], ["Arm", "arm throttle"], ["Take off 10 m", "takeoff 10"],
+           ["Loiter", "mode loiter"], ["Auto", "mode auto"], ["RTL", "mode rtl"], ["Land", "mode land"],
+           ["Disarm", "disarm"]],
+  rover: [["Guided", "mode guided"], ["Arm", "arm throttle"], ["Auto", "mode auto"], ["Hold", "mode hold"],
+          ["RTL", "mode rtl"], ["Disarm", "disarm"]],
+  plane: [["Arm", "arm throttle"], ["Takeoff mode", "mode takeoff"], ["Auto", "mode auto"],
+          ["Loiter", "mode loiter"], ["RTL", "mode rtl"], ["Disarm", "disarm"]],
+};
+
+Terminal.mount($("terminal"), async (line) => {
+  if (!run || !run.running) return { ok: false, message: "nothing is running" };
+  const r = await post(`/api/runs/${run.id}/input`, { line });
+  poll();  // the echo and MAVProxy's answer, now
+  return r;
+});
+
 async function fly() {
-  const r = await post("/api/fly", { choice: choice(), mode: $("mode").value });
-  if (!r.ok) { $("fly-msg").textContent = r.message; return; }
-  $("fly-msg").textContent = `Running ${r.path} on SITL instance ${r.instance}.`;
-  run = { id: r.id, next: 0, running: true };
-  $("log").hidden = false;
-  $("log").textContent = "";
+  // The terminal opens at once: the run's raw output from its first byte.
+  Terminal.dock(true);
+  Terminal.clear();
+  Terminal.show("out");
+  Terminal.files([]);
+  Terminal.prompt(false);
+  Terminal.write("sys", `Composing and checking ${$("sitl-name").value.trim()}…\n`);
   $("fly").disabled = true;
+  const r = await post("/api/fly", { choice: choice(), mode: $("mode").value });
+  if (!r.ok) {
+    Terminal.write("sys", `Not started: ${r.message}\n`);
+    $("fly-msg").textContent = r.message;
+    $("fly").disabled = false;
+    return;
+  }
+  $("fly-msg").textContent = `Running ${r.path} on SITL instance ${r.instance}.`;
+  run = { id: r.id, next: 0, running: true, logs: { sitl: 0, mission: 0 } };
+  const kind = { multirotor: "copter", rover: "rover", fixed_wing: "plane" }[frame().vehicle] || "copter";
+  Terminal.prompt($("mode").value !== "headless", QUICK[kind]);
   $("stop").disabled = false;
+  $("show-terminal").hidden = false;
   poll();
 }
 
+$("show-terminal").addEventListener("click", () => Terminal.dock(true));
+let polling = false;
 async function poll() {
   clearTimeout(pollTimer);
-  if (!run) return;
-  const r = await (await fetch(`/api/runs/${run.id}?from=${run.next}`)).json();
-  const log = $("log");
-  const atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
-  if (r.lines.length) log.textContent += r.lines.join("\n") + "\n";
-  if (atEnd) log.scrollTop = log.scrollHeight;
-  run.next = r.next;
-  run.running = r.running;
-  if (r.running) pollTimer = setTimeout(poll, 1000);
-  else { $("stop").disabled = true; scheduleCheck(0); }
+  if (!run || polling) { pollTimer = setTimeout(poll, 150); return; }
+  polling = true;
+  try {
+    const r = await (await fetch(`/api/runs/${run.id}?from=${run.next}`)).json();
+    for (const [kind, text] of r.chunks) Terminal.write(kind, text);
+    run.next = r.next;
+    run.running = r.running;
+    Terminal.files(r.files);
+    // The raw log of the open tab, as it grows.
+    const tab = Terminal.tab;
+    if (tab !== "out" && r.files.includes(tab)) {
+      const f = await (await fetch(`/api/runs/${run.id}/log/${tab}?from=${run.logs[tab]}`)).json();
+      if (f.text) Terminal.write("out", f.text, tab);
+      run.logs[tab] = f.next;
+    }
+  } finally {
+    polling = false;
+  }
+  if (run.running) pollTimer = setTimeout(poll, 300);
+  else { $("stop").disabled = true; Terminal.prompt(false); $("fly").disabled = false; scheduleCheck(0); }
 }
 
 $("save").addEventListener("click", () => save());

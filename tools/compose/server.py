@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Vehicle builder: pick a vehicle's parts from CP Models in the browser, get its
+"""Compose: pick a vehicle's parts from CP Models in the browser, get its
 TOML, and fly it in ArduPilot SITL.
 
-usage: python3 tools/vehicle_builder/server.py [--port 8765] [--host 127.0.0.1]
+usage: python3 tools/compose/server.py [--port 8765] [--host 127.0.0.1]
 
 Open http://127.0.0.1:8765 (from another machine: ssh -L 8765:127.0.0.1:8765 HOST).
 Every change is checked by `fire-compose validate`. "Save" writes the run file;
 "Fly" runs runtime/hosts/ardupilot/run.sh on it here (build, SITL, and the
 MAVProxy map on this machine's display, or a headless mission check), and
-streams its output. Building needs what run.sh needs (README there) on PATH.
+streams its output; the page's command line is MAVProxy's MAV> prompt. Building needs what run.sh needs (README there) on PATH.
 Standard library only.
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ import parts
 HERE = Path(__file__).resolve().parent
 ROOT = parts.ROOT
 RUN = ROOT / "runtime" / "hosts" / "ardupilot" / "run.sh"
-WORK = ROOT / "build" / "vehicle-builder"
+WORK = ROOT / "build" / "compose"
 NAME = re.compile(r"[a-z][a-z0-9_]{0,47}")
 MODES = {"map": [], "mission": ["--mission"], "headless": ["--headless"]}
 
@@ -40,33 +40,70 @@ LOCK = threading.Lock()
 
 
 class Run:
-    """One run.sh process and its output."""
+    """One run.sh process: its output as it comes, raw, and the logs it names.
+
+    The output is a list of chunks (kind, text): "out" what the run printed
+    (MAVProxy's prompt has no newline, so it is read as bytes, not lines),
+    "cmd" a line sent to it, "sys" the builder's own notes."""
+
+    LOG = re.compile(r"^(SITL log|mission check): (\S+)$", re.M)
 
     def __init__(self, ident: int, name: str, args: list[str], instance: int):
         self.ident, self.name, self.instance = ident, name, instance
-        self.lines: list[str] = []
-        env = dict(os.environ, RUN_NONINTERACTIVE="1", PYTHONUNBUFFERED="1")
+        self.chunks: list[tuple[str, str]] = [("sys", f"$ run.sh {' '.join(args)}\n")]
+        self.files: dict[str, str] = {}
+        env = dict(os.environ, PYTHONUNBUFFERED="1", RUN_NO_CONSOLE="1")
+        env.pop("RUN_NONINTERACTIVE", None)
         # Own process group, so Stop ends SITL, MAVProxy and the build with it.
+        # stdin is MAVProxy's MAV> prompt: the page's command line writes to it.
         self.proc = subprocess.Popen([str(RUN), *args], cwd=ROOT, env=env,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     stdin=subprocess.DEVNULL, text=True, bufsize=1,
-                                     start_new_session=True)
+                                     stdin=subprocess.PIPE, start_new_session=True)
         threading.Thread(target=self._read, daemon=True).start()
 
     def _read(self):
-        for line in self.proc.stdout:
-            self.lines.append(line.rstrip("\n"))
+        fd, tail = self.proc.stdout.fileno(), ""
+        while chunk := os.read(fd, 65536):
+            text = chunk.decode(errors="replace")
+            self.chunks.append(("out", text))
+            tail = (tail + text)[-4096:]
+            for label, path in self.LOG.findall(tail):
+                self.files["sitl" if label == "SITL log" else "mission"] = path
         self.proc.wait()
-        self.lines.append(f"[run.sh exited with {self.proc.returncode}]")
+        self.chunks.append(("sys", f"\n[run.sh exited with {self.proc.returncode}]\n"))
+
+    def send(self, line: str) -> bool:
+        """A line to MAVProxy's prompt (the run's stdin), echoed into the output."""
+        if self.proc.poll() is not None or self.proc.stdin is None:
+            return False
+        try:
+            self.proc.stdin.write((line + "\n").encode())
+            self.proc.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return False
+        self.chunks.append(("cmd", line + "\n"))
+        return True
 
     def stop(self):
         if self.proc.poll() is None:
+            self.chunks.append(("sys", "\n[stopping]\n"))
             os.killpg(self.proc.pid, signal.SIGTERM)
 
     def status(self, start: int) -> dict:
-        return {"id": self.ident, "name": self.name, "lines": self.lines[start:],
-                "next": len(self.lines), "running": self.proc.poll() is None,
-                "exit": self.proc.returncode}
+        n = len(self.chunks)
+        return {"id": self.ident, "name": self.name, "chunks": self.chunks[start:n],
+                "next": n, "running": self.proc.poll() is None,
+                "exit": self.proc.returncode, "files": sorted(self.files)}
+
+    def log(self, which: str, start: int) -> dict:
+        """A log file the run named (sitl, mission), raw, from byte `start`."""
+        path = self.files.get(which)
+        if not path or not os.path.exists(path):
+            return {"text": "", "next": start}
+        with open(path, "rb") as f:
+            f.seek(start)
+            data = f.read(1 << 20)
+        return {"text": data.decode(errors="replace"), "next": start + len(data)}
 
 
 def check(choice: dict) -> dict:
@@ -75,7 +112,7 @@ def check(choice: dict) -> dict:
         run, physics = parts.compose(choice, CATALOG)
     except (ValueError, KeyError) as e:
         return {"ok": False, "message": str(e), "toml": ""}
-    text = parts.run_file_text(run, "# Composed with tools/vehicle_builder\n")
+    text = parts.run_file_text(run, "# Composed with tools/compose\n")
     with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as f:
         f.write(text)
     try:
@@ -96,7 +133,7 @@ def check(choice: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "vehicle-builder"
+    server_version = "compose"
 
     def log_message(self, fmt, *args):  # quiet
         pass
@@ -118,10 +155,15 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/":
             self.send((HERE / "index.html").read_bytes(), kind="text/html; charset=utf-8")
-        elif path == "/garage.js":
-            self.send((HERE / "garage.js").read_bytes(), kind="text/javascript; charset=utf-8")
+        elif path in ("/garage.js", "/terminal.js"):
+            self.send((HERE / path[1:]).read_bytes(), kind="text/javascript; charset=utf-8")
         elif path == "/api/catalog":
             self.send(CATALOG)
+        elif m := re.fullmatch(r"/api/runs/(\d+)/log/(sitl|mission)", path):
+            run = RUNS.get(int(m.group(1)))
+            start = int(self.path.partition("from=")[2] or 0)
+            self.send(run.log(m.group(2), start) if run else {"error": "no such run"},
+                      HTTPStatus.OK if run else HTTPStatus.NOT_FOUND)
         elif m := re.fullmatch(r"/api/runs/(\d+)", path):
             start = int(self.path.partition("from=")[2] or 0)
             run = RUNS.get(int(m.group(1)))
@@ -146,6 +188,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(self.save(req))
         if path == "/api/fly":
             return self.send(self.fly(req))
+        if m := re.fullmatch(r"/api/runs/(\d+)/input", path):
+            run = RUNS.get(int(m.group(1)))
+            line = str(req.get("line", ""))
+            if not run:
+                return self.send({"ok": False, "message": "no such run"}, HTTPStatus.NOT_FOUND)
+            if "\n" in line or "\r" in line or len(line) > 500:
+                return self.send({"ok": False, "message": "one line, at most 500 characters"})
+            ok = run.send(line)
+            return self.send({"ok": ok, "message": "" if ok else "the run has ended"})
         if m := re.fullmatch(r"/api/runs/(\d+)/stop", path):
             run = RUNS.get(int(m.group(1)))
             if run:
@@ -203,7 +254,7 @@ def main():
     a = p.parse_args()
     CATALOG.update(parts.catalog())
     server = ThreadingHTTPServer((a.host, a.port), Handler)
-    print(f"vehicle builder: http://{a.host}:{a.port}  (Ctrl-C to stop)", flush=True)
+    print(f"compose: http://{a.host}:{a.port}  (Ctrl-C to stop)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
