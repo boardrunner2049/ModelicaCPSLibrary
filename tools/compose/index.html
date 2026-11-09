@@ -101,8 +101,15 @@ ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--mut
   border-top: 1px solid color-mix(in srgb, var(--t-fg) 25%, transparent); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); }
 .term.collapsed { height: auto; }
 .term.collapsed > :not(.t-tabs):not(.t-grip) { display: none; }
-body.docked main { padding-bottom: calc(var(--t-height, 42vh) + 16px); }
-body.docked.collapsed main { padding-bottom: 56px; }
+/* With the terminal open, the page is its own scroll area above it: all of it
+   reachable, nothing sticky taller than what is left. --t-shown is the
+   terminal's height (terminal.js). */
+body.docked { overflow: hidden; }
+body.docked #page { height: calc(100vh - var(--t-shown, 42vh)); height: calc(100dvh - var(--t-shown, 42vh));
+  overflow-y: auto; overscroll-behavior: contain; }
+body.docked .garage { position: relative; top: auto; }
+body.docked .side { max-height: calc(100vh - var(--t-shown, 42vh) - 24px); overflow-y: auto; }
+@media (max-width: 900px) { body.docked .side { max-height: none; overflow: visible; } }
 .t-grip { height: 6px; cursor: ns-resize; flex: none; touch-action: none; }
 .t-grip:hover { background: color-mix(in srgb, var(--t-fg) 20%, transparent); }
 .t-title { font: 600 12px system-ui, sans-serif; padding: 0 8px 0 4px; color: var(--t-sys); }
@@ -207,6 +214,7 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
 </style>
 </head>
 <body>
+<div id="page">
 <header>
   <h1>Compose</h1>
   <span>Pick a vehicle's parts from CP Models, then fly it in ArduPilot SITL.</span>
@@ -257,6 +265,7 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
     </section>
   </div>
 </main>
+</div>
 <script>
 // The theme: auto follows the system; light or dark is remembered in this browser.
 (() => {

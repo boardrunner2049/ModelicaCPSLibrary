@@ -161,6 +161,9 @@ const Terminal = (() => {
     quick = el("div", { class: "t-quick", hidden: true });
     note = el("div", { class: "t-note", "aria-live": "polite" });
     root.replaceChildren(grip, tabs, custom, ...Object.values(screens), form, quick, note);
+    // The page above ends where the terminal starts, whatever its size.
+    new ResizeObserver(() => document.body.style.setProperty("--t-shown",
+      root.hidden ? "0px" : `${root.offsetHeight}px`)).observe(root);
     paint();
   }
 
@@ -168,6 +171,7 @@ const Terminal = (() => {
   function dock(on) {
     root.hidden = !on;
     document.body.classList.toggle("docked", on);
+    document.body.style.setProperty("--t-shown", on ? `${root.offsetHeight}px` : "0px");
     if (on && scheme.collapsed) { scheme.collapsed = false; save(); paint(); }
   }
 
