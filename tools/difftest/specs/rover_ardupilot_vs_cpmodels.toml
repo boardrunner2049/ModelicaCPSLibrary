@@ -1,10 +1,13 @@
 # The same autopilot and mission on two physics: ArduPilot's own SITL rover (A)
 # and the CP Models rover (B), closed loop, from the moment each starts moving.
 title = "Rover: ArduPilot SITL physics vs CP Models, same mission"
+root = "../../.."
+plugins = ["../cpmodels.py"]
+out = "build/difftest/{name}"
 
 [a]
 name = "ArduPilot SITL rover"
-[a.sitl]
+[a.ardupilot]
 model = "rover"
 vehicle = "rover"
 speedup = 2
@@ -12,7 +15,7 @@ instance = 8
 
 [b]
 name = "CP Models rover"
-[b.sitl]
+[b.cpvehicle]
 config = "configs/rover.toml"
 speedup = 2
 instance = 9

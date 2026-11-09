@@ -4,10 +4,13 @@
 # airframes respond (thrust and torque per command, inertia, drag). A
 # multirotor is unstable open loop, so B departs eventually in any case.
 title = "Quad: CP Models driven by ArduPilot SITL's motor commands"
+root = "../../.."
+plugins = ["../cpmodels.py"]
+out = "build/difftest/{name}"
 
 [a]
 name = "ArduPilot SITL X quad"
-[a.sitl]
+[a.ardupilot]
 model = "x"
 vehicle = "copter"
 parameters = ["third_party/ardupilot/Tools/autotest/default_params/copter.parm",
@@ -15,7 +18,7 @@ parameters = ["third_party/ardupilot/Tools/autotest/default_params/copter.parm",
 speedup = 2
 instance = 12
 
-[b.replay]
+[b.cpv_replay]
 model = "quad"
 inputs = "a"
 

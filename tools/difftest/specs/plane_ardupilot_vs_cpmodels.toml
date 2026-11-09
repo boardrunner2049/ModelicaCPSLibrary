@@ -1,10 +1,13 @@
 # The same autopilot and mission on two physics: ArduPilot's own SITL plane (A)
 # and the CP Models plane (B), closed loop, from the start of the takeoff roll.
 title = "Plane: ArduPilot SITL physics vs CP Models, same mission"
+root = "../../.."
+plugins = ["../cpmodels.py"]
+out = "build/difftest/{name}"
 
 [a]
 name = "ArduPilot SITL plane"
-[a.sitl]
+[a.ardupilot]
 model = "plane"
 vehicle = "plane"
 speedup = 2
@@ -12,7 +15,7 @@ instance = 10
 
 [b]
 name = "CP Models plane"
-[b.sitl]
+[b.cpvehicle]
 config = "configs/plane.toml"
 speedup = 2
 instance = 11

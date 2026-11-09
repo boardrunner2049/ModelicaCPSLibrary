@@ -3,12 +3,15 @@
 # Same model, same commands at the same frame times: any difference is the
 # host (the adapter, the recorder, cpv_replay), not physics.
 title = "CP Models quad: SITL vs open-loop replay of its own commands"
+root = "../../.."
+plugins = ["../cpmodels.py"]
+out = "build/difftest/{name}"
 
-[a.sitl]
+[a.cpvehicle]
 config = "configs/quad.toml"
 speedup = 2
 
-[b.replay]
+[b.cpv_replay]
 model = "quad"
 inputs = "a"
 
