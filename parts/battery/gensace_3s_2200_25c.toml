@@ -1,0 +1,15 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Gens ace G-Tech 2200mAh 3S 25C"
+kind = "battery"
+manufacturer = "Gens ace (Grepow)"
+source = "GensTattu (Grepow's official Gens ace/Tattu store) product page, SKU GEA223S25T3GT, Air Classic series, retrieved 2026-11-08, https://genstattu.com/gens-ace-2200mah-3s-11-1v-25c-g-tech-lipo-battery-pack-with-ec3-deans-and-xt60-adapter-for-rc-plane"
+notes = "This SKU ships with EC3 + Deans + XT60 adapter (the XT60 is an adapter, not a native plug); the native-XT60 variant is a different SKU not checked. Dimensions 107 (+-5) x 33 (+-2) x 22 (+-2) mm, 14 AWG wire, G-Tech-4P balance lead. NOT stated: cell max/full voltage, cutoff voltage, burst duration, internal resistance, max charge rate. cell_nominal_v is the stated pack voltage divided by the stated cell count."
+chemistry = "LiPo"           # product page: 'G-Tech Lipo Battery Pack'
+cells_series = 3             # product page 'Configuration: 3S1P'
+cells_parallel = 1           # product page 'Configuration: 3S1P'
+capacity_mah = 2200          # product page 'Capacity(mAh): 2200'
+pack_nominal_v = 11.1        # product page 'Voltage(V): 11.1'
+cell_nominal_v = 3.7         # 11.1 V / 3S (both stated); per-cell value itself not printed
+c_rating_continuous = 25     # product page 'Discharge Rate (C): 25'
+c_rating_burst = 50          # product page 'Max Burst discharge Rate (C): 50'
+weight_g = 169               # product page 'Net Weight(+-20g): 169' / 'Weight: 169g'

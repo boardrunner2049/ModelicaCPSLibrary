@@ -1,0 +1,106 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "EMAX MT2213 935KV"
+kind = "motor"
+manufacturer = "EMAX"
+source = "EMAX official shop, product 'EMAX MT2213 935KV Multicopter Brushless Motor' (published 2022-05-30), description images QQ_20220530165924 (spec) and QQ_20220530165947 (test table), https://shop.emaxmodel.com/products/emax-mt2213-935kv-multicopter-brushless-motor (retrieved 2026-11-08)"
+notes = "Spec and test data are images on the manufacturer's shop page, not a PDF datasheet. Test table is indexed by current steps, not throttle %; no throttle_pct given. Recommended pairing per EMAX: 3S + 1045 prop, 4S + 8045 prop (EMAX MT2213-des-1 image). Only the 11.1 V EMAX1045 block is recorded (the 3S/1045 recommendation); the same table also has 11.1 V EMAX8045 and 14.8 V EMAX8045 blocks. CONFLICTS: EMAX's older combo listing (emx-mt-1534..., 2020) shows a slightly different 11 V EMAX1045 table (e.g. 4 A -> 370 g, 9.6 A -> 670 g / 106 W / 6530 rpm, working temperature 43 C at the top row) and 'MAX THRUST 860G', whereas the 2022 page says 'Max. thrust 720g'. Another EMAX USA image labels the motor 'MT2213-920KV' with 28.0 mm/39.5 mm. Max thrust and 'ESC recommended 18A' are not mapped to keys. Internal resistance, idle current, max continuous current/power not published."
+kv_rpm_per_v = 935                 # spec image "KV: 935KV"
+stator_slots = 12                  # spec image "Framework: 12N14P"
+magnet_poles = 14                  # spec image "Framework: 12N14P"
+shaft_diameter_mm = 3              # spec image "Shaft: 3mm"
+diameter_mm = 27.9                 # spec image "Diameter: 27.9mm"
+length_mm = 39.7                   # spec image "Length: 39.7mm"
+weight_g = 53                      # spec image "Weight: 53g" (with/without cables not stated)
+cells_min = 3                      # spec image "No.of cells: 3-4S"
+cells_max = 4                      # spec image "No.of cells: 3-4S"
+
+# Test table image, block "11.1 V, EMAX1045" (rows by current)
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 1
+thrust_g = 130
+power_w = 11.0
+efficiency_g_per_w = 11.8
+rpm = 2940
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 2
+thrust_g = 220
+power_w = 22.0
+efficiency_g_per_w = 10.0
+rpm = 3860
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 3
+thrust_g = 290
+power_w = 33.0
+efficiency_g_per_w = 8.8
+rpm = 4400
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 4
+thrust_g = 360
+power_w = 44.0
+efficiency_g_per_w = 8.2
+rpm = 4940
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 5
+thrust_g = 430
+power_w = 55.0
+efficiency_g_per_w = 7.8
+rpm = 5340
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 6
+thrust_g = 490
+power_w = 66.0
+efficiency_g_per_w = 7.4
+rpm = 5720
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 7
+thrust_g = 540
+power_w = 77.0
+efficiency_g_per_w = 7.0
+rpm = 5980
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 8
+thrust_g = 580
+power_w = 88.0
+efficiency_g_per_w = 6.6
+rpm = 6170
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 9
+thrust_g = 620
+power_w = 99.0
+efficiency_g_per_w = 6.3
+rpm = 6410
+
+[[test]]
+propeller = "EMAX1045"
+voltage_v = 11.1
+current_a = 9.5
+thrust_g = 640
+power_w = 105.5
+efficiency_g_per_w = 6.1
+rpm = 6530

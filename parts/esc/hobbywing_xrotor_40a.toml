@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Hobbywing XRotor 40A (COB)"
+kind = "esc"
+manufacturer = "Hobbywing"
+source = "HOBBYWING North America (official NA distributor store) product page 'XRotor 40A ESC COB', spec table, Model/SKU XRotor-40A COB / 30901001, https://www.hobbywingdirect.com/products/xrotor-40a-esc (retrieved 2026-11-08); peak duration from column header 'Peak Current (10s)' in Hobbywing 'XRotor User Manual' (https://cdn.shopify.com/s/files/1/0109/9702/files/User_s_Manual_Xrotor-en.pdf)"
+notes = "Hobbywing proprietary firmware (not BLHeli); all settings preset except Timing (High/Intermediate, Intermediate default). Throttle input: standard PWM, signal frequency up to 621 Hz ('all throttle signals over 500Hz are non-standard'). No BEC. 3.5 mm bullet connectors. Size 68 x 25 x 8.7 mm (~12.4 mm at capacitor). Typical application 500/650-class quadcopter. Page says 'MOSFET with extra-low resistance' but no part number; motor PWM switching frequency, dead time and capacitor value NOT published. The user-manual PDF has a broken font encoding (digits unreadable), so only its column header was used."
+current_continuous_a = 40          # Product page "Cont./Peak Current 40A /60A"
+current_burst_a = 60               # Product page "Cont./Peak Current 40A /60A"
+burst_duration_s = 10              # XRotor user manual spec table header "Peak Current (10s)"
+cells_min = 2                      # Product page "Input 2-6S Lipo"
+cells_max = 6                      # Product page "Input 2-6S Lipo"
+firmware = "Hobbywing proprietary"  # not named on page; only 'special core program for multi-rotor'
+input_signal_hz_max = 621          # Product page "supports a signal frequency of up to 621Hz"
+weight_g = 26                      # Product page "Size / Weight ... 26g (0.92oz)"

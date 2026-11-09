@@ -25,6 +25,13 @@ what you type overrides them. "What the level leaves out or assumes" lists the
 datasheet figures the level cannot represent. `?gnss=ublox_neo_m9n&imu=tdk_icm42688p`
 in the URL starts with those devices.
 
+Propulsion picks a **motor, propeller, battery and ESC**; the plane's servos
+and the rover's steering a **servo**; the rover's drive a **gearmotor** (and
+battery). After each check the card lists the composer's checks: full
+throttle, hover and thrust/weight, the parts' limits, and the model against
+the motor maker's bench table. `?motor=tmotor_mn3508_kv580&propeller=apc_12x45mr&battery=tattu_4s_5200_35c&propulsion_level=P2`
+starts with those.
+
 Each level says how fast it runs in SITL; the slow ones (I3, P3, P4) are marked.
 Every edit is composed and checked by `fire-compose validate`; the run file
 (`[sitl]` and `[physics]`, as `runtime/hosts/ardupilot/run.sh` takes it) is

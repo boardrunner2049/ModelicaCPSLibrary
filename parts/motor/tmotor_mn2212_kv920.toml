@@ -1,0 +1,72 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "T-MOTOR MN2212 V2.0 KV920"
+kind = "motor"
+manufacturer = "T-MOTOR"
+source = "T-MOTOR official store product page 'MN2212 V2.0 Multirotor Fixed Wing UAV Motor KV780/KV920', Specification table + Test Data table, https://store.tmotor.com/goods.php?id=388 (retrieved 2026-11-08; no revision/date shown)"
+notes = "Product page spec/test tables, not a PDF datasheet. Test table only at 11.1 V with T-MOTOR 9545B prop for KV920. Temperature note: motor surface temperature at 100% throttle after 10 min run (shown as '/' i.e. not given for KV920). 'Max Continuous Current 180S' / 'Max Power (180S)' = 180 s rating. Marketing text on the same page mentions MN4112 and P15*5 props (copy-paste error); not used."
+kv_rpm_per_v = 920                 # Spec table, "MN2212 V2.0 KV920"
+resistance_mohm = 142              # Spec table "Internal Resistance 142mΩ"; phase-to-phase vs phase not stated
+no_load_current_a = 0.5            # Spec table "Idle Current@10v 0.5A"
+no_load_current_at_v = 10          # Spec table "Idle Current@10v"
+stator_slots = 9                   # Spec table "Configuration 9N12P"
+magnet_poles = 12                  # Spec table "Configuration 9N12P"
+stator_diameter_mm = 22            # Spec table "Stator Diameter 22mm"
+stator_height_mm = 13              # Spec table "Stator Height 13mm"
+shaft_diameter_mm = 4              # Spec table "Shaft Diameter 4mm"
+weight_g = 54                      # Spec table "Weight Excluding Cables 54g"
+weight_with_cables_g = 65          # Spec table "Weight Including Cables 65g"
+max_continuous_current_a = 15      # Spec table "Max Continuous Current 180S 15A" (180 s)
+max_power_w = 220                  # Spec table "Max Power (180S) 220W"
+cells_min = 2                      # Spec table "No.of Cells(Lipo) 2-4S"
+cells_max = 4                      # Spec table "No.of Cells(Lipo) 2-4S"
+
+# Test Data table, KV920 block: 11.1 V, T-MOTOR 9545B
+[[test]]
+propeller = "T-MOTOR 9545B"
+voltage_v = 11.1
+throttle_pct = 50
+current_a = 1.6
+power_w = 17.76
+thrust_g = 176
+rpm = 4400
+efficiency_g_per_w = 9.91
+
+[[test]]
+propeller = "T-MOTOR 9545B"
+voltage_v = 11.1
+throttle_pct = 65
+current_a = 3
+power_w = 33.3
+thrust_g = 289
+rpm = 5500
+efficiency_g_per_w = 8.68
+
+[[test]]
+propeller = "T-MOTOR 9545B"
+voltage_v = 11.1
+throttle_pct = 75
+current_a = 4.3
+power_w = 47.73
+thrust_g = 385
+rpm = 6400
+efficiency_g_per_w = 8.07
+
+[[test]]
+propeller = "T-MOTOR 9545B"
+voltage_v = 11.1
+throttle_pct = 85
+current_a = 5.8
+power_w = 64.38
+thrust_g = 475
+rpm = 7000
+efficiency_g_per_w = 7.38
+
+[[test]]
+propeller = "T-MOTOR 9545B"
+voltage_v = 11.1
+throttle_pct = 100
+current_a = 8.1
+power_w = 89.91
+thrust_g = 617
+rpm = 7800
+efficiency_g_per_w = 6.86

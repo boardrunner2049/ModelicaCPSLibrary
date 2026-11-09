@@ -1,0 +1,18 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "KST X08 V6.0"
+kind = "servo"
+manufacturer = "KST (KST Digital Technology Limited)"
+source = "KST 'X08 V6.0 Technical Specification' (1 page, dated 2023-10, www.kstsz.com), https://cdn.shopify.com/s/files/1/0570/1766/3541/files/X08_V6.0_Technical_Specifcation.pdf (fetched 2026-11-08)"
+notes = "Thin wing servo (case 23.5 x 8 x 16.8 mm). KST rated voltage is 7.4 V but the V6.0 sheet gives speed/torque only at 3.8, 6.0 and 8.4 V; speed_at_v uses the 8.4 V max, speed_low uses 6.0 V (3.8 V: 0.18 s/60, 1.40 kgf.cm). Dead band NOT stated on the V6.0 sheet (the 2021 X08 Plus sheet gives 'Resolution <=2us' -- different, stronger X08 Plus model, not used). Sheet does not say 'digital' explicitly (333 Hz frame, programmable) -- digital omitted. Sheet also lists 'Working Frequency 1520us/333Hz' while its Pulse Lengths section puts center (0°) at 1500 us; pulse_neutral_us uses the latter. Motor type ambiguous in the sheet text (layout shows both 'Brushless DC Motor' and 'Coreless DC Motor'); position sensor 'Contactless/Potentiometer'. Hardened steel gears, aluminium case, 15T 4 mm spline."
+speed_s_per_60deg = 0.09          # sheet 'Speed 0.09sec/60°@8.4V'
+speed_at_v = 8.4
+speed_low_s_per_60deg = 0.15      # sheet 'Speed 0.15sec/60°@6.0V'
+speed_low_at_v = 6.0
+torque_kgcm = 2.80                # sheet 'Torque 2.80Kgf.cm@8.4V' (6.0V: 2.20 Kgf.cm)
+travel_deg = 120                  # sheet 'Default Travel Angle ±60° = 120° Total'
+travel_pulse_us = [1000, 2000]    # sheet 'Pulse Lengths for Position -60°/0°/+60°: 1000us/1500us/2000us'
+operating_angle_deg_per_us = 0.12 # sheet states ±60° for 1000/1500/2000us positions (120° over 1000 us) -> 120/1000
+pulse_neutral_us = 1500           # sheet 'Pulse Lengths for Position ... 0° ... 1500us'
+voltage_min_v = 3.8               # sheet 'Voltage Range DC3.8V-8.4V'
+voltage_max_v = 8.4
+weight_g = 8                      # sheet 'Weight 8g±10%'

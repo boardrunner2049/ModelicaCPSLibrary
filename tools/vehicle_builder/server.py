@@ -82,11 +82,17 @@ def check(choice: dict) -> dict:
         table = ["--config-table", "physics"]
         r = subprocess.run([str(parts.compose_binary()), "validate", f.name, *table],
                            capture_output=True, text=True)
+        reports = []
+        if r.returncode == 0:
+            j = subprocess.run([str(parts.compose_binary()), "validate", f.name, *table, "--json"],
+                               capture_output=True, text=True)
+            if j.returncode == 0:
+                reports = json.loads(j.stdout).get("parts", [])
     finally:
         os.unlink(f.name)
     message = (r.stdout + r.stderr).strip().removeprefix("fire-compose: ")
     return {"ok": r.returncode == 0, "message": message, "toml": text,
-            "model_name": physics["model_name"]}
+            "model_name": physics["model_name"], "reports": reports}
 
 
 class Handler(BaseHTTPRequestHandler):

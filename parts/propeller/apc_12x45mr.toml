@@ -1,0 +1,144 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "APC 12x4.5MR"
+kind = "propeller"
+manufacturer = "APC Propellers"
+source = "PER3_12x45MR.dat (header: 12x4.5MR (12x45MR.dat) v2022-0915, Simulation Date: 09/22/2022), https://www.apcprop.com/files/PER3_12x45MR.dat; mass: https://www.apcprop.com/product/12x4-5mr/; RPM limit: https://www.apcprop.com/technical-information/rpm-limits/"
+notes = "APC data are computed by APC's own blade element/vortex theory, not measured. Static rows are the V = 0 (J = 0) row of each PROP RPM block. Torque/thrust/power columns are printed by APC with 3 decimals, so low-RPM rows are coarsely rounded (Ct/Cp carry more precision). APC tabulates RPM blocks beyond its suggested max RPM; those rows are simulation output above the stated limit."
+diameter_in = 12                # PER3_12x45MR.dat title line
+pitch_in = 4.5                # PER3_12x45MR.dat title line
+# blades = 2                  # NOT stated by APC (product page or data file); two-blade by APC Multi-Rotor naming convention only, left commented out
+mass_oz = 0.78               # product page "Product Weight 0.78 oz."
+max_rpm = 8750               # APC RPM-limits page: MR "Maximum RPM=105,000/prop diameter (inches)" -> 105000/12
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 1000, V = 0 row
+rpm = 1000
+ct = 0.0893
+cp = 0.0362
+thrust_lbf = 0.059
+torque_inlbf = 0.046
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 2000, V = 0 row
+rpm = 2000
+ct = 0.0896
+cp = 0.0330
+thrust_lbf = 0.237
+torque_inlbf = 0.167
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 3000, V = 0 row
+rpm = 3000
+ct = 0.0898
+cp = 0.0316
+thrust_lbf = 0.534
+torque_inlbf = 0.359
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 4000, V = 0 row
+rpm = 4000
+ct = 0.0900
+cp = 0.0308
+thrust_lbf = 0.952
+torque_inlbf = 0.623
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 5000, V = 0 row
+rpm = 5000
+ct = 0.0903
+cp = 0.0303
+thrust_lbf = 1.492
+torque_inlbf = 0.957
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 6000, V = 0 row
+rpm = 6000
+ct = 0.0906
+cp = 0.0300
+thrust_lbf = 2.156
+torque_inlbf = 1.362
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 7000, V = 0 row
+rpm = 7000
+ct = 0.0910
+cp = 0.0298
+thrust_lbf = 2.946
+torque_inlbf = 1.842
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 8000, V = 0 row
+rpm = 8000
+ct = 0.0914
+cp = 0.0297
+thrust_lbf = 3.865
+torque_inlbf = 2.396
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 9000, V = 0 row
+rpm = 9000
+ct = 0.0919
+cp = 0.0296
+thrust_lbf = 4.918
+torque_inlbf = 3.029
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 10000, V = 0 row
+rpm = 10000
+ct = 0.0924
+cp = 0.0297
+thrust_lbf = 6.109
+torque_inlbf = 3.744
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 11000, V = 0 row
+rpm = 11000
+ct = 0.0931
+cp = 0.0298
+thrust_lbf = 7.443
+torque_inlbf = 4.545
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 12000, V = 0 row
+rpm = 12000
+ct = 0.0938
+cp = 0.0299
+thrust_lbf = 8.926
+torque_inlbf = 5.438
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 13000, V = 0 row
+rpm = 13000
+ct = 0.0946
+cp = 0.0301
+thrust_lbf = 10.568
+torque_inlbf = 6.430
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 14000, V = 0 row
+rpm = 14000
+ct = 0.0956
+cp = 0.0304
+thrust_lbf = 12.377
+torque_inlbf = 7.530
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 15000, V = 0 row
+rpm = 15000
+ct = 0.0966
+cp = 0.0308
+thrust_lbf = 14.366
+torque_inlbf = 8.751
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 16000, V = 0 row
+rpm = 16000
+ct = 0.0978
+cp = 0.0313
+thrust_lbf = 16.552
+torque_inlbf = 10.115
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 17000, V = 0 row
+rpm = 17000
+ct = 0.0992
+cp = 0.0321
+thrust_lbf = 18.953
+torque_inlbf = 11.715
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 18000, V = 0 row
+rpm = 18000
+ct = 0.1008
+cp = 0.0337
+thrust_lbf = 21.584
+torque_inlbf = 13.777
+
+[[static]]                    # PER3_12x45MR.dat, PROP RPM = 19000, V = 0 row
+rpm = 19000
+ct = 0.1024
+cp = 0.0365
+thrust_lbf = 24.421
+torque_inlbf = 16.615

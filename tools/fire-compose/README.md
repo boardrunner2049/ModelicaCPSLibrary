@@ -85,6 +85,9 @@ for actual FMI 2.0 CS generation/stepping. Neither proves Rumoca/FastDyn firmwar
 
 ## Real parts
 
+Motors, propellers, batteries, ESCs, servos and gearmotors too: `[models.propulsion]`, `[models.servos]`/`[models.steering]`, `[models.drive]` (src/powertrain.rs); see parts/README.md.
+
+
 `[models.KIND] part = "..."` (imu, gnss, barometer, magnetometer) names a real
 device from `parts/` instead of a model: the composer selects the level and
 fills `[KIND]` from the device's datasheet figures, explicit keys winning, and

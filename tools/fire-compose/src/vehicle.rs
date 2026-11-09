@@ -37,7 +37,7 @@ pub struct Kind {
     pub plant: &'static str,
     pub default_model_name: &'static str,
     /// Export defaults of pwm_min/pwm_max, used only to validate a partial [interface].
-    pwm: (f64, f64),
+    pub pwm: (f64, f64),
     /// [plant] keys: plant and sensor-mount parameters of the plant class.
     parameters: &'static [(&'static str, Shape)],
     /// [plant.RECORD] tables: record parameters set field by field.

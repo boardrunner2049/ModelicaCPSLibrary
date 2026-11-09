@@ -1,0 +1,179 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "T-MOTOR MN3508 KV580"
+kind = "motor"
+manufacturer = "T-MOTOR"
+source = "T-MOTOR official store product page 'MN3508 Multirotor Fixed Wing UAV Motor KV380/KV580/KV700', Specification table + Test Data table, https://store.tmotor.com/goods.php?id=354 (retrieved 2026-11-08; no revision/date shown)"
+notes = "Product page spec/test tables, not a PDF datasheet. KV580 test data published only at 14.8 V, three props (12*4CF, 13*4.4CF, 14*4.8CF); all rows included. Page's matching guide recommends T-MOTOR P15*5 prop / Air 20A ESC but no KV580 test row exists for P15*5. Operating temperature = motor surface temperature at 100% throttle after 10 min run (one value per prop, recorded on the 100% row). 'Max ... 180S' = 180 s rating."
+kv_rpm_per_v = 580                 # Spec table "MN3508 KV580"
+resistance_mohm = 110              # Spec table "Internal Resistance 110mΩ"; phase-to-phase vs phase not stated
+no_load_current_a = 0.4            # Spec table "Idle Current@10v 0.4A"
+no_load_current_at_v = 10          # Spec table "Idle Current@10v"
+stator_slots = 12                  # Spec table "Configuration 12N14P"
+magnet_poles = 14                  # Spec table "Configuration 12N14P"
+stator_diameter_mm = 35            # Spec table "Stator Diameter 35mm"
+stator_height_mm = 8               # Spec table "Stator Height 8mm"
+shaft_diameter_mm = 4              # Spec table "Shaft Diameter 4mm"
+weight_g = 82                      # Spec table "Weight Excluding Cables 82g"
+weight_with_cables_g = 103         # Spec table "Weight Including Cables 103g"
+max_continuous_current_a = 18      # Spec table "Max Continuous Current 180S 18A" (180 s)
+max_power_w = 400                  # Spec table "Max Power (180S) 400W"
+cells_min = 3                      # Spec table "No.of Cells(Lipo) 3-4S"
+cells_max = 4                      # Spec table "No.of Cells(Lipo) 3-4S"
+
+# Test Data table, KV580 block: 14.8 V, T-MOTOR 12*4CF
+[[test]]
+propeller = "T-MOTOR 12*4CF"
+voltage_v = 14.8
+throttle_pct = 50
+current_a = 2.2
+power_w = 32.56
+thrust_g = 360
+rpm = 4000
+efficiency_g_per_w = 11.06
+
+[[test]]
+propeller = "T-MOTOR 12*4CF"
+voltage_v = 14.8
+throttle_pct = 65
+current_a = 4.2
+power_w = 62.16
+thrust_g = 600
+rpm = 5200
+efficiency_g_per_w = 9.65
+
+[[test]]
+propeller = "T-MOTOR 12*4CF"
+voltage_v = 14.8
+throttle_pct = 75
+current_a = 6.1
+power_w = 90.28
+thrust_g = 770
+rpm = 5900
+efficiency_g_per_w = 8.53
+
+[[test]]
+propeller = "T-MOTOR 12*4CF"
+voltage_v = 14.8
+throttle_pct = 85
+current_a = 8
+power_w = 118.4
+thrust_g = 910
+rpm = 6500
+efficiency_g_per_w = 7.69
+
+[[test]]
+propeller = "T-MOTOR 12*4CF"
+voltage_v = 14.8
+throttle_pct = 100
+current_a = 9.6
+power_w = 142.08
+thrust_g = 1050
+rpm = 7000
+efficiency_g_per_w = 7.39
+motor_surface_temp_c = 43           # "Operating Temperature", surface temp at 100% after 10 min
+
+
+# Test Data table, KV580 block: 14.8 V, T-MOTOR 13*4.4CF
+[[test]]
+propeller = "T-MOTOR 13*4.4CF"
+voltage_v = 14.8
+throttle_pct = 50
+current_a = 2.6
+power_w = 38.48
+thrust_g = 450
+rpm = 4000
+efficiency_g_per_w = 11.69
+
+[[test]]
+propeller = "T-MOTOR 13*4.4CF"
+voltage_v = 14.8
+throttle_pct = 65
+current_a = 5
+power_w = 74.0
+thrust_g = 710
+rpm = 5200
+efficiency_g_per_w = 9.59
+
+[[test]]
+propeller = "T-MOTOR 13*4.4CF"
+voltage_v = 14.8
+throttle_pct = 75
+current_a = 7
+power_w = 103.6
+thrust_g = 900
+rpm = 5700
+efficiency_g_per_w = 8.69
+
+[[test]]
+propeller = "T-MOTOR 13*4.4CF"
+voltage_v = 14.8
+throttle_pct = 85
+current_a = 9.3
+power_w = 137.64
+thrust_g = 1120
+rpm = 6300
+efficiency_g_per_w = 8.14
+
+[[test]]
+propeller = "T-MOTOR 13*4.4CF"
+voltage_v = 14.8
+throttle_pct = 100
+current_a = 11.3
+power_w = 167.24
+thrust_g = 1230
+rpm = 6600
+efficiency_g_per_w = 7.35
+motor_surface_temp_c = 43           # "Operating Temperature", surface temp at 100% after 10 min
+
+
+# Test Data table, KV580 block: 14.8 V, T-MOTOR 14*4.8CF
+[[test]]
+propeller = "T-MOTOR 14*4.8CF"
+voltage_v = 14.8
+throttle_pct = 50
+current_a = 3.7
+power_w = 54.76
+thrust_g = 600
+rpm = 3800
+efficiency_g_per_w = 10.96
+
+[[test]]
+propeller = "T-MOTOR 14*4.8CF"
+voltage_v = 14.8
+throttle_pct = 65
+current_a = 7
+power_w = 103.6
+thrust_g = 930
+rpm = 4600
+efficiency_g_per_w = 8.98
+
+[[test]]
+propeller = "T-MOTOR 14*4.8CF"
+voltage_v = 14.8
+throttle_pct = 75
+current_a = 9.7
+power_w = 143.56
+thrust_g = 1150
+rpm = 4900
+efficiency_g_per_w = 8.01
+
+[[test]]
+propeller = "T-MOTOR 14*4.8CF"
+voltage_v = 14.8
+throttle_pct = 85
+current_a = 12.9
+power_w = 190.92
+thrust_g = 1350
+rpm = 5700
+efficiency_g_per_w = 7.07
+
+[[test]]
+propeller = "T-MOTOR 14*4.8CF"
+voltage_v = 14.8
+throttle_pct = 100
+current_a = 15.2
+power_w = 224.96
+thrust_g = 1520
+rpm = 6100
+efficiency_g_per_w = 6.76
+motor_surface_temp_c = 55           # "Operating Temperature", surface temp at 100% after 10 min

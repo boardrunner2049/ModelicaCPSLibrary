@@ -1,0 +1,101 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "T-MOTOR C15x10"
+kind = "propeller"
+manufacturer = "T-MOTOR"
+source = "T-MOTOR product page '15*10' (Type C15x10), Specification + Test Data tables, retrieved 2026-11-08, https://uav-en.tmotor.com/2026/fpv-propellers_0228/1368.html"
+notes = "Measured static bench data published by T-MOTOR, motor 4220 KV350, 48 V nominal supply, throttle 10%..100%; ambient 25 C. power_w is the published 'Power (W)' column, which tracks Voltage x Current, i.e. electrical input power of motor+ESC, not shaft power. Only one operating-temperature figure (127 C) is given, on the first row. No date in table. Prop is 3-blade glass fiber nylon, sold as 1 CW + 1 CCW; hub 27.5 mm, hub bore 6 mm, centre thickness 15 mm, max blade width 31.3 mm."
+diameter_in = 15             # page title '15x10 15" Propellers' / Test Data Type '15x10'
+diameter_mm = 381            # Specification 'Prop Disc Diameter 381mm'
+pitch_in = 10                # Specification 'Pitch 10 Inch'
+blades = 3                   # Specification 'Blades 3'
+mass_g = 61.1                # Specification 'Weight 61.1g' (per prop, as stated)
+
+[[static]]                   # Test Data row: 4220 KV350, 48.1 V, throttle 10%, 0.5 A
+rpm = 1341
+thrust_g = 181
+torque_nm = 0.07
+power_w = 22
+voltage_v = 48.1
+current_a = 0.5
+throttle = "10%"
+
+[[static]]                   # Test Data row: 4220 KV350, 48.0 V, throttle 20%, 2.3 A
+rpm = 2749
+thrust_g = 887
+torque_nm = 0.25
+power_w = 111
+voltage_v = 48.0
+current_a = 2.3
+throttle = "20%"
+
+[[static]]                   # Test Data row: 4220 KV350, 47.9 V, throttle 30%, 6.3 A
+rpm = 3960
+thrust_g = 1879
+torque_nm = 0.52
+power_w = 301
+voltage_v = 47.9
+current_a = 6.3
+throttle = "30%"
+
+[[static]]                   # Test Data row: 4220 KV350, 47.8 V, throttle 40%, 12.5 A
+rpm = 5021
+thrust_g = 3042
+torque_nm = 0.83
+power_w = 597
+voltage_v = 47.8
+current_a = 12.5
+throttle = "40%"
+
+[[static]]                   # Test Data row: 4220 KV350, 47.5 V, throttle 50%, 21.9 A
+rpm = 5984
+thrust_g = 4344
+torque_nm = 1.19
+power_w = 1043
+voltage_v = 47.5
+current_a = 21.9
+throttle = "50%"
+
+[[static]]                   # Test Data row: 4220 KV350, 47.1 V, throttle 60%, 38.3 A
+rpm = 7004
+thrust_g = 5936
+torque_nm = 1.63
+power_w = 1808
+voltage_v = 47.1
+current_a = 38.3
+throttle = "60%"
+
+[[static]]                   # Test Data row: 4220 KV350, 46.7 V, throttle 70%, 55.5 A
+rpm = 7674
+thrust_g = 7155
+torque_nm = 1.98
+power_w = 2591
+voltage_v = 46.7
+current_a = 55.5
+throttle = "70%"
+
+[[static]]                   # Test Data row: 4220 KV350, 46.2 V, throttle 80%, 75.0 A
+rpm = 8218
+thrust_g = 8192
+torque_nm = 2.28
+power_w = 3466
+voltage_v = 46.2
+current_a = 75.0
+throttle = "80%"
+
+[[static]]                   # Test Data row: 4220 KV350, 45.6 V, throttle 90%, 101.3 A
+rpm = 8441
+thrust_g = 8659
+torque_nm = 2.42
+power_w = 4615
+voltage_v = 45.6
+current_a = 101.3
+throttle = "90%"
+
+[[static]]                   # Test Data row: 4220 KV350, 44.9 V, throttle 100%, 126.2 A
+rpm = 8460
+thrust_g = 8706
+torque_nm = 2.43
+power_w = 5671
+voltage_v = 44.9
+current_a = 126.2
+throttle = "100%"

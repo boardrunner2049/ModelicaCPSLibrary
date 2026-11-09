@@ -1,0 +1,15 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Tattu G-Tech 5200mAh 4S 35C"
+kind = "battery"
+manufacturer = "Tattu (Grepow)"
+source = "GensTattu (Grepow's official Tattu/Gens ace store) product page, SKU TAA52004S35X6, retrieved 2026-11-08, https://genstattu.com/tattu-5200mah-14-8v-35c-4s1p-lipo-battery-pack-with-xt60-plug.html; cross-checked with Grepow page https://www.grepow.com/uav-battery/tattu-g-tech-4s-5200mah-14-8v-35c-lipo-drone-battery.html"
+notes = "Dimensions 133 (+-5) x 45 (+-2) x 33.5 (+-2) mm. XT60 discharge plug, 10 AWG wire 120 mm, JST-XHR balance lead 65 mm, G-Tech chip. NOT stated: cell max/full voltage, cutoff voltage, burst duration, internal resistance, max charge rate (page only recommends the TA1000 charger). cell_nominal_v is the stated pack voltage divided by the stated cell count."
+chemistry = "LiPo"           # product page: Tattu 'Lipo Battery Pack'
+cells_series = 4             # product page 'Configuration: 4S1P'
+cells_parallel = 1           # product page 'Configuration: 4S1P'
+capacity_mah = 5200          # product page 'Capacity(mAh): 5200' (Grepow page: 'Minimum Capacity: 5200mAh')
+pack_nominal_v = 14.8        # product page 'Voltage(V): 14.8'
+cell_nominal_v = 3.7         # 14.8 V / 4S (both stated); per-cell value itself not printed
+c_rating_continuous = 35     # product page 'Discharge Rate (C): 35'
+c_rating_burst = 70          # product page 'Max Burst discharge Rate (C): 70'
+weight_g = 436.5             # product page 'Net Weight(+-20g): 436.5'

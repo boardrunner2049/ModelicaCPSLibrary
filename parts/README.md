@@ -51,6 +51,51 @@ figure, so the gaps say which models to add next. Lower levels keep only what
 they can represent (`--level G0` of a GNSS receiver keeps nothing but reports
 every figure it dropped).
 
+## Powertrain parts: motors, propellers, batteries, ESCs, servos, gearmotors
+
+A propulsion level is an assembly, so it names several parts in one table:
+
+```toml
+[models.propulsion]              # multirotor: sets models.esc/motor/rotor and fills
+motor = "tmotor_mn3508_kv580"    #   [motor], [rotor], [power], [esc]
+propeller = "apc_12x45mr"        # optional when the motor's bench table has a propeller
+battery = "tattu_4s_5200_35c"    # or [power] dcVoltage
+esc = "holybro_kotleta20"        # optional: limits; switch figures at P3/P4
+level = "P2"                     # P0..P4 (default P2)
+battery_state = "nominal"        # full | nominal | storage | empty
+
+[models.servos]                  # plane control surfaces; a rover's [models.steering]
+part = "kst_x08_v6"
+level = "S1"
+voltage = 6.0                    # optional: which rated voltage's speed
+
+[models.drive]                   # rover
+part = "pololu_37d_50to1_12v_4753"
+count = 2                        # gearmotors on the axle
+battery = "gensace_3s_2200_25c"  # optional; default the rated voltage
+```
+
+```sh
+fire-compose part motor mn3508 --with propeller=12x45mr --with battery=tattu_4s --mass 2.0
+fire-compose part servo sc1258 --with vehicle=rover
+fire-compose part gearmotor 37d_50 --with count=2 --level D0
+```
+
+| Model | Figures | Parameters |
+|---|---|---|
+| Motor | KV, internal resistance, no-load current at V, poles, inductance and rotor inertia if stated | k = 60/(2π KV); R line-to-line (six-step, two phases conduct); b = k I0/ω0 (no-load loss as viscous friction); P3/P4 per phase R/2, L/2, ke = k/2, poles/2. Not stated: L = 0.2 ms × R, rotor inertia = 40 % of the mass on a ring scaled from a 2212 bell (assumed, reported). |
+| Propeller | APC static rows (V = 0) of the PER3 data, or measured thrust/torque per rpm | kT, kQ by least squares over the rows up to the RPM limit; J = m D²/24 (assumed). Without a propeller part, the motor's bench table is fitted instead. |
+| P0 / P1 | the above + supply | the loaded speed ω(V) solved from k(V − kω)/R = kQ ω² + bω, fitted linearly over 30–100 % of the supply (`omegaMax`, `Kv`); time constant J/(b + k²/R + 2kQω) at hover. |
+| Battery | cells, cell voltages, internal resistance | dcVoltage = cells × cell voltage at `battery_state`; P3/P4 sourceResistance (DC before AC impedance; not stated: 15 mΩ·Ah per cell, assumed). |
+| ESC (P3/P4) | per-phase inverter resistance or MOSFET Rds(on), diode Vf, PWM frequency, dead time, capacitor | Ron, Rdiode, Vdiode, pwmFrequency, deadTime, dcLinkCapacitance; each assumption is reported. |
+| Servo (S1) | speed per 60° at a voltage, dead band, angle per µs | maxServoRate/maxSteerRate through the linkage that maps full command to maxAileron/maxSteerAngle; dead band as that fraction of the surface range. |
+| Gearmotor (D0/D1) | output-shaft no-load speed, stall torque and current, ratio, rated voltage | motorNoLoadSpeed, motorStallTorque (× count, scaled to the supply), gearRatio, supplyVoltage. |
+
+The report's `checks` set the result against the datasheets: full throttle
+and hover (thrust/weight, throttle, current), the motor's, ESC's, battery's
+and propeller's limits, and the model's speed, thrust and current at each row
+of the manufacturer's bench table (by throttle, or at the row's current).
+
 ## Writing a part
 
 Use only figures the datasheet states, in the units of the key name, with the

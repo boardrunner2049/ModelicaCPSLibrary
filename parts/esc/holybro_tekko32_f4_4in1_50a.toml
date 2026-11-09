@@ -1,0 +1,15 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Holybro Tekko32 F4 4in1 50A ESC"
+kind = "esc"
+manufacturer = "Holybro"
+source = "Holybro spec sheet 'Tekko32 F4 4in1 50A ESC' (#31102), 2 pages, PDF dated 2021-11-08, linked from https://docs.holybro.com/company/user-manuals/esc (file Holybro_Tekko32_F4_4in1_50A_ESC_spec.pdf)"
+notes = "4-in-1 board; currents are per channel ('50A x4', '60A x4'). Protocols: DShot150/300/600/1200, MultiShot, OneShot, ProShot, PWM; ESC telemetry; onboard analog current sensor (scale 168). No output BEC. F4 MCU @150 MHz. Size 45x37x6 mm, M4 30.5x30.5 mounting. Burst duration NOT stated. MOSFET part number, Rds(on), diode Vf, dead time NOT published by Holybro (no Holybro Tekko32 spec sheet names its MOSFETs). capacitance_uf is the external electrolytic cap shipped in the box, not on-board capacitance."
+current_continuous_a = 50          # Spec p.1 "Continuous Current: 50A x4"
+current_burst_a = 60               # Spec p.1 "Burst Current: 60A x4"; duration not stated
+cells_min = 4                      # Spec p.1 "Supports 4-6S battery"
+cells_max = 6                      # Spec p.1 "Supports 4-6S battery"
+pwm_frequency_khz = 48             # Spec p.1 "PWM output up to 96K (default 48K)"
+pwm_frequency_max_khz = 96         # Spec p.1 "PWM output up to 96K"; discrete option list not given
+firmware = "BLHeli_32"             # Spec p.1 "BLHeli_32 firmware"
+weight_g = 13.8                    # Spec p.1 "Weight: 13.8g" (whole 4-in-1 board)
+capacitance_uf = 1000              # Spec p.1 "1000uf 35v capacitor included (highly recommended for 6s setup)"; external, 35 V

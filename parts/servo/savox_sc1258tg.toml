@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Savox SC-1258TG+"
+kind = "servo"
+manufacturer = "Savox"
+source = "Savox 'SC-1258TG+' Specification Data Sheet (SC-1258TGP_SpecSheet.pdf, 1 page, linked from https://www.savox-servo.com/en/product/SC-1258TGplus/savox-servo-sc-1258tg-digital-coreless-motor-titanium-gear) plus that product page's Technical Specs (fetched 2026-11-08)"
+notes = "Rover steering servo (Savox: 'steering servo on 1/10 scale buggies', Application: CAR). Figures are for the current 'Plus' version (SC-1258TG+ / SC-1258TGP); the original SC-1258TG is discontinued and retailers list it at a different weight (52.4 g) -- not used. Data sheet gives Dead Band Width as a RANGE '3-5 μsec' -- deadband_us left unset. Max Travel approximate ('~130°'). Rotating direction: counterclockwise when 1500->2000 us. Currents: idle 5 mA; operating 100 mA @4.8V, 120 mA @6.0V; stall 4000 mA @4.8V, 5000 mA @6.0V. 12-bit PCB, VR potentiometer, frame rate 50-360 Hz, coreless motor, titanium gears."
+speed_s_per_60deg = 0.08          # data sheet 'Speed @6.0V 0.08 s/60°'
+speed_at_v = 6.0
+speed_low_s_per_60deg = 0.10      # data sheet 'Speed @4.8V 0.1 s/60°'
+speed_low_at_v = 4.8
+torque_kgcm = 12.0                # data sheet 'Torque @6.0V 12 kg/cm | 166.6 oz/in' (4.8V: 9.6 kg/cm)
+# deadband: data sheet 'Dead Band Width 3-5 μsec' (range, not a single figure)
+travel_deg = 130                  # data sheet 'Max Travel ~130° (when 900→2100 μsec)' -- approximate per Savox
+travel_pulse_us = [900, 2100]     # same line
+operating_angle_deg_per_us = 0.1  # data sheet 'Operating Travel 100° (when 1000→2000 μsec)' -> 100/1000
+pulse_neutral_us = 1500           # data sheet 'Neutral Position 1500 μsec'
+voltage_min_v = 4.8               # data sheet 'Operating Voltage 4.8V-6.0V'
+voltage_max_v = 6.0
+weight_g = 64                     # data sheet 'Weight 64 g'
+digital = true                    # data sheet 'Amplifier Type: Digital Controller'
+deadband_range_us = [3, 5]        # data sheet "Dead Band Width 3-5 usec" (a range)

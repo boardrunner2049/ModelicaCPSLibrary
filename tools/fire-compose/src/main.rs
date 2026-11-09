@@ -29,7 +29,8 @@ enum Action {
     /// Show what a real part (parts/KIND/*.toml) becomes at a level: the
     /// parameters, the figures each came from, and what the level cannot represent.
     Part {
-        /// imu, gnss, barometer or magnetometer
+        /// imu, gnss, barometer, magnetometer; motor, propeller, battery, esc,
+        /// servo, gearmotor
         kind: String,
         /// A part id, name or path; omit to list the parts of KIND.
         part: Option<String>,
@@ -46,6 +47,17 @@ enum Action {
         /// The report as JSON
         #[arg(long)]
         json: bool,
+        /// Powertrain parts: the rest of the assembly and its options, e.g.
+        /// --with propeller=apc_10x47sf --with battery=tattu_4s --with
+        /// battery_state=full (servo: --with vehicle=rover|fixed_wing --with
+        /// voltage=6; gearmotor: --with count=2)
+        #[arg(long, value_name = "KEY=VALUE")]
+        with: Vec<String>,
+        /// Multirotor mass [kg] and rotor count, for hover and thrust/weight
+        #[arg(long)]
+        mass: Option<f64>,
+        #[arg(long, default_value_t = 4)]
+        rotors: u32,
     },
     /// Emit and run OpenModelica checkModel; this does not simulate an FMU.
     Check {
@@ -133,6 +145,9 @@ fn run() -> Result<()> {
             tolerances,
             set,
             json,
+            with,
+            mass,
+            rotors,
         } => {
             let Some(part) = part else {
                 println!(
@@ -141,6 +156,48 @@ fn run() -> Result<()> {
                 );
                 return Ok(());
             };
+            let explicit: toml::map::Map<String, toml::Value> =
+                toml::from_str(set.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+            if fire_compose::powertrain::KINDS.contains(&kind.as_str()) {
+                let mut sel = toml::map::Map::new();
+                let key = if ["servo", "gearmotor"].contains(&kind.as_str()) {
+                    "part"
+                } else {
+                    kind.as_str()
+                };
+                sel.insert(key.into(), toml::Value::String(part));
+                if let Some(l) = level {
+                    sel.insert("level".into(), toml::Value::String(l));
+                }
+                for w in with {
+                    let (k, v) = w
+                        .split_once('=')
+                        .ok_or(format!("--with {w}: expected KEY=VALUE"))?;
+                    let v = v
+                        .parse::<f64>()
+                        .map(toml::Value::Float)
+                        .unwrap_or(toml::Value::String(v.into()));
+                    sel.insert(k.into(), v);
+                }
+                // The configuration around it: explicit tables, and an
+                // airframe for hover.
+                let mut root = explicit;
+                if let Some(m) = mass {
+                    let t: toml::map::Map<String, toml::Value> = toml::from_str(&format!(
+                        "[geometry]\nnActuators = {rotors}\n[mass]\nmode = \"aggregate\"\n[mass.aggregate]\nmass = {m:?}\n"
+                    )).unwrap();
+                    for (k, v) in t {
+                        root.entry(k).or_insert(v);
+                    }
+                }
+                let report = fire_compose::powertrain::report(&kind, &sel, &root)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                } else {
+                    print!("{}", parts::summary(&report));
+                }
+                return Ok(());
+            }
             let mut sel = toml::map::Map::new();
             sel.insert("part".into(), toml::Value::String(part));
             for (k, v) in [("level", level), ("mode", mode), ("tolerances", tolerances)] {
@@ -148,8 +205,6 @@ fn run() -> Result<()> {
                     sel.insert(k.into(), toml::Value::String(v));
                 }
             }
-            let explicit: toml::map::Map<String, toml::Value> =
-                toml::from_str(set.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
             let (_, _, report) = parts::resolve(&kind, &sel, &explicit)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report).unwrap());

@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Tattu Plus 10000mAh 6S 25C (smart, AS150+XT150)"
+kind = "battery"
+manufacturer = "Tattu (Grepow)"
+source = "GensTattu product page, SKU TAA10K6SP25AX ('new version'), retrieved 2026-11-08, https://www.genstattu.com/tattu-plus-22-2v-25c-6s-liPo-battery-10000-mah-with-as150-xt150-plug.html; cell voltage limits: Tattu Plus manual linked from that page, Tattu-Plus.pdf (undated), https://www.genstattu.com/content/Tattu-Plus.pdf"
+notes = "Smart pack with BMS. Product page dimensions 186 (+-5) x 70 (+-2) x 63 (+-2) mm, AWG#8 wire. The Tattu Plus manual (generic for 10000/12000/16000/22000 mAh, possibly older version) lists 10000mAh as 70.00 x 62.80 x 185.77 mm, 1466.0 +-10 g -- weight disagrees with the product page's 1517 g; weight_g uses the product page. Manual also states: over-voltage protection 4.24 V/cell, under-voltage alarm 3.1 V, over-temp alarm 55 C, use temperature -10..40 C, storage 3.8-3.85 V/cell. NOT stated: burst duration, internal resistance, max charge rate (page only recommends TA3200 charger)."
+chemistry = "LiPo"           # manual 'Cell: Lithium polymer'
+cells_series = 6             # product page 'Configuration: 6S1P'
+cells_parallel = 1           # product page 'Configuration: 6S1P'
+capacity_mah = 10000         # product page 'Capacity(mAh): 10000'
+pack_nominal_v = 22.2        # product page 'Voltage(V): 22.2'; manual 'Voltage 22.2V'
+cell_nominal_v = 3.7         # 22.2 V / 6S (both stated); per-cell value itself not printed
+cell_full_v = 4.25           # manual 'Never over-charge the battery (each cell voltage never higher than 4.25V)'; BMS over-voltage protection is 4.24 V
+cell_cutoff_v = 3.3          # manual 'Never over-discharge (each cell voltage can't be lower than 3.3V)'; BMS under-voltage alarm is 3.1 V
+c_rating_continuous = 25     # product page 'Discharge Rate (C): 25'
+c_rating_burst = 50          # product page 'Max Burst discharge Rate (C): 50'
+weight_g = 1517              # product page 'Net Weight(+-20g): 1517' (manual says 1466.0 +-10 g, see notes)

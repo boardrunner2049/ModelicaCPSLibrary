@@ -7,6 +7,7 @@ pub mod config;
 pub mod imu;
 pub mod lower;
 pub mod parts;
+pub mod powertrain;
 pub mod sensors;
 pub mod vehicle;
 

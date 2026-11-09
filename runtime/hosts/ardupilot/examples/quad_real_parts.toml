@@ -1,8 +1,12 @@
-# The quad with real sensor parts: each [models.X] names a part (parts/X/*.toml,
-# datasheet figures) and the composer fills that sensor's level from the
-# datasheet. A Pixhawk 6C-like set: ICM-42688-P IMU, MS5611 barometer, IST8310
-# magnetometer, and a NEO-M9N GNSS receiver.
+# A quad built from real parts: each [models.X] names parts (parts/KIND/*.toml,
+# datasheet figures) and the composer fills that model's level from the
+# datasheets. A 2 kg 650-class quad: T-MOTOR MN3508 KV580 motors, APC 12x4.5MR
+# propellers, a Tattu 4S 5200 mAh battery and a Holybro Tekko32 ESC; a Pixhawk
+# 6C-like sensor set: ICM-42688-P IMU, MS5611 barometer, IST8310 magnetometer,
+# and a NEO-M9N GNSS receiver.
 #   tools/fire-compose/target/debug/fire-compose part gnss neo_m9n   # what a part becomes
+#   tools/fire-compose/target/debug/fire-compose part motor mn3508 --with propeller=12x45mr \
+#       --with battery=tattu_4s --mass 2.0                        # the propulsion, with checks
 #   runtime/hosts/ardupilot/run.sh runtime/hosts/ardupilot/examples/quad_real_parts.toml --mission
 [sitl]
 speedup = 1
@@ -20,8 +24,8 @@ spinSign = [-1, 1, -1, 1]
 [physics.mass]
 mode = "aggregate"
 [physics.mass.aggregate]
-mass = 1.5
-inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+mass = 2.0
+inertia = [[0.03, 0.0, 0.0], [0.0, 0.03, 0.0], [0.0, 0.0, 0.055]]
 
 [physics.initial]
 p_start = [0.0, 0.0, -0.12]
@@ -34,6 +38,14 @@ stiffness = 3000.0
 damping = 150.0
 tangentialDamping = 25.0
 frictionCoefficient = 0.6
+
+[physics.models.propulsion]
+motor = "tmotor_mn3508_kv580"
+propeller = "apc_12x45mr"
+battery = "tattu_4s_5200_35c"
+esc = "holybro_tekko32_f4_4in1_50a"
+level = "P2"                  # DC motor with winding current and back-EMF
+battery_state = "nominal"
 
 [physics.models.imu]
 part = "tdk_icm42688p"        # I2 (errors) by default; level = "I1" for the deterministic readout

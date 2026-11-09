@@ -1,0 +1,19 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Holybro Kotleta20"
+kind = "esc"
+manufacturer = "Holybro"
+source = "Holybro 'Kotleta20 Datasheet', Revision 15.07.2019, Table 2.1 (abs. max) and Table 2.4 'Power characteristics' (section 2.3), linked from https://docs.holybro.com/company/user-manuals/esc (file Holybro_Kotleta20_datasheet_v1.0.pdf); firmware defaults from Sapog source PX4/sapog master @601f458, firmware/src/motor/realtime/motor_pwm.c"
+notes = "Sensorless BLDC (trapezoidal) CAN (UAVCAN/DroneCAN) ESC running open-source Sapog firmware; also UART and RCPWM inputs; regenerative braking / active freewheeling. Supply 9-26 V (typ 14.8 V); LiPo cell range not stated (so cells_min/max omitted). Continuous power 500 W (input 24 V), peak 1000 W; idle consumption 50 mA; per-phase cumulative inverter resistance 3.5 mohm typ. MOSFET part number NOT published; Rds(on) is the figure the Kotleta20 datasheet itself gives for its FETs (typ 0.79, max 1.2 mohm; Vgs not stated). Body-diode Vf NOT published. Peak-current duration NOT stated. pwm_frequency_khz and dead_time_ns are Sapog firmware parameter DEFAULTS (mot_pwm_hz = 60000, range 20000-75000; mot_pwm_dt_ns = 600, range 400-800) from source code, not from the Holybro datasheet; the shipped configuration of a Kotleta20 is not stated. Datasheet mentions 'low-ESR embedded filtering capacitors' without a value; capacitance_uf is the external cap shipped in the box (220 uF 35 V, one per ESC)."
+current_continuous_a = 20          # Table 2.4 "Continuous DC current 20 A"
+current_burst_a = 55               # Table 2.4 "Peak DC current 55 A"; duration not stated
+max_voltage_v = 26                 # Table 2.1 abs. max supply 26 V; Table 2.4 Vinv 9 / 14.8 / 26 V
+min_voltage_v = 9                  # Table 2.4 Vinv min 9 V
+firmware = "Sapog"                 # Datasheet p.1 "It runs the Sapog Firmware"
+pwm_frequency_khz = 60             # Sapog motor_pwm.c CONFIG_PARAM_INT("mot_pwm_hz", 60000, 20000, 75000) - firmware default
+pwm_frequency_min_khz = 20         # Sapog pwm.h MOTOR_PWM_MIN_FREQUENCY 20000
+pwm_frequency_max_khz = 75         # Sapog pwm.h MOTOR_PWM_MAX_FREQUENCY 75000
+dead_time_ns = 600                 # Sapog motor_pwm.c CONFIG_PARAM_INT("mot_pwm_dt_ns", 600, 400, 800) - firmware default
+mosfet_rds_on_mohm = 0.79          # Table 2.4 "RDS-on FET drain-source on-state resistance" typ 0.79 (max 1.2) mohm; Vgs and part no. not stated
+phase_resistance_mohm = 3.5        # Table 2.4 "Rphase Cumulative resistance of the inverter per phase" typ 3.5 mohm
+weight_g = 8.8                     # Datasheet Features "500 W continuous power output at 8.8 g weight"
+capacitance_uf = 220               # Sec. 1.3 accessories "Electrolytic capacitor 220uF 35v" (external, in box)

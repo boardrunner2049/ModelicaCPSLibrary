@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "CNHL Black Series V2.0 1500mAh 4S 130C"
+kind = "battery"
+manufacturer = "CNHL (China Hobby Line)"
+source = "ChinaHobbyLine product page (2-pack listing; specs are per pack), Stock Number 1501304BK, retrieved 2026-11-08, https://chinahobbyline.com/products/2-packs-cnhl-black-series-v2-0-1500mah-14-8v-4s-130c-lipo-battery-with-xt60-plug (reached via https://chinahobbyline.com/shop/detail/310, which formerly listed the original 100C Black Series)"
+notes = "Racing/freestyle 4S pack. Size 39 x 28 x 80 mm (1-5 mm difference). XT60, JST-XH balance, 12 AWG. The older non-V2 Black Series 1500mAh 4S is 100C/200C (per retailers, not captured here). 'Normal cell voltage is between 3.7V~4.2V' -- 3.7 V is given as the low end of normal range, not explicitly as nominal; pack nominal 14.8 V / 4S = 3.7 V. NOT stated: cutoff voltage, burst duration, internal resistance."
+chemistry = "LiPo"           # product page 'Lipo Battery'
+cells_series = 4             # product page 'Voltage: 14.8V / 4-Cell / 4S1P'
+cells_parallel = 1           # product page '4S1P'
+capacity_mah = 1500          # product page 'Capacity: 1500mAh'
+pack_nominal_v = 14.8        # product page 'Voltage: 14.8V'
+cell_nominal_v = 3.7         # 14.8 V / 4S; also 'Normal cell voltage is between 3.7V~4.2V'
+cell_full_v = 4.2            # product page 'Please stop charging immediately when the cell voltage has been charged to 4.2V'
+c_rating_continuous = 130    # product page 'Discharge Rate: 130C Continual / 260C Burst'
+c_rating_burst = 260         # product page 'Discharge Rate: 130C Continual / 260C Burst'
+max_charge_c = 5             # product page 'Charge Rate: 5C Max'
+weight_g = 164               # product page 'Approx Weight(+-5g) : 164g'

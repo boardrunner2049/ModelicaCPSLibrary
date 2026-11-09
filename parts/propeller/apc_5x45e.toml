@@ -1,0 +1,275 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "APC 5x4.5E"
+kind = "propeller"
+manufacturer = "APC Propellers"
+source = "PER3_5x45E.dat (header: 5x4.5E (5x45E.dat) v2022-0915, Simulation Date: 09/22/2022), https://www.apcprop.com/files/PER3_5x45E.dat; no apcprop.com product page found for 5x4.5E (https://www.apcprop.com/product/5x4-5e/ returns 404), so no mass"
+notes = "APC data are computed by APC's own blade element/vortex theory, not measured. Static rows are the V = 0 (J = 0) row of each PROP RPM block. Torque/thrust/power columns are printed by APC with 3 decimals, so low-RPM rows are coarsely rounded (Ct/Cp carry more precision). APC tabulates RPM blocks beyond its suggested max RPM; those rows are simulation output above the stated limit. max_rpm omitted: APC RPM-limits page gives 190,000/D for Speed 400 Electric (E) and 150,000/D for Thin Electric (E); which family 5x4.5E belongs to is not stated."
+diameter_in = 5                # PER3_5x45E.dat title line
+pitch_in = 4.5                # PER3_5x45E.dat title line
+# blades = 2                  # NOT stated by APC (product page or data file); two-blade by APC Electric naming convention only, left commented out
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 1000, V = 0 row
+rpm = 1000
+ct = 0.1888
+cp = 0.1456
+thrust_lbf = 0.004
+torque_inlbf = 0.002
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 2000, V = 0 row
+rpm = 2000
+ct = 0.1900
+cp = 0.1314
+thrust_lbf = 0.015
+torque_inlbf = 0.008
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 3000, V = 0 row
+rpm = 3000
+ct = 0.1906
+cp = 0.1251
+thrust_lbf = 0.034
+torque_inlbf = 0.018
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 4000, V = 0 row
+rpm = 4000
+ct = 0.1910
+cp = 0.1214
+thrust_lbf = 0.061
+torque_inlbf = 0.031
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 5000, V = 0 row
+rpm = 5000
+ct = 0.1913
+cp = 0.1188
+thrust_lbf = 0.095
+torque_inlbf = 0.047
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 6000, V = 0 row
+rpm = 6000
+ct = 0.1915
+cp = 0.1169
+thrust_lbf = 0.137
+torque_inlbf = 0.067
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 7000, V = 0 row
+rpm = 7000
+ct = 0.1917
+cp = 0.1155
+thrust_lbf = 0.187
+torque_inlbf = 0.090
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 8000, V = 0 row
+rpm = 8000
+ct = 0.1919
+cp = 0.1144
+thrust_lbf = 0.245
+torque_inlbf = 0.116
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 9000, V = 0 row
+rpm = 9000
+ct = 0.1920
+cp = 0.1134
+thrust_lbf = 0.310
+torque_inlbf = 0.146
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 10000, V = 0 row
+rpm = 10000
+ct = 0.1922
+cp = 0.1127
+thrust_lbf = 0.383
+torque_inlbf = 0.179
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 11000, V = 0 row
+rpm = 11000
+ct = 0.1924
+cp = 0.1121
+thrust_lbf = 0.464
+torque_inlbf = 0.215
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 12000, V = 0 row
+rpm = 12000
+ct = 0.1925
+cp = 0.1115
+thrust_lbf = 0.552
+torque_inlbf = 0.255
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 13000, V = 0 row
+rpm = 13000
+ct = 0.1927
+cp = 0.1111
+thrust_lbf = 0.649
+torque_inlbf = 0.298
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 14000, V = 0 row
+rpm = 14000
+ct = 0.1929
+cp = 0.1107
+thrust_lbf = 0.753
+torque_inlbf = 0.344
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 15000, V = 0 row
+rpm = 15000
+ct = 0.1931
+cp = 0.1105
+thrust_lbf = 0.865
+torque_inlbf = 0.394
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 16000, V = 0 row
+rpm = 16000
+ct = 0.1933
+cp = 0.1102
+thrust_lbf = 0.985
+torque_inlbf = 0.447
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 17000, V = 0 row
+rpm = 17000
+ct = 0.1935
+cp = 0.1100
+thrust_lbf = 1.114
+torque_inlbf = 0.504
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 18000, V = 0 row
+rpm = 18000
+ct = 0.1937
+cp = 0.1099
+thrust_lbf = 1.250
+torque_inlbf = 0.564
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 19000, V = 0 row
+rpm = 19000
+ct = 0.1939
+cp = 0.1098
+thrust_lbf = 1.394
+torque_inlbf = 0.628
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 20000, V = 0 row
+rpm = 20000
+ct = 0.1941
+cp = 0.1097
+thrust_lbf = 1.547
+torque_inlbf = 0.696
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 21000, V = 0 row
+rpm = 21000
+ct = 0.1944
+cp = 0.1097
+thrust_lbf = 1.707
+torque_inlbf = 0.767
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 22000, V = 0 row
+rpm = 22000
+ct = 0.1946
+cp = 0.1097
+thrust_lbf = 1.876
+torque_inlbf = 0.841
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 23000, V = 0 row
+rpm = 23000
+ct = 0.1949
+cp = 0.1097
+thrust_lbf = 2.053
+torque_inlbf = 0.920
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 24000, V = 0 row
+rpm = 24000
+ct = 0.1951
+cp = 0.1098
+thrust_lbf = 2.238
+torque_inlbf = 1.002
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 25000, V = 0 row
+rpm = 25000
+ct = 0.1954
+cp = 0.1099
+thrust_lbf = 2.432
+torque_inlbf = 1.088
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 26000, V = 0 row
+rpm = 26000
+ct = 0.1957
+cp = 0.1100
+thrust_lbf = 2.635
+torque_inlbf = 1.178
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 27000, V = 0 row
+rpm = 27000
+ct = 0.1960
+cp = 0.1101
+thrust_lbf = 2.846
+torque_inlbf = 1.272
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 28000, V = 0 row
+rpm = 28000
+ct = 0.1963
+cp = 0.1103
+thrust_lbf = 3.065
+torque_inlbf = 1.371
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 29000, V = 0 row
+rpm = 29000
+ct = 0.1966
+cp = 0.1105
+thrust_lbf = 3.293
+torque_inlbf = 1.473
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 30000, V = 0 row
+rpm = 30000
+ct = 0.1970
+cp = 0.1107
+thrust_lbf = 3.531
+torque_inlbf = 1.580
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 31000, V = 0 row
+rpm = 31000
+ct = 0.1973
+cp = 0.1110
+thrust_lbf = 3.777
+torque_inlbf = 1.691
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 32000, V = 0 row
+rpm = 32000
+ct = 0.1977
+cp = 0.1113
+thrust_lbf = 4.032
+torque_inlbf = 1.806
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 33000, V = 0 row
+rpm = 33000
+ct = 0.1980
+cp = 0.1116
+thrust_lbf = 4.296
+torque_inlbf = 1.926
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 34000, V = 0 row
+rpm = 34000
+ct = 0.1984
+cp = 0.1120
+thrust_lbf = 4.569
+torque_inlbf = 2.052
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 35000, V = 0 row
+rpm = 35000
+ct = 0.1988
+cp = 0.1124
+thrust_lbf = 4.852
+torque_inlbf = 2.183
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 36000, V = 0 row
+rpm = 36000
+ct = 0.1993
+cp = 0.1130
+thrust_lbf = 5.144
+torque_inlbf = 2.321
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 37000, V = 0 row
+rpm = 37000
+ct = 0.1997
+cp = 0.1137
+thrust_lbf = 5.445
+torque_inlbf = 2.468
+
+[[static]]                    # PER3_5x45E.dat, PROP RPM = 38000, V = 0 row
+rpm = 38000
+ct = 0.2001
+cp = 0.1148
+thrust_lbf = 5.755
+torque_inlbf = 2.626

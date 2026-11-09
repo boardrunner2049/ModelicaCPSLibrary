@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "DJI 2312E 800KV (E305 Tuned Propulsion System)"
+kind = "motor"
+manufacturer = "DJI"
+source = "DJI 'E305 Tuned Propulsion System User Manual' V1.0 2015.5, section 7 'Specifications' (p.5) and section 4 'Mounting the Motors' (p.3), https://dl.djicdn.com/downloads/e305/en/E305_User_Manual_v1.00_en.pdf; same figures on archived DJI spec page https://web.archive.org/web/20210927050207/https://www.dji.com/e305/spec_v1-doc"
+notes = "The E305's 2312E is 800 KV per DJI (the 960 KV 2312 belongs to the older E300/E310 systems; not used here). DJI publishes NO bench test table, internal resistance, idle current, pole/slot count or current/power rating for the 2312E, so there is no [[test]] section. System-level figures (with 420 LITE ESC + DJI 9450 prop 9.4x5.0 in): max thrust 850 g/rotor at 14.8 V sea level; recommended takeoff weight 350-400 g/rotor; recommended battery 4S LiPo; working temp -10..40 C. Drawing on p.3 shows ~28.2 mm diameter, M6 prop thread, 4xM3 holes on 16/19 mm."
+kv_rpm_per_v = 800                 # Manual p.5 Specifications, Motor "KV 800 rpm/V"
+stator_diameter_mm = 23            # Manual p.5 "Stator Size 23x12 mm"
+stator_height_mm = 12              # Manual p.5 "Stator Size 23x12 mm"
+weight_g = 56                      # Manual p.5 Motor "Weight 56 g"
+cells_min = 4                      # Manual p.5 "Battery (Recommended) 4S LiPo" (system recommendation, not a range)
+cells_max = 4                      # Manual p.5 "Battery (Recommended) 4S LiPo"; the ESC accepts 3S-4S
+max_thrust_g = 850                 # Manual p.5 "Max. Thrust 850 g/rotor (14.8 V, Sea Level)" with 9450 prop
+max_thrust_at_v = 14.8             # Manual p.5

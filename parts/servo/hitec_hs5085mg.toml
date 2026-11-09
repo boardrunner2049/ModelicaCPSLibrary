@@ -1,0 +1,15 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Hitec HS-5085MG"
+kind = "servo"
+manufacturer = "Hitec"
+source = "Hitec RCD USA product page 'HS-5085MG 21.9g Standard Voltage Metal Gear Digital Micro Servo' (Part # 35085S), https://hitecrcd.com/search/product_home/HS-5085MG (fetched 2026-11-08)"
+notes = "Current Hitec page lists 4.8 V: 0.17 s/60 & 3.6 kgf-cm and 6.0 V: 0.13 s/60 & 4.3 kgf-cm (these differ from the 0.17 s @ 6 V / 0.20 s @ 4.8 V figures in the request template). Dead band, travel/operating angle, pulse range and neutral are NOT stated on the current Hitec page; retailers quote 2 us dead band but that is not manufacturer-sourced here, so omitted. Hitec states the voltage range as 3.5-6.8 V (2S LiFe) but gives speed/torque only at 4.8 and 6.0 V. Hitec notes an upgraded successor, D85MG. Gear train: 1 resin + 4 metal gears; cored metal-brush motor; programmable (DPC-20 / HFP-30)."
+speed_s_per_60deg = 0.13          # product page Specifications 'Speed: 6.0V: 0.13 sec/60°' (also Hitec spec chart '0.13 @ 6.0V')
+speed_at_v = 6.0
+speed_low_s_per_60deg = 0.17      # product page 'Speed: 4.8V: 0.17 sec/60°'
+speed_low_at_v = 4.8
+torque_kgcm = 4.3                 # product page 'Torque: 6.0V: 59.7 oz-in (4.3 kgf-cm)'; 4.8V: 50.0 oz-in (3.6 kgf-cm)
+voltage_min_v = 3.5               # product page 'Operating Voltage Range: 3.5V ~ 6.8V (2S LiFe)'
+voltage_max_v = 6.8               # same line
+weight_g = 21.9                   # product page 'Weight: 0.77 oz (21.9g)'
+digital = true                    # product page title 'Digital Micro Servo', 'high-performance digital circuit'

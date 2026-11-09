@@ -856,7 +856,7 @@ fn normalized(s: &str) -> String {
 /// Every part file: (kind, id, table).
 pub fn all() -> Vec<(String, String, Table)> {
     let mut out = Vec::new();
-    for (kind, _) in KINDS {
+    for kind in KINDS.iter().map(|k| k.0).chain(crate::powertrain::KINDS) {
         let Ok(dir) = std::fs::read_dir(directory().join(kind)) else {
             continue;
         };
@@ -914,7 +914,7 @@ pub fn find(kind: &str, name: &str) -> Result<(String, Table)> {
     match hits.as_slice() {
         [(_, id, t)] => Ok((id.clone(), t.clone())),
         [] => Err(format!(
-            "models.{kind}.part = {name:?}: no such {kind} part in parts/{kind}/ (have: {})",
+            "{kind} part {name:?}: no such part in parts/{kind}/ (have: {})",
             parts
                 .iter()
                 .map(|(_, id, _)| id.as_str())
@@ -922,7 +922,7 @@ pub fn find(kind: &str, name: &str) -> Result<(String, Table)> {
                 .join(", ")
         )),
         many => Err(format!(
-            "models.{kind}.part = {name:?} is ambiguous: {}",
+            "{kind} part {name:?} is ambiguous: {}",
             many.iter()
                 .map(|(_, id, _)| id.as_str())
                 .collect::<Vec<_>>()
@@ -1086,7 +1086,12 @@ pub fn resolve(
     let mut not_stated = serde_json::Map::new();
     for (figure, parameter) in &conv.missing {
         if keys.contains(parameter) && !explicit.contains_key(*parameter) {
-            not_stated.insert((*figure).into(), json!(format!("not stated: {parameter} stays at the library default")));
+            not_stated.insert(
+                (*figure).into(),
+                json!(format!(
+                    "not stated: {parameter} stays at the library default"
+                )),
+            );
         }
     }
     let report = json!({
@@ -1140,6 +1145,7 @@ pub fn expand(root: &Table) -> Result<(Table, Vec<Json>)> {
         }
         reports.push(report);
     }
+    crate::powertrain::expand(&mut out, &mut reports)?;
     Ok((out, reports))
 }
 
@@ -1193,6 +1199,12 @@ pub fn summary(report: &Json) -> String {
     }
     if let Some(a) = report["assumed"].as_array().filter(|a| !a.is_empty()) {
         out.push_str("  assumed:\n");
+        for x in a {
+            out.push_str(&format!("    {}\n", x.as_str().unwrap_or("")));
+        }
+    }
+    if let Some(a) = report["checks"].as_array().filter(|a| !a.is_empty()) {
+        out.push_str("  checks:\n");
         for x in a {
             out.push_str(&format!("    {}\n", x.as_str().unwrap_or("")));
         }
@@ -1357,18 +1369,24 @@ mod tests {
     #[test]
     fn every_part_converts_and_composes() {
         for (kind, id, _) in all() {
-            for (level, _) in KINDS.iter().find(|(k, _)| *k == kind).unwrap().1 {
+            let Some((_, levels)) = KINDS.iter().find(|(k, _)| *k == kind) else {
+                continue;
+            };
+            for (level, _) in *levels {
                 let mut sel = Table::new();
                 sel.insert("part".into(), Value::String(id.clone()));
                 sel.insert("level".into(), Value::String((*level).into()));
-                resolve(&kind, &sel, &Table::new()).unwrap_or_else(|e| panic!("{kind} {id} {level}: {e}"));
+                resolve(&kind, &sel, &Table::new())
+                    .unwrap_or_else(|e| panic!("{kind} {id} {level}: {e}"));
             }
         }
         let c = crate::config::parse(
             "schema_version = 3\nvehicle = \"rover\"\n[models.gnss]\npart = \"m9n\"\n[gnss]\nseed = 9\n\
              [models.barometer]\npart = \"bmp388\"\n[models.imu]\npart = \"bmi088\"\n",
         );
-        let Ok(c) = c else { return assert!(all().is_empty(), "{c:?}") };
+        let Ok(c) = c else {
+            return assert!(all().is_empty(), "{c:?}");
+        };
         assert_eq!(c.gnss["seed"].as_integer(), Some(9));
         assert_eq!(c.imu_model(), "errors");
         assert_eq!(c.parts.len(), 3);

@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Pololu 50:1 Metal Gearmotor 37Dx70L mm 12V with 64 CPR Encoder (Helical Pinion)"
+kind = "gearmotor"
+manufacturer = "Pololu"
+source = "Pololu item #4753 product page and specs tab, https://www.pololu.com/product/4753 and https://www.pololu.com/product/4753/specs (fetched 2026-11-08)"
+notes = "All figures at the gearbox output shaft. Encoder: 2-channel Hall quadrature, 64 CPR on motor shaft = 3200 counts per output rev (product page); encoder Vcc 3.5-20 V, max 10 mA. Stall torque/current are Pololu's theoretical extrapolations ('units will typically stall well before'); stalling likely damages the motor. Pololu also states 6 V figures: 100 rpm, 0.15 A no-load, 3.0 A stall, 12 kg·cm stall ('will run at 6 V but is intended for 12 V'). Max-efficiency point @12V: 51 %, 180 rpm, 2.2 kg·cm, 0.66 A, 4.0 W output. Shaft 6 mm D, size 37D x 70L mm."
+gear_ratio = 50.0               # specs tab 'Gear ratio: 50:1'; product page gives exact train (25×30×25×40)/(10×10×15×10) = 50 exactly
+rated_voltage_v = 12.0          # specs tab 'Motor type: 12V'; all figures below '@ 12V'
+no_load_speed_rpm = 200         # specs tab 'No-load speed @ 12V: 200 rpm'
+no_load_current_a = 0.2         # specs tab 'No-load current @ 12V: 0.2 A'
+stall_torque_kgcm = 21          # specs tab 'Stall torque @ 12V: 21 kg·cm' (290 oz·in on product page), extrapolated (note 3)
+stall_current_a = 5.5           # specs tab 'Stall current @ 12V: 5.5 A', extrapolated (note 3)
+max_power_w = 10                # specs tab 'Max output power @ 12V: 10 W'
+weight_g = 205                  # specs tab 'Weight: 205 g'

@@ -1,0 +1,186 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "APC 9x4.7SF"
+kind = "propeller"
+manufacturer = "APC Propellers"
+source = "PER3_9x47SF.dat (header: 9x4.7SF (9x47SF.dat) v2022-0915, Simulation Date: 09/22/2022), https://www.apcprop.com/files/PER3_9x47SF.dat; mass: https://www.apcprop.com/product/9x4-7sf/; RPM limit: https://www.apcprop.com/technical-information/rpm-limits/"
+notes = "APC data are computed by APC's own blade element/vortex theory, not measured. Static rows are the V = 0 (J = 0) row of each PROP RPM block. Torque/thrust/power columns are printed by APC with 3 decimals, so low-RPM rows are coarsely rounded (Ct/Cp carry more precision). APC tabulates RPM blocks beyond its suggested max RPM; those rows are simulation output above the stated limit."
+diameter_in = 9                # PER3_9x47SF.dat title line
+pitch_in = 4.7                # PER3_9x47SF.dat title line
+# blades = 2                  # NOT stated by APC (product page or data file); two-blade by APC Slow Flyer naming convention only, left commented out
+mass_oz = 0.32               # product page "Product Weight 0.32 oz."
+max_rpm = 7222               # APC RPM-limits page: SF "Maximum RPM=65,000/prop diameter (inches)" -> 65000/9 = 7222.2, truncated
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 1000, V = 0 row
+rpm = 1000
+ct = 0.1447
+cp = 0.0622
+thrust_lbf = 0.030
+torque_inlbf = 0.019
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 2000, V = 0 row
+rpm = 2000
+ct = 0.1449
+cp = 0.0610
+thrust_lbf = 0.121
+torque_inlbf = 0.073
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 3000, V = 0 row
+rpm = 3000
+ct = 0.1451
+cp = 0.0604
+thrust_lbf = 0.273
+torque_inlbf = 0.163
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 4000, V = 0 row
+rpm = 4000
+ct = 0.1452
+cp = 0.0601
+thrust_lbf = 0.486
+torque_inlbf = 0.288
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 5000, V = 0 row
+rpm = 5000
+ct = 0.1455
+cp = 0.0599
+thrust_lbf = 0.760
+torque_inlbf = 0.448
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 6000, V = 0 row
+rpm = 6000
+ct = 0.1457
+cp = 0.0598
+thrust_lbf = 1.097
+torque_inlbf = 0.645
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 7000, V = 0 row
+rpm = 7000
+ct = 0.1460
+cp = 0.0598
+thrust_lbf = 1.496
+torque_inlbf = 0.877
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 8000, V = 0 row
+rpm = 8000
+ct = 0.1464
+cp = 0.0598
+thrust_lbf = 1.959
+torque_inlbf = 1.147
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 9000, V = 0 row
+rpm = 9000
+ct = 0.1468
+cp = 0.0599
+thrust_lbf = 2.486
+torque_inlbf = 1.454
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 10000, V = 0 row
+rpm = 10000
+ct = 0.1473
+cp = 0.0601
+thrust_lbf = 3.079
+torque_inlbf = 1.800
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 11000, V = 0 row
+rpm = 11000
+ct = 0.1478
+cp = 0.0603
+thrust_lbf = 3.738
+torque_inlbf = 2.186
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 12000, V = 0 row
+rpm = 12000
+ct = 0.1483
+cp = 0.0606
+thrust_lbf = 4.466
+torque_inlbf = 2.612
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 13000, V = 0 row
+rpm = 13000
+ct = 0.1490
+cp = 0.0609
+thrust_lbf = 5.263
+torque_inlbf = 3.082
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 14000, V = 0 row
+rpm = 14000
+ct = 0.1496
+cp = 0.0613
+thrust_lbf = 6.132
+torque_inlbf = 3.596
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 15000, V = 0 row
+rpm = 15000
+ct = 0.1504
+cp = 0.0617
+thrust_lbf = 7.075
+torque_inlbf = 4.156
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 16000, V = 0 row
+rpm = 16000
+ct = 0.1512
+cp = 0.0622
+thrust_lbf = 8.094
+torque_inlbf = 4.766
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 17000, V = 0 row
+rpm = 17000
+ct = 0.1521
+cp = 0.0627
+thrust_lbf = 9.192
+torque_inlbf = 5.427
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 18000, V = 0 row
+rpm = 18000
+ct = 0.1531
+cp = 0.0633
+thrust_lbf = 10.372
+torque_inlbf = 6.143
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 19000, V = 0 row
+rpm = 19000
+ct = 0.1542
+cp = 0.0640
+thrust_lbf = 11.639
+torque_inlbf = 6.919
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 20000, V = 0 row
+rpm = 20000
+ct = 0.1554
+cp = 0.0648
+thrust_lbf = 12.995
+torque_inlbf = 7.759
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 21000, V = 0 row
+rpm = 21000
+ct = 0.1567
+cp = 0.0656
+thrust_lbf = 14.447
+torque_inlbf = 8.671
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 22000, V = 0 row
+rpm = 22000
+ct = 0.1581
+cp = 0.0667
+thrust_lbf = 15.999
+torque_inlbf = 9.667
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 23000, V = 0 row
+rpm = 23000
+ct = 0.1597
+cp = 0.0681
+thrust_lbf = 17.659
+torque_inlbf = 10.788
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 24000, V = 0 row
+rpm = 24000
+ct = 0.1614
+cp = 0.0702
+thrust_lbf = 19.432
+torque_inlbf = 12.113
+
+[[static]]                    # PER3_9x47SF.dat, PROP RPM = 25000, V = 0 row
+rpm = 25000
+ct = 0.1632
+cp = 0.0735
+thrust_lbf = 21.325
+torque_inlbf = 13.762

@@ -70,6 +70,8 @@ pre.log { max-height: 34vh; white-space: pre-wrap; word-break: break-all; }
 .actions select { width: auto; }
 .device { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin: 8px 0 4px; }
 .device label { color: var(--muted); font-size: 13px; }
+ul.checks { margin: 6px 0; padding-left: 18px; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre-wrap; }
+ul.checks li.warn { color: var(--bad, #b42318); }
 ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
 .msg { color: var(--muted); font-size: 13px; }
 </style>
@@ -118,7 +120,8 @@ ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--mut
 "use strict";
 const $ = (id) => document.getElementById(id);
 let catalog = null;
-const state = { airframe: "quad", model_name: "", levels: {}, devices: {}, values: {} };
+const state = { airframe: "quad", model_name: "", levels: {}, devices: {}, slots: {}, values: {} };
+let reports = [];        // the composer's part reports of the last check
 let initial = {};        // dotted path -> starting value text of the current fields
 let run = null, pollTimer = null, checkTimer = null;
 
@@ -136,14 +139,18 @@ const frame = () => catalog.airframes[state.airframe];
 const level = (part) => part.levels.find((l) => l.id === state.levels[part.id]) || part.levels[0];
 const fieldsOf = (part) => [...level(part).fields, ...(part.fields || [])];
 const dotted = (f) => f.path.join(".");
-const device = (part) => (part.devices || []).find((d) => d.id === state.devices[part.id]) || null;
+const device = (part) => (part.devices || []).find((d) => d.id === state.devices[part.id]) ||
+  (Object.keys(state.slots[part.id] || {}).length ? { slotted: true } : null);
 // What the selected device fills at the selected level: {values, how, assumed, not_represented, not_stated}.
-const fromDevice = (part) => { const d = device(part); return d ? d.levels[level(part).id] || null : null; };
+const fromDevice = (part) => { const d = device(part); return d && d.levels ? d.levels[level(part).id] || null : null; };
+// The composer's report of a part assembled from slots (after a check).
+const slotReport = (part) => reports.find((r) => r.kind === part.id) || null;
 
 function pickAirframe(name) {
   state.airframe = name;
   state.levels = {};
   state.devices = {};
+  state.slots = {};
   state.values = {};
   initial = {};
   for (const part of frame().parts) {
@@ -180,7 +187,67 @@ function pickDevice(part, id) {
   render();
 }
 
+function pickSlot(part, key, id) {
+  for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
+  const s = state.slots[part.id] = state.slots[part.id] || {};
+  if (id) s[key] = id; else delete s[key];
+  if (!Object.keys(s).length) delete state.slots[part.id];
+  // The airframe's rotor coefficients are the propeller's once one is
+  // picked: blank them so the parts fill them (typing a value still wins).
+  if (part.id === "propulsion")
+    for (const f of frame().parts[0].levels[0].fields)
+      if (f.path[0] === "rotor") initial[dotted(f)] = state.values[dotted(f)] = state.slots.propulsion ? "" : f.value;
+  startLevel(part);
+  render();
+}
+
+// Device pickers of an actuator assembled from real parts, and the composer's
+// report on the assembly (filled in after each check).
+function slotBlock(part) {
+  if (!(part.slots || []).some((s) => s.options.length)) return null;
+  const picked = state.slots[part.id] || {};
+  const rows = part.slots.filter((s) => s.options.length).map((s) => el("div", { class: "device" },
+    el("label", {}, s.title),
+    el("select", { "aria-label": `${part.title} ${s.title}`, onchange: (e) => pickSlot(part, s.key, e.target.value) },
+      el("option", { value: "" }, "Generic: set the parameters below"),
+      s.options.map((o) => el("option", { value: o.id, selected: o.id === picked[s.key] }, o.name)))));
+  return [...rows, el("div", { id: `report-${part.id}` })];
+}
+
+function showReports() {
+  for (const part of frame().parts) {
+    const box = $(`report-${part.id}`);
+    if (!box) continue;
+    const r = Object.keys(state.slots[part.id] || {}).length ? slotReport(part) : null;
+    const kids = [];
+    if (r) {
+      if (r.checks.length)
+        kids.push(el("ul", { class: "checks" }, r.checks.map((c) =>
+          el("li", { class: /WARNING|CANNOT/.test(c) ? "warn" : "" }, c))));
+      const gaps = [...Object.entries(r.not_stated).map(([k, v]) => `${k}: ${v}`),
+                    ...Object.entries(r.not_represented).map(([k, v]) => `${k}: ${v}`)];
+      if (r.assumed.length || gaps.length)
+        kids.push(el("details", {}, el("summary", {},
+          `What ${r.level} leaves out or assumes (${gaps.length + r.assumed.length})`),
+          el("ul", { class: "gaps" }, [...r.assumed.map((a) => el("li", {}, "assumed: " + a)),
+                                       ...gaps.map((g) => el("li", {}, g))])));
+      kids.push(el("p", { class: "about" }, r.parts.map((p) => `${p.name}: ${p.source}`).join(" · ")));
+    }
+    box.replaceChildren(...kids);
+    // Placeholders: what the parts fill.
+    for (const f of fieldsOf(part)) {
+      const input = document.querySelector(`input[aria-label="${CSS.escape(dotted(f))}"]`);
+      if (!input) continue;
+      const p = r && r.parameters[dotted(f)];
+      if (p) { input.placeholder = `from the parts: ${typeof p.value === "string" ? p.value : JSON.stringify(p.value)}`;
+               input.title = p.how + (p.from.length ? ` [${p.from.join(", ")}]` : ""); }
+      else if (input.placeholder.startsWith("from the parts")) { input.placeholder = "library default"; input.title = ""; }
+    }
+  }
+}
+
 function deviceBlock(part) {
+  if (part.slots) return slotBlock(part);
   if (!(part.devices || []).length) return null;
   const d = device(part), info = fromDevice(part);
   const select = el("select", { "aria-label": `${part.title} device`,
@@ -270,7 +337,7 @@ function choice() {
   const values = {};
   for (const [k, v] of Object.entries(state.values)) if (v !== "") values[k] = v;
   return { airframe: state.airframe, model_name: state.model_name, levels: state.levels,
-           devices: state.devices, values, sitl };
+           devices: state.devices, slots: state.slots, values, sitl };
 }
 
 async function post(url, body) {
@@ -287,6 +354,8 @@ function scheduleCheck(delay = 300) {
     s.className = "status " + (r.ok ? "ok" : "bad");
     s.textContent = r.ok ? `✓ ${r.message}` : `✗ ${r.message}`;
     $("toml").textContent = r.toml || "";
+    reports = r.reports || [];
+    showReports();
     $("fly").disabled = !r.ok || (run && run.running);
   }, delay);
 }
@@ -333,9 +402,16 @@ fetch("/api/catalog").then((r) => r.json()).then((c) => {
   const q = new URLSearchParams(location.search);
   const asked = q.get("airframe");
   pickAirframe(asked in c.airframes ? asked : "quad");
-  // ?gnss=ublox_neo_m9n&imu=tdk_icm42688p: start with those devices.
-  for (const part of frame().parts)
+  // ?gnss=ublox_neo_m9n&imu=tdk_icm42688p&motor=...&propeller=...: start with those devices.
+  for (const part of frame().parts) {
     if ((part.devices || []).some((d) => d.id === q.get(part.id))) pickDevice(part, q.get(part.id));
+    for (const s of part.slots || []) {
+      const want = q.get(s.key === "part" ? part.id : s.key);
+      if (s.options.some((o) => o.id === want)) pickSlot(part, s.key, want);
+    }
+    const lv = q.get(part.id + "_level");
+    if (part.levels.some((l) => l.id === lv)) pickLevel(part, lv);
+  }
 })
   .catch((e) => { $("parts").textContent = "Could not load the catalog: " + e; });
 </script>

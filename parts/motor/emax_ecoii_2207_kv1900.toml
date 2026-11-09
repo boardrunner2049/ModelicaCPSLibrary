@@ -1,0 +1,245 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "EMAX ECO II 2207 1900KV"
+kind = "motor"
+manufacturer = "EMAX"
+source = "EMAX official shop, product 'Emax ECO II Series 2207 1700KV 1900KV 2400KV Brushless Motor' (published 2020-10-16): spec drawing image '2207-2020-10-29-2.jpg' (Specifications table, KV1900 block) and test image '2-ECOII2207-1900KV_25.2V_V1.0_-01.jpg' (V1.0), https://shop.emaxmodel.com/products/emax-eco-ii-series-2207-3-6s-1700kv-1900kv-2400kv-brushless-motor-for-rc-drone-fpv-racing (retrieved 2026-11-08)"
+notes = "Chosen as the 5-inch racing motor because T-MOTOR F60PRO IV/V pages (store.tmotor.com -> shop.tmotor.com -> t-hobby.com) are behind a Cloudflare challenge and could not be read. Spec/test data are images on the manufacturer's shop page. Test table: 25.2 V (6S) only, rows at fixed thrust points (300/500/700 g) plus a full-power row whose speed column reads 'Max' (rpm omitted there); no throttle % given. EMAX names no single recommended prop (spec: 'Propeller 5\"-5.5\"'), so all six prop blocks are included. Peak current/max power are stated 'at 6S'; duration of the peak rating not stated. No ambient temperature, ESC or motor temperature given."
+kv_rpm_per_v = 1900                # Specifications table, "KV1900"
+resistance_mohm = 59               # Specifications "Internal Resistance 59mΩ"; phase-to-phase vs phase not stated
+no_load_current_a = 1.4            # Specifications "Idle Current (10V) 1.4A"
+no_load_current_at_v = 10          # Specifications "Idle Current (10V)"
+stator_slots = 12                  # Specifications "Framework 12N14P"
+magnet_poles = 14                  # Specifications "Framework 12N14P"
+shaft_diameter_mm = 4              # Specifications "Bearing Shaft 4mm" (drawing shows M5 thread)
+weight_g = 33.6                    # Specifications "33.6g (W/O Silicone Wire)"
+peak_current_a = 45                # Specifications "Peak Current (6S) 45A"; duration not stated
+max_power_w = 1130                 # Specifications "Max.Power (6S) 1130W"
+cells_min = 3                      # Specifications "No.of cells 3-6S"
+cells_max = 6                      # Specifications "No.of cells 3-6S"
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, DALPROP Cyclone 5040"
+[[test]]
+propeller = "DALPROP Cyclone 5040"
+voltage_v = 25.2
+current_a = 3.2
+thrust_g = 300
+power_w = 80.64
+efficiency_g_per_w = 3.72
+rpm = 15900
+
+[[test]]
+propeller = "DALPROP Cyclone 5040"
+voltage_v = 25.2
+current_a = 5.2
+thrust_g = 500
+power_w = 131.04
+efficiency_g_per_w = 3.82
+rpm = 19900
+
+[[test]]
+propeller = "DALPROP Cyclone 5040"
+voltage_v = 25.2
+current_a = 9.3
+thrust_g = 700
+power_w = 234.36
+efficiency_g_per_w = 2.99
+rpm = 23600
+
+[[test]]
+propeller = "DALPROP Cyclone 5040"
+voltage_v = 25.2
+current_a = 32.6
+thrust_g = 1860
+power_w = 821.52
+efficiency_g_per_w = 2.26
+# rpm: table says "Max" (full-power row)
+
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, DALPROP Cyclone 5050"
+[[test]]
+propeller = "DALPROP Cyclone 5050"
+voltage_v = 25.2
+current_a = 3
+thrust_g = 300
+power_w = 75.6
+efficiency_g_per_w = 3.97
+rpm = 13200
+
+[[test]]
+propeller = "DALPROP Cyclone 5050"
+voltage_v = 25.2
+current_a = 5.8
+thrust_g = 500
+power_w = 146.16
+efficiency_g_per_w = 3.42
+rpm = 16800
+
+[[test]]
+propeller = "DALPROP Cyclone 5050"
+voltage_v = 25.2
+current_a = 9.6
+thrust_g = 700
+power_w = 241.92
+efficiency_g_per_w = 2.89
+rpm = 19700
+
+[[test]]
+propeller = "DALPROP Cyclone 5050"
+voltage_v = 25.2
+current_a = 43.8
+thrust_g = 1980
+power_w = 1103.76
+efficiency_g_per_w = 1.79
+# rpm: table says "Max" (full-power row)
+
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, DALPROP Cyclone 5046"
+[[test]]
+propeller = "DALPROP Cyclone 5046"
+voltage_v = 25.2
+current_a = 2.8
+thrust_g = 300
+power_w = 70.56
+efficiency_g_per_w = 4.25
+rpm = 13800
+
+[[test]]
+propeller = "DALPROP Cyclone 5046"
+voltage_v = 25.2
+current_a = 5.5
+thrust_g = 500
+power_w = 138.6
+efficiency_g_per_w = 3.61
+rpm = 17500
+
+[[test]]
+propeller = "DALPROP Cyclone 5046"
+voltage_v = 25.2
+current_a = 8.9
+thrust_g = 700
+power_w = 224.28
+efficiency_g_per_w = 3.12
+rpm = 20500
+
+[[test]]
+propeller = "DALPROP Cyclone 5046"
+voltage_v = 25.2
+current_a = 40.6
+thrust_g = 2020
+power_w = 1023.12
+efficiency_g_per_w = 1.97
+# rpm: table says "Max" (full-power row)
+
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, HQ 5*4.3*3"
+[[test]]
+propeller = "HQ 5*4.3*3"
+voltage_v = 25.2
+current_a = 3
+thrust_g = 300
+power_w = 75.6
+efficiency_g_per_w = 3.97
+rpm = 14100
+
+[[test]]
+propeller = "HQ 5*4.3*3"
+voltage_v = 25.2
+current_a = 5.4
+thrust_g = 500
+power_w = 136.08
+efficiency_g_per_w = 3.67
+rpm = 17800
+
+[[test]]
+propeller = "HQ 5*4.3*3"
+voltage_v = 25.2
+current_a = 8.8
+thrust_g = 700
+power_w = 221.76
+efficiency_g_per_w = 3.16
+rpm = 21700
+
+[[test]]
+propeller = "HQ 5*4.3*3"
+voltage_v = 25.2
+current_a = 36.4
+thrust_g = 1960
+power_w = 917.28
+efficiency_g_per_w = 2.14
+# rpm: table says "Max" (full-power row)
+
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, HQ 5*4.8*3"
+[[test]]
+propeller = "HQ 5*4.8*3"
+voltage_v = 25.2
+current_a = 2.9
+thrust_g = 300
+power_w = 73.08
+efficiency_g_per_w = 4.11
+rpm = 14000
+
+[[test]]
+propeller = "HQ 5*4.8*3"
+voltage_v = 25.2
+current_a = 5.7
+thrust_g = 500
+power_w = 143.64
+efficiency_g_per_w = 3.48
+rpm = 18100
+
+[[test]]
+propeller = "HQ 5*4.8*3"
+voltage_v = 25.2
+current_a = 9.1
+thrust_g = 700
+power_w = 229.32
+efficiency_g_per_w = 3.05
+rpm = 21100
+
+[[test]]
+propeller = "HQ 5*4.8*3"
+voltage_v = 25.2
+current_a = 41.6
+thrust_g = 1970
+power_w = 1048.32
+efficiency_g_per_w = 1.88
+# rpm: table says "Max" (full-power row)
+
+
+# Test image, block "ECOII2207-1900KV, 25.2 V, GF 5045-3"
+[[test]]
+propeller = "GF 5045-3"
+voltage_v = 25.2
+current_a = 2.8
+thrust_g = 300
+power_w = 70.56
+efficiency_g_per_w = 4.25
+rpm = 14900
+
+[[test]]
+propeller = "GF 5045-3"
+voltage_v = 25.2
+current_a = 5.8
+thrust_g = 500
+power_w = 146.16
+efficiency_g_per_w = 3.42
+rpm = 19200
+
+[[test]]
+propeller = "GF 5045-3"
+voltage_v = 25.2
+current_a = 9.2
+thrust_g = 700
+power_w = 231.84
+efficiency_g_per_w = 3.02
+rpm = 22800
+
+[[test]]
+propeller = "GF 5045-3"
+voltage_v = 25.2
+current_a = 37.2
+thrust_g = 1890
+power_w = 937.44
+efficiency_g_per_w = 2.02
+# rpm: table says "Max" (full-power row)

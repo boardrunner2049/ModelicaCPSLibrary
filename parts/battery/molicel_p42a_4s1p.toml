@@ -1,0 +1,18 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Molicel INR-21700-P42A 4S1P (cell datasheet)"
+kind = "battery"
+manufacturer = "E-One Moli Energy (Molicel)"
+source = "Molicel PRODUCT DATA SHEET MODEL INR-21700-P42A, file INR21700P42A-V4-80092.pdf (undated), https://www.molicel.com/wp-content/uploads/INR21700P42A-V4-80092.pdf; product page https://www.molicel.com/product/inr-21700-p42a/"
+notes = "NOT a commercial pack: a hypothetical 4S1P assembled from P42A cells; every figure is PER CELL from the cell datasheet. Pack weight, wiring/BMS resistance and enclosure are not included and not stated anywhere. Capacity typical 4200 mAh / 15.5 Wh, minimum 4000 mAh / 14.7 Wh. Standard charge CC-CV 4.2 A to 4.2 V, 50 mA cut, 1.5 hr; datasheet charge plot also shows an 8.4 A curve but no max-charge spec is given, so max_charge_c is omitted. Continuous discharge is stated in amps (45 A), not C; C ratings are omitted (no burst rating stated). Cell: cylindrical steel can, 21.7 mm dia (max) x 70.2 mm (max). Charge temp 0..45 C, discharge -40..60 C. 615 Wh/l, 230 Wh/kg. Datasheet disclaimer: 'for reference only'."
+chemistry = "Li-ion"         # datasheet 'LITHIUM-ION RECHARGEABLE BATTERY'
+cells_series = 4             # pack layout chosen for this entry (not a datasheet figure)
+cells_parallel = 1           # pack layout chosen for this entry (not a datasheet figure)
+capacity_mah = 4200          # datasheet 'Capacity Typical 4200 mAh' (Minimum 4000 mAh)
+cell_nominal_v = 3.6         # datasheet 'Cell Voltage Nominal 3.6 V'
+cell_full_v = 4.2            # datasheet 'Cell Voltage Charge 4.2 V'
+cell_cutoff_v = 2.5          # datasheet 'Cell Voltage Discharge 2.5 V'
+cell_discharge_continuous_a = 45   # datasheet 'Discharge Current Continuous 45 A'
+cell_charge_standard_a = 4.2       # datasheet 'Charge Current Standard 4.2 A'
+cell_weight_max_g = 70             # datasheet 'Weight 70 g (Max)' -- per cell, not pack
+internal_resistance_cell_mohm_ac_1khz = 10   # datasheet 'Typical Impedance AC (1 KHz) 10 mOhm' (fresh cell, typical)
+internal_resistance_cell_mohm_dc_10a_1s = 16 # datasheet 'Typical Impedance DC (10A/1s) 16 mOhm' (typical)

@@ -1,0 +1,16 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Hitec HS-65MG"
+kind = "servo"
+manufacturer = "Hitec"
+source = "Hitec RCD USA product page 'HS-65MG 11.9g Metal Gear Analog Micro Servo' (Part # 32065S), 'Servo Specifications' table, https://hitecrcd.com/search/product_home/HS-65MG (fetched 2026-11-08)"
+notes = "Hitec gives speed and torque as ranges over '4.8V ~ 6.0V'; low value mapped to 4.8 V, high to 6.0 V (description confirms '0.11-second transit speed at 6.0V' and '31 oz-in of torque at 6 volts'). Travel/operating angle, pulse range and neutral NOT stated. Currents: idle 8 mA, no-load operating 220 mA, stall 1200 mA (voltage not specified). Motor: 3-pole metal-brush neodymium; HT7003 analog SMT; metal gears, top ball bearing."
+speed_s_per_60deg = 0.11          # spec table 'Speed (Second @ 60°): 0.14 ~ 0.11'; description '0.11-second transit speed at 6.0V'
+speed_at_v = 6.0
+speed_low_s_per_60deg = 0.14      # same row, 4.8V end
+speed_low_at_v = 4.8
+torque_kgcm = 2.2                 # spec table 'Maximum Torque Range kg. / cm.: 1.8 ~ 2.2' (6.0V end); oz-in 25 ~ 31
+deadband_us = 5                   # spec table 'Dead Band Width: 5 µs'
+voltage_min_v = 4.8               # spec table 'Operating Voltage Range (Volts DC): 4.8V ~ 6.0V'
+voltage_max_v = 6.0
+weight_g = 11.9                   # spec table 'Weight (Gram): 11.9'
+digital = false                   # spec table 'Circuit Type: HT7003 Analog SMT'

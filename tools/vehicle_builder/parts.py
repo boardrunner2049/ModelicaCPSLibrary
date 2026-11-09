@@ -230,7 +230,7 @@ def catalog() -> dict:
         if kind == "multirotor":
             parts.append(propulsion_part(cc, doc))
         else:
-            parts += [actuator_part(a, field) for a in spec.get("actuators", [])]
+            parts += [actuator_part(a, field, cc) for a in spec.get("actuators", [])]
         parts.append(imu_part(cc, mounts.get("imu", [])))
         parts += [sensor_part(cc, sensor, mounts.get(sensor, []))
                   for sensor in ("magnetometer", "barometer", "gnss")]
@@ -239,7 +239,26 @@ def catalog() -> dict:
     return {"airframes": airframes}
 
 
-def actuator_part(actuator: dict, field) -> dict:
+# Real powertrain parts each actuator can be assembled from: (slot key, title,
+# part kind). The composer converts them (fire-compose src/powertrain.rs).
+SLOTS = {
+    "propulsion": [("motor", "Motor", "motor"), ("propeller", "Propeller", "propeller"),
+                   ("battery", "Battery", "battery"), ("esc", "ESC", "esc")],
+    "servos": [("part", "Servo", "servo")],
+    "steering": [("part", "Servo", "servo")],
+    "drive": [("part", "Gearmotor", "gearmotor"), ("battery", "Battery", "battery")],
+}
+
+
+def slots(cc: dict, part: str) -> list[dict]:
+    """The device pickers of an actuator: each slot's parts from the catalog."""
+    return [{"key": key, "title": title,
+             "options": [{"id": p["id"], "name": p["name"], "source": p["source"]}
+                         for p in cc.get("parts", {}).get(kind, [])]}
+            for key, title, kind in SLOTS.get(part, [])]
+
+
+def actuator_part(actuator: dict, field, cc: dict | None = None) -> dict:
     """A rover/plane actuator: its levels and the plant parameters each adds."""
     levels = [{"id": l["level"], "label": f"{l['level']} {l['model'].replace('_', ' ')}",
                "description": l["description"] + ".",
@@ -247,7 +266,7 @@ def actuator_part(actuator: dict, field) -> dict:
                "fields": [field(["plant", name], name) for name in l["parameters"]]}
               for l in actuator["levels"]]
     return {"id": actuator["key"], "title": ACTUATOR_TITLE.get(actuator["key"], actuator["key"]),
-            "levels": levels}
+            "levels": levels, "slots": slots(cc or {}, actuator["key"])}
 
 
 def sensor_part(cc: dict, sensor: str, mounts: list[dict]) -> dict:
@@ -296,7 +315,8 @@ def propulsion_part(cc: dict, base: dict) -> dict:
                        "description": f"{spec['description']}. Speed: {SPEED[spec['level']]}.",
                        "select": {"models.esc": spec["esc"], "models.motor": spec["motor"]},
                        "fields": table_fields(tables)})
-    return {"id": "propulsion", "title": "Propulsion (ESC and motor)", "levels": levels}
+    return {"id": "propulsion", "title": "Propulsion (ESC and motor)", "levels": levels,
+            "slots": slots(cc, "propulsion")}
 
 
 # --- composing ---------------------------------------------------------------
@@ -305,10 +325,14 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
     """A builder choice -> (run file document, physics document).
 
     choice = {"airframe": "quad", "model_name": "...", "levels": {part: level},
-              "devices": {part: device id}, "values": {"plant.mass": "4.0", ...}, "sitl": {...}}
+              "devices": {part: device id}, "slots": {part: {slot: device id}},
+              "values": {"plant.mass": "4.0", ...}, "sitl": {...}}
 
     A part with a device names it ([models.KIND] part, level): the composer
     fills the level's parameters from the datasheet, and values set here win.
+    An actuator with devices in its slots (propulsion: motor, propeller,
+    battery, ESC; a servo; a gearmotor and battery) is [models.PART] with
+    those parts and the level.
     """
     cat = cat or catalog()
     frame = cat["airframes"][choice["airframe"]]
@@ -324,7 +348,12 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
         level = next((lv for lv in part["levels"]
                       if lv["id"] == choice.get("levels", {}).get(part["id"])), part["levels"][0])
         device = choice.get("devices", {}).get(part["id"])
-        if device and any(d["id"] == device for d in part.get("devices", [])):
+        picked = {s["key"]: choice["slots"][part["id"]][s["key"]] for s in part.get("slots", [])
+                  if any(o["id"] == choice.get("slots", {}).get(part["id"], {}).get(s["key"])
+                         for o in s["options"])}
+        if picked:
+            put(physics, ["models", part["id"]], {**picked, "level": level["id"]})
+        elif device and any(d["id"] == device for d in part.get("devices", [])):
             put(physics, ["models", part["id"], "part"], device)
             put(physics, ["models", part["id"], "level"], level["id"])
         else:
@@ -336,7 +365,7 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
             continue  # a field of a level not selected
         if str(text).strip():
             put(physics, dotted.split("."), parse_value(str(text), dotted))
-    if frame["vehicle"] == "multirotor":
+    if frame["vehicle"] == "multirotor" and "propulsion" not in physics.get("models", {}):
         physics.setdefault("models", {}).setdefault("rotor", "quadratic_blade")
     sitl = {k: v for k, v in choice.get("sitl", {}).items() if v not in (None, "", [])}
     run = {"sitl": sitl, "physics": physics} if sitl else {"physics": physics}

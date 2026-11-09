@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+name = "Savox SH-0255MG+"
+kind = "servo"
+manufacturer = "Savox"
+source = "Savox 'SH-0255MG+' Specification Data Sheet (SH-0255MGP_SpecSheet.pdf, 1 page, linked from https://www.savox-servo.com/en/product/SH-0255MGplus/savox-servo-sh-0255mg-digital-dc-motor-metal-gear) plus that product page's Technical Specs (fetched 2026-11-08)"
+notes = "Figures are for the current 'Plus' (SH-0255MG+ / SH-0255MGP) version, which Savox sells as the SH-0255MG; Plus adds soft start / Sanwa SSR compatibility. Data sheet gives Dead Band Width as a RANGE '3-5 μsec' -- deadband_us left unset, choose 3 or 5 explicitly. Max Travel is approximate ('~145°'). Rotating direction: clockwise when 1000->2000 us. Currents: idle 5 mA; operating 180 mA @4.8V, 240 mA @6.0V; stall 1200 mA @4.8V, 1400 mA @6.0V. 10-bit PCB, VR potentiometer, frame rate 50-360 Hz. Weight: data sheet 16 g, product-page description text 15.8 g."
+speed_s_per_60deg = 0.13          # data sheet 'Speed @6.0V 0.13 s/60°'
+speed_at_v = 6.0
+speed_low_s_per_60deg = 0.16      # data sheet 'Speed @4.8V 0.16 s/60°'
+speed_low_at_v = 4.8
+torque_kgcm = 3.9                 # data sheet 'Torque @6.0V 3.9 kg/cm | 54.2 oz/in' (4.8V: 3.1 kg/cm)
+# deadband: data sheet 'Dead Band Width 3-5 μsec' (range, not a single figure)
+travel_deg = 145                  # data sheet 'Max Travel ~145° (when 800→2200 μsec)' -- approximate per Savox
+travel_pulse_us = [800, 2200]     # same line
+operating_angle_deg_per_us = 0.09 # data sheet 'Operating Travel 90° (when 1000→2000 μsec)' -> 90/1000
+pulse_neutral_us = 1500           # data sheet 'Neutral Position 1500 μsec'
+voltage_min_v = 4.8               # data sheet 'Operating Voltage 4.8V-6.0V'
+voltage_max_v = 6.0
+weight_g = 16                     # data sheet 'Weight 16 g' (product description says 15.8g)
+digital = true                    # data sheet 'Amplifier Type: Digital Controller'
+deadband_range_us = [3, 5]        # data sheet "Dead Band Width 3-5 usec" (a range)
