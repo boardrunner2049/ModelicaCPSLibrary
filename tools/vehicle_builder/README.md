@@ -51,6 +51,9 @@ the server. Building needs what `run.sh` needs on PATH (see
 `runtime/hosts/ardupilot/README.md`). Runs at the same time use separate SITL
 instances. `?airframe=rover` opens on an airframe.
 
+**Auto / Light / Dark** in the header sets the theme (auto follows the
+system; the choice is remembered in the browser; `?theme=dark` for one page).
+
 The server listens on 127.0.0.1 only (`--host` to change) and refuses
 cross-origin POSTs.
 

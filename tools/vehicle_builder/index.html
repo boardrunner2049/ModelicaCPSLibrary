@@ -6,6 +6,7 @@
 <title>Vehicle Builder</title>
 <style>
 :root {
+  color-scheme: light;
   --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5b6676; --line: #dde2e9;
   --accent: #2357c6; --accent-ink: #ffffff; --ok: #1d7a46; --bad: #b3261e; --warn: #8a5a00;
   --code: #f0f2f6; --chip: #eef2fb;
@@ -13,14 +14,24 @@
   --g-body: #cdd5e2; --g-edge: #46536b; --g-dark: #2c3445; --g-board: #3d7a62; --g-batt: #c99436;
   --g-servo: #5468a8; --g-esc: #6f7a92; --g-disc: rgba(35, 87, 198, .07); --g-text: #46536b;
 }
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #1a1f27; --ink: #e5e9f0; --muted: #9aa5b5; --line: #2c333f;
+  --accent: #7aa2ff; --accent-ink: #0d1117; --ok: #5cc98a; --bad: #ff8a80; --warn: #e3b55a;
+  --code: #141920; --chip: #232b3a;
+  --g-stage-a: #1c2331; --g-stage-b: #0e1117; --g-floor-a: #26303f; --g-floor-b: #141920;
+  --g-body: #2f394a; --g-edge: #9aa7bd; --g-dark: #0f131a; --g-board: #3f8a6c; --g-batt: #d6a24a;
+  --g-servo: #7b8fd6; --g-esc: #8592ab; --g-disc: rgba(122, 162, 255, .08); --g-text: #aeb9cb;
+  color-scheme: dark;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12151b; --panel: #1a1f27; --ink: #e5e9f0; --muted: #9aa5b5; --line: #2c333f;
     --accent: #7aa2ff; --accent-ink: #0d1117; --ok: #5cc98a; --bad: #ff8a80; --warn: #e3b55a;
     --code: #141920; --chip: #232b3a;
     --g-stage-a: #1c2331; --g-stage-b: #0e1117; --g-floor-a: #26303f; --g-floor-b: #141920;
     --g-body: #2f394a; --g-edge: #9aa7bd; --g-dark: #0f131a; --g-board: #3f8a6c; --g-batt: #d6a24a;
     --g-servo: #7b8fd6; --g-esc: #8592ab; --g-disc: rgba(122, 162, 255, .08); --g-text: #aeb9cb;
+    color-scheme: dark;
   }
 }
 * { box-sizing: border-box; }
@@ -30,6 +41,10 @@ header { padding: 14px 20px; border-bottom: 1px solid var(--line); background: v
   display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 header h1 { font-size: 17px; margin: 0; }
 header span { color: var(--muted); }
+.theme { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.theme button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 13px; }
+.theme button + button { border-left: 1px solid var(--line); }
+.theme button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 18px;
   padding: 18px 20px; max-width: 1400px; margin: 0 auto; }
 @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
@@ -134,6 +149,11 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
 <header>
   <h1>Vehicle Builder</h1>
   <span>Pick a vehicle's parts from CP Models, then fly it in ArduPilot SITL.</span>
+  <div class="theme" role="group" aria-label="Theme">
+    <button type="button" data-theme="auto">Auto</button>
+    <button type="button" data-theme="light">Light</button>
+    <button type="button" data-theme="dark">Dark</button>
+  </div>
 </header>
 <main>
   <div>
@@ -173,6 +193,28 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
     </section>
   </div>
 </main>
+<script>
+// The theme: auto follows the system; light or dark is remembered in this browser.
+(() => {
+  let saved = "auto";
+  try { saved = localStorage.getItem("vehicle-builder-theme") || "auto"; } catch (e) { /* no storage */ }
+  // ?theme=dark (or light, auto): this page only, not remembered.
+  const asked = new URLSearchParams(location.search).get("theme");
+  if (["auto", "light", "dark"].includes(asked)) saved = asked;
+  const apply = (t) => {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    for (const b of document.querySelectorAll(".theme button"))
+      b.setAttribute("aria-pressed", String(b.dataset.theme === t));
+  };
+  apply(saved);
+  for (const b of document.querySelectorAll(".theme button"))
+    b.addEventListener("click", () => {
+      apply(b.dataset.theme);
+      try { localStorage.setItem("vehicle-builder-theme", b.dataset.theme); } catch (e) { /* no storage */ }
+    });
+})();
+</script>
 <script src="/garage.js"></script>
 <script>
 "use strict";
