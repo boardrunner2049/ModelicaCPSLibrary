@@ -18,6 +18,13 @@ Standard library only. The page shows, per airframe (quad, rover, plane):
 | IMU | I0 ideal, I1 digital, I2 errors, I3 electromechanical | every `[imu]` key the level accepts, starting from `configs/quad_iN.toml`; mount (rover/plane) |
 | Magnetometer, barometer, GNSS | M0/B0/G0 ideal; M1/B1 sampled, G1 statistical | every key the level accepts, the sampled ones starting from `runtime/hosts/ardupilot/examples/rover_all_sensors.toml`; mounts (rover/plane) |
 
+Above the cards, the **garage** draws the vehicle (quad, rover or plane, from
+above). Picking a part, by its card, one of its pickers, the buttons under
+the drawing or the part itself, moves the camera onto it and lights it, and
+the caption says its level and the device picked. The drawing follows the
+parts: propeller diameter, motor size, battery cells and capacity.
+`?focus=propulsion.propeller` (or `imu`, `gnss`, `steering`, ...) opens on a part.
+
 Each sensor also offers real **devices** (`parts/`: a u-blox NEO-M9N, an
 ICM-42688-P, ...). Picking one selects its level and fills the parameters from
 its datasheet; the fields then show the part's values as placeholders and only

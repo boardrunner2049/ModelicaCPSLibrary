@@ -118,6 +118,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/":
             self.send((HERE / "index.html").read_bytes(), kind="text/html; charset=utf-8")
+        elif path == "/garage.js":
+            self.send((HERE / "garage.js").read_bytes(), kind="text/javascript; charset=utf-8")
         elif path == "/api/catalog":
             self.send(CATALOG)
         elif m := re.fullmatch(r"/api/runs/(\d+)", path):

@@ -9,12 +9,18 @@
   --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5b6676; --line: #dde2e9;
   --accent: #2357c6; --accent-ink: #ffffff; --ok: #1d7a46; --bad: #b3261e; --warn: #8a5a00;
   --code: #f0f2f6; --chip: #eef2fb;
+  --g-stage-a: #f3f6fb; --g-stage-b: #d9e0eb; --g-floor-a: #ffffff; --g-floor-b: #e4e9f1;
+  --g-body: #cdd5e2; --g-edge: #46536b; --g-dark: #2c3445; --g-board: #3d7a62; --g-batt: #c99436;
+  --g-servo: #5468a8; --g-esc: #6f7a92; --g-disc: rgba(35, 87, 198, .07); --g-text: #46536b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12151b; --panel: #1a1f27; --ink: #e5e9f0; --muted: #9aa5b5; --line: #2c333f;
     --accent: #7aa2ff; --accent-ink: #0d1117; --ok: #5cc98a; --bad: #ff8a80; --warn: #e3b55a;
     --code: #141920; --chip: #232b3a;
+    --g-stage-a: #1c2331; --g-stage-b: #0e1117; --g-floor-a: #26303f; --g-floor-b: #141920;
+    --g-body: #2f394a; --g-edge: #9aa7bd; --g-dark: #0f131a; --g-board: #3f8a6c; --g-batt: #d6a24a;
+    --g-servo: #7b8fd6; --g-esc: #8592ab; --g-disc: rgba(122, 162, 255, .08); --g-text: #aeb9cb;
   }
 }
 * { box-sizing: border-box; }
@@ -74,6 +80,54 @@ ul.checks { margin: 6px 0; padding-left: 18px; font-size: 13px; font-family: ui-
 ul.checks li.warn { color: var(--bad, #b42318); }
 ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
 .msg { color: var(--muted); font-size: 13px; }
+
+/* The garage: the vehicle, the camera on the picked part. */
+.garage { position: relative; background: radial-gradient(ellipse at 50% 40%, var(--g-stage-a), var(--g-stage-b));
+  border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+@media (min-width: 901px) and (min-height: 820px) { .garage { position: sticky; top: 0; z-index: 2; } }
+.g-svg { display: block; width: 100%; height: clamp(190px, 30vh, 300px); }
+.g-caption { position: absolute; left: 14px; top: 10px; max-width: 60%; pointer-events: none;
+  display: flex; flex-direction: column; gap: 1px; text-shadow: 0 1px 0 var(--g-stage-a); }
+.g-caption strong { font-size: 16px; letter-spacing: .01em; }
+.g-caption span { color: var(--muted); font-size: 12.5px; }
+.g-chips { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; border-top: 1px solid var(--line);
+  background: var(--panel); scrollbar-width: thin; }
+.g-chips button { white-space: nowrap; padding: 4px 10px; font-size: 13px; }
+.g-chips button.sub { font-size: 12px; color: var(--muted); padding: 4px 8px; }
+.g-chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.g-floor-a { stop-color: var(--g-floor-a); } .g-floor-b { stop-color: var(--g-floor-b); stop-opacity: 0; }
+.g-svg [data-focus] { cursor: pointer; }
+.g-svg [data-focus], .g-svg .g-neutral { transition: opacity .35s; }
+.g-body, .g-wing { fill: var(--g-body); stroke: var(--g-edge); stroke-width: 1.5; }
+.g-fin, .g-surface { fill: var(--g-body); stroke: var(--g-edge); stroke-width: 1.2; }
+.g-arm { stroke: var(--g-edge); stroke-width: 12; stroke-linecap: round; }
+.g-axle { stroke: var(--g-edge); stroke-width: 5; }
+.g-gear, .g-bumper { fill: var(--g-dark); opacity: .55; }
+.g-wheel, .g-motor, .g-motor-r, .g-blade { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: 1; }
+.g-hub { fill: var(--g-edge); }
+.g-disc { fill: var(--g-disc); stroke: var(--g-edge); stroke-width: 1; stroke-dasharray: 3 5; }
+.g-esc { fill: var(--g-esc); stroke: var(--g-dark); stroke-width: 1; }
+.g-batt { fill: var(--g-batt); stroke: var(--g-dark); stroke-width: 1.2; }
+.g-strap { fill: var(--g-dark); opacity: .7; }
+.g-board { fill: var(--g-board); stroke: var(--g-dark); stroke-width: 1; }
+.g-chip { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: .8; }
+.g-servo { fill: var(--g-servo); stroke: var(--g-dark); stroke-width: 1; }
+.g-link, .g-line { stroke: var(--g-edge); stroke-width: 2; }
+.g-puck { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: 1.5; }
+.g-mark { fill: var(--g-edge); }
+.g-svg text { text-anchor: middle; fill: var(--g-text); font: 600 9px system-ui, sans-serif; pointer-events: none; }
+.g-svg text.g-label { fill: var(--g-dark); font-size: 15px; }
+.g-focused [data-focus]:not(.g-on):not(.g-near), .g-focused .g-neutral { opacity: .22; }
+.g-focused .g-near { opacity: .55; }
+.g-on { filter: drop-shadow(0 0 5px var(--accent)); }
+.g-on :is(rect, circle, ellipse, path):not(.g-strap):not(.g-gear) { stroke: var(--accent); stroke-width: 2.2; }
+.g-on :is(.g-arm, .g-axle, .g-link, .g-line) { stroke: var(--accent); }
+.g-spin { animation: g-rot 2.4s linear infinite; }
+.g-ccw { animation-direction: reverse; }
+.g-fast .g-spin { animation-duration: .45s; }
+@keyframes g-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .g-spin { animation: none; } .g-svg [data-focus], .g-svg .g-neutral { transition: none; } }
+section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 </style>
 </head>
 <body>
@@ -82,7 +136,10 @@ ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--mut
   <span>Pick a vehicle's parts from CP Models, then fly it in ArduPilot SITL.</span>
 </header>
 <main>
-  <div id="parts"><section class="card">Loading the catalog…</section></div>
+  <div>
+    <div id="garage" class="garage"></div>
+    <div id="parts"><section class="card">Loading the catalog…</section></div>
+  </div>
   <div class="side">
     <section class="card">
       <h2>Run file</h2>
@@ -116,6 +173,7 @@ ul.gaps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--mut
     </section>
   </div>
 </main>
+<script src="/garage.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -208,7 +266,7 @@ function slotBlock(part) {
   const picked = state.slots[part.id] || {};
   const rows = part.slots.filter((s) => s.options.length).map((s) => el("div", { class: "device" },
     el("label", {}, s.title),
-    el("select", { "aria-label": `${part.title} ${s.title}`, onchange: (e) => pickSlot(part, s.key, e.target.value) },
+    el("select", { "aria-label": `${part.title} ${s.title}`, "data-focus": `${part.id}.${s.key}`, onchange: (e) => pickSlot(part, s.key, e.target.value) },
       el("option", { value: "" }, "Generic: set the parameters below"),
       s.options.map((o) => el("option", { value: o.id, selected: o.id === picked[s.key] }, o.name)))));
   return [...rows, el("div", { id: `report-${part.id}` })];
@@ -304,7 +362,7 @@ function fieldTable(part) {
 
 function render() {
   const fr = frame();
-  const cards = [el("section", { class: "card" },
+  const cards = [el("section", { class: "card", "data-part": "overview" },
     el("h2", {}, "Vehicle"),
     el("div", { class: "airframes" }, Object.entries(catalog.airframes).map(([name, a]) =>
       el("button", { "aria-pressed": String(name === state.airframe),
@@ -316,7 +374,7 @@ function render() {
   for (const part of fr.parts) {
     const lv = level(part);
     const slow = /0\.0\d|hours|not practical/.test(lv.description);
-    cards.push(el("section", { class: "card" },
+    cards.push(el("section", { class: "card", "data-part": part.id },
       el("h2", {}, part.title, el("span", { class: "tag" },
         part.levels.length > 1 ? `${part.levels.length} levels` : "")),
       part.levels.length > 1 ? el("div", { class: "seg", role: "group", "aria-label": part.title },
@@ -327,8 +385,47 @@ function render() {
       fieldTable(part)));
   }
   $("parts").replaceChildren(...cards);
+  Garage.update(garageInfo());
+  markCard();
   scheduleCheck(0);
 }
+
+// What the garage draws and says: the parts, their levels and picks.
+function garageInfo() {
+  const levels = {}, devices = {}, picked = {};
+  for (const p of frame().parts) {
+    levels[p.id] = level(p);
+    const d = (p.devices || []).find((x) => x.id === state.devices[p.id]);
+    if (d) devices[p.id] = d.name;
+    for (const [k, id] of Object.entries(state.slots[p.id] || {})) {
+      const o = ((p.slots || []).find((s) => s.key === k)?.options || []).find((x) => x.id === id);
+      if (o) (picked[p.id] = picked[p.id] || {})[k] = o.name;
+    }
+  }
+  return { airframe: state.airframe, parts: frame().parts, levels, devices, picked };
+}
+
+function markCard() {
+  const part = Garage.key.split(".")[0];
+  for (const c of document.querySelectorAll("#parts section.card"))
+    c.classList.toggle("active", c.dataset.part === part && part !== "overview");
+}
+
+// A card, or a picker in it, takes the camera to its part.
+function followCards(e) {
+  const card = e.target.closest("section.card[data-part]");
+  if (!card) return;
+  Garage.focus(e.target.closest("[data-focus]")?.dataset.focus || card.dataset.part);
+  markCard();
+}
+$("parts").addEventListener("focusin", followCards);
+$("parts").addEventListener("pointerdown", followCards);
+// The drawing or its part buttons: show the part's card.
+Garage.mount($("garage"), (key) => {
+  markCard();
+  const card = document.querySelector(`#parts section.card[data-part="${key.split(".")[0]}"]`);
+  if (card && key !== "overview") card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
 
 function choice() {
   const home = $("sitl-home").value.split(",").map((s) => parseFloat(s.trim()));
@@ -412,6 +509,8 @@ fetch("/api/catalog").then((r) => r.json()).then((c) => {
     const lv = q.get(part.id + "_level");
     if (part.levels.some((l) => l.id === lv)) pickLevel(part, lv);
   }
+  // ?focus=propulsion.propeller: start with the camera on a part.
+  if (q.get("focus")) { Garage.focus(q.get("focus")); markCard(); }
 })
   .catch((e) => { $("parts").textContent = "Could not load the catalog: " + e; });
 </script>
