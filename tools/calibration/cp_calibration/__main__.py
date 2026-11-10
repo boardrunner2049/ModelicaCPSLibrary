@@ -36,7 +36,17 @@ def main(argv=None) -> int:
     if a.command == "datasheet":
         print(json.dumps(baro.datasheet_report(a.part, a.mode, a.drift, a.calibration), indent=1))
         return 0
-    rep = pipeline.run(a.experiment.resolve(), a.out)
+    import tomllib
+    kind = tomllib.loads(a.experiment.read_text())["experiment"].get("kind", "barometer")
+    if kind == "power_module":
+        from . import power as runner
+    elif kind == "rpm":
+        from . import rpm as runner
+    elif kind == "imu":
+        from . import imu as runner
+    else:
+        runner = pipeline
+    rep = runner.run(a.experiment.resolve(), a.out)
     out = Path(rep["profile"]["path"]).parent
     print(f"report: {out / 'report.md'}\nprofile: {rep['profile']['path']}")
     ok = rep["toolchain"]["pass"]

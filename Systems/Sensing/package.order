@@ -8,4 +8,6 @@ Magnetometer
 GNSS
 Barometer
 Range
+PowerModule
+Rpm
 SensorSuite

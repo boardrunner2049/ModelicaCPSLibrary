@@ -32,6 +32,15 @@ from .fmu import Trace, file_sha256
 
 READINGS = ["time_s", "pressure_pa", "temperature_k"]
 REFERENCE = ["time_s", "pressure_pa", "temperature_k"]
+# The columns each sensor kind's datasets must have (readings, reference), and
+# how the reference maps onto the model's inputs.
+KINDS = {
+    "barometer": (READINGS, REFERENCE, {"ambientPressure": "pressure_pa", "ambientTemperature": "temperature_k"}),
+    "power_module": (["time_s", "voltage_sense_v", "current_sense_v"], ["time_s", "voltage_v", "current_a", "temperature_k"],
+                     {"voltage": "voltage_v", "current": "current_a", "temperature": "temperature_k"}),
+    "rpm": (["time_s", "edge", "reference_time_s"], ["time_s", "speed_rad_s"], {"speed": "speed_rad_s"}),
+    "imu": (["time_s", "gyro_x", "gyro_y", "gyro_z", "accel_x", "accel_y", "accel_z"], ["time_s"], {}),
+}
 
 
 @dataclass
@@ -44,14 +53,15 @@ class Dataset:
     sha256: str
     reference_sha256: str
 
+    @property
+    def kind(self) -> str:
+        return self.meta.get("kind", "barometer")
+
     def trace(self) -> Trace:
-        """The reference as the model's input trace (ambient pressure and
-        temperature), on the readings' time base."""
+        """The reference as the model's input trace, on the readings' time base."""
         offset = float(self.meta.get("reference", {}).get("clock_offset_s", 0.0))
         t = self.reference["time_s"] + offset
-        return Trace(t,
-                     {"ambientPressure": self.reference["pressure_pa"],
-                      "ambientTemperature": self.reference["temperature_k"]})
+        return Trace(t, {inp: self.reference[col] for inp, col in KINDS[self.kind][2].items()})
 
     def summary(self) -> dict:
         t = self.readings["time_s"]
@@ -84,8 +94,9 @@ def _read_csv(path: Path, columns: list[str]) -> dict[str, np.ndarray]:
 def write(path: Path, readings: dict, reference: dict, meta: dict) -> "Dataset":
     path = Path(path).with_suffix("")
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_csv(path.with_suffix(".csv"), READINGS, readings)
-    _write_csv(path.with_suffix(".reference.csv"), REFERENCE, reference)
+    cols, ref_cols, _ = KINDS[meta.get("kind", "barometer")]
+    _write_csv(path.with_suffix(".csv"), cols, readings)
+    _write_csv(path.with_suffix(".reference.csv"), ref_cols, reference)
     path.with_suffix(".json").write_text(json.dumps(meta, indent=1, default=float) + "\n")
     return read(path)
 
@@ -103,5 +114,6 @@ def read(path: Path, expect: dict | None = None) -> Dataset:
                              "immutable; give a changed dataset a new name")
     meta_path = base.with_name(base.name + ".json")
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
-    return Dataset(base.name, readings_path, meta, _read_csv(readings_path, READINGS),
-                   _read_csv(reference_path, REFERENCE), sha, ref_sha)
+    cols, ref_cols, _ = KINDS[meta.get("kind", "barometer")]
+    return Dataset(base.name, readings_path, meta, _read_csv(readings_path, cols),
+                   _read_csv(reference_path, ref_cols), sha, ref_sha)

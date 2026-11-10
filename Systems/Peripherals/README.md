@@ -12,8 +12,8 @@ feeds it to ArduPilot's own driver.
 | `rangefinder` | L0 / L1 | slant range along the boresight to the ground plane | `rangefinder_v1` | `RNGFND1_TYPE 100` |
 | `airspeed` | A0 / A1 | pitot-static ½ρu\|u\| of the axial air velocity, air temperature | `airspeed_v1` | `ARSPD_TYPE 100` |
 | `optical_flow` | F0 / F1 | flow rates (ArduPilot's convention) and body rates | `optical_flow_v1` | `FLOW_TYPE 10` |
-| `rpm` | R0 / R1 | shaft speeds (rotors; a rover's rear wheels) | `rpm_v1` | `RPM1_TYPE 10` |
-| `power_module` | W0 / W1 | a battery pack (`Power.Battery`) and its voltage and current | `battery_v1` | `BATT_MONITOR 4` |
+| `rpm` | R0 / R1 / R2 (pulses: `rpm_pulses_v1`) | shaft speeds (rotors; a rover's rear wheels) | `rpm_v1` | `RPM1_TYPE 10` |
+| `power_module` | W0 / W1 / W2 (analog: `power_module_analog_v1`) | a battery pack (`Power.Battery`) and its voltage and current | `battery_v1` | `BATT_MONITOR 4` |
 | `temperature` | T0 / T1 | air temperature at the mount | `temperature_v1` | `TEMP1_TYPE 1` (TSYS01) |
 | `external_ahrs` | E0 / E1 | attitude, rates, specific force, position, velocity | `external_ahrs_v1` | `EAHRS_TYPE 1` (VectorNav serial) |
 | `visual_odometry` | V0 / V1 | camera pose and velocity in the odometry frame | `visual_odometry_v1` | `VISO_TYPE 1` (vicon serial) |

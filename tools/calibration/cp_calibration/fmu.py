@@ -127,7 +127,7 @@ class Trace:
 
     def at(self, t: float) -> dict[str, float]:
         k = max(int(np.searchsorted(self.time, t + 1e-12, side="right")) - 1, 0)
-        return {n: float(v[k]) for n, v in self.values.items()}
+        return {n: (float(v[k]) if np.ndim(v[k]) == 0 else np.asarray(v[k], float)) for n, v in self.values.items()}
 
     @property
     def breakpoints(self) -> np.ndarray:

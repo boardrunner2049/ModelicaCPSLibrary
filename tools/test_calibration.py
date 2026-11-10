@@ -141,6 +141,39 @@ pressureDriftTau = {{ value = 40.0, class = "measured", dataset = "bench1" }}
             self.assertIn("names no dataset", part("--calibration", str(f)).stderr)
 
 
+def peripheral(kind, part_id, level, *args):
+    return subprocess.run([str(COMPOSE), "part", kind, part_id, "--level", level, "--json", *args],
+                          capture_output=True, text=True, cwd=ROOT)
+
+
+@unittest.skipUnless(COMPOSE.exists(), "build tools/fire-compose first")
+class PeripheralLevels(unittest.TestCase):
+    def test_analog_power_module_classifies_its_values(self):
+        r = json.loads(peripheral("power_module", "holybro_pm02_v3", "W2").stdout)
+        p = r["parameters"]
+        self.assertEqual(p["currentGain"]["class"], "derived")
+        self.assertAlmostEqual(p["currentGain"]["value"], 1 / 36.364)
+        self.assertEqual(p["ampsPerVolt"]["class"], "specified")
+        self.assertEqual(p["adcBits"]["class"], "assumed")
+        self.assertEqual(r["evidence"], "datasheet-derived")
+
+    def test_power_module_part_defaults_to_the_sampled_level(self):
+        r = json.loads(subprocess.run([str(COMPOSE), "part", "power_module", "holybro_pm02_v3", "--json"],
+                                      capture_output=True, text=True, cwd=ROOT).stdout)
+        self.assertEqual(r["level"], "W1")
+
+    def test_peripheral_calibration_overlay(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "p.toml"
+            f.write_text('[profile]\nkind = "rpm"\npart = "melexis_us5881"\nlevel = "R2"\n'
+                         '[parameters]\nedgeDelay = { value = 2e-5, class = "measured", dataset = "bench" }\n')
+            r = json.loads(peripheral("rpm", "melexis_us5881", "R2", "--calibration", str(f)).stdout)
+            self.assertEqual(r["evidence"], "measurement-calibrated")
+            self.assertEqual(r["parameters"]["edgeDelay"]["class"], "measured")
+            f.write_text(f.read_text().replace('level = "R2"', 'level = "R1"'))
+            self.assertIn("fitted at level", peripheral("rpm", "melexis_us5881", "R2", "--calibration", str(f)).stderr)
+
+
 def _fmpy():
     try:
         import fmpy  # noqa: F401
@@ -160,6 +193,55 @@ class Toolchain(unittest.TestCase):
             m.close()
         failed = [c for c in r["checks"] if not c["pass"]]
         self.assertFalse(failed, failed)
+
+
+@unittest.skipUnless(os.environ.get("FIRE_TEST_FMU") == "1" and _fmpy(), "FIRE_TEST_FMU=1 with FMPy")
+class PowerAndRpmToolchain(unittest.TestCase):
+    def test_power_module_models(self):
+        from cp_calibration import power
+        m = power.Models()
+        try:
+            r = power.toolchain_check(m)
+        finally:
+            m.close()
+        self.assertFalse([c for c in r["checks"] if not c["pass"]])
+
+    def test_rpm_event_contract(self):
+        from cp_calibration import rpm
+        from cp_calibration.fmu import Slave, export
+        s, ramp = Slave(export(rpm.E1)), Slave(export("x", wrapper=rpm.RAMP, wrapper_model="RpmRamp"))
+        try:
+            r = rpm.contract_check(s, ramp)
+        finally:
+            s.close()
+            ramp.close()
+        self.assertFalse([c for c in r["checks"] if not c["pass"]])
+        lost = [x for x in r["rows"] if x["lost_times"]]
+        self.assertTrue(lost and all(x["count"] == x["expected"] for x in r["rows"]))
+
+
+@unittest.skipUnless(os.environ.get("FIRE_TEST_CALIBRATION") == "1" and _fmpy(), "FIRE_TEST_CALIBRATION=1 with FMPy")
+class PowerAndRpmPilots(unittest.TestCase):
+    def test_power_module(self):
+        from cp_calibration import power
+        r = power.run(ROOT / "tools/calibration/experiments/power_pm02_synthetic.toml")
+        self.assertTrue(r["toolchain"]["pass"])
+        self.assertTrue(all(x["recovered"] for x in r["recovery"]))
+        self.assertTrue(r["identifiability"]["shunt_and_gain"]["flagged"])
+        self.assertTrue(r["mismatch"]["revealed"])
+        for h in r["holdout"]:
+            self.assertTrue(h["calibrated"]["pass"])
+            self.assertFalse(h["reference"]["pass"])
+        self.assertEqual(r["profile_in_composer"]["evidence"], "synthetic-calibrated (not a device)")
+
+    def test_rpm(self):
+        from cp_calibration import rpm
+        r = rpm.run(ROOT / "tools/calibration/experiments/rpm_us5881_synthetic.toml")
+        self.assertTrue(r["toolchain"]["pass"])
+        self.assertTrue(all(x["recovered"] for x in r["recovery"]))
+        self.assertTrue(r["identifiability"]["delay_and_clock_offset"]["flagged"])
+        self.assertTrue(r["mismatch"]["revealed"])
+        self.assertTrue(all(h["calibrated"]["pass"] for h in r["holdout"]))
 
 
 @unittest.skipUnless(os.environ.get("FIRE_TEST_CALIBRATION") == "1" and _fmpy(), "FIRE_TEST_CALIBRATION=1 with FMPy")

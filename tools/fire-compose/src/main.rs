@@ -215,6 +215,10 @@ fn run() -> Result<()> {
                 return Ok(());
             }
             if fire_compose::peripherals::kind(&kind).is_some() {
+                let mut explicit = explicit.clone();
+                if let Some(c) = &calibration {
+                    explicit.insert("calibration".into(), toml::Value::String(c.clone()));
+                }
                 let report = fire_compose::peripherals::report(&kind, &part, level.as_deref(), &explicit)?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report).unwrap());

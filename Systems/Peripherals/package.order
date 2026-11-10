@@ -11,9 +11,11 @@ OpticalFlow
 SampledOpticalFlow
 Rpm
 SampledRpm
+PulseRpm
 PartialPowerModule
 PowerModule
 SampledPowerModule
+AnalogPowerModule
 Temperature
 SampledTemperature
 ExternalAhrs

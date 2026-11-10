@@ -412,6 +412,33 @@ required = false
 unit = "1"
 meaning = "1 when a sample has been delivered, else 0."
 
+[capabilities.rpm_pulses_v1]
+summary = "Every rpm-sensor pulse, countable and timed, for consumers stepping coarser than the pulses (R2)."
+[[capabilities.rpm_pulses_v1.fields]]
+name = "rpm_pulse_count"
+type = "Float64"
+causality = "output"
+shape = ["n"]
+required = true
+unit = "1"
+meaning = "Per shaft, rising edges since the start: an exact integer. The edges since a consumer's previous read are the difference."
+[[capabilities.rpm_pulses_v1.fields]]
+name = "rpm_last_edge_time_s"
+type = "Float64"
+causality = "output"
+shape = ["n"]
+required = true
+unit = "s"
+meaning = "Per shaft, reported simulation time of the latest rising edge (including the sensor's delay and jitter); -1 before the first."
+[[capabilities.rpm_pulses_v1.fields]]
+name = "rpm_edge_times_s"
+type = "Float64"
+causality = "output"
+shape = ["n"]
+required = true
+unit = "s"
+meaning = "Per shaft, the latest bufferSize edge times, newest first, flattened shaft-major (shaft i at (i-1)*bufferSize+1..). A consumer that saw k new edges reads the first k of its shaft; k > bufferSize means the older times were lost (the count stays exact). -1 where no edge yet."
+
 [capabilities.battery_v1]
 summary = "Battery pack and power module: measured voltage and current."
 [[capabilities.battery_v1.fields]]
@@ -454,6 +481,25 @@ shape = []
 required = false
 unit = "1"
 meaning = "1 when a sample has been delivered, else 0."
+
+[capabilities.power_module_analog_v1]
+summary = "The analog power module's sense voltages, before the autopilot's ADC and scaling (W2)."
+[[capabilities.power_module_analog_v1.fields]]
+name = "battery_voltage_sense_v"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "V"
+meaning = "Voltage-sense output of the module (the divided battery voltage), continuous."
+[[capabilities.power_module_analog_v1.fields]]
+name = "battery_current_sense_v"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "V"
+meaning = "Current-sense output of the module, continuous; offset at zero current, clipped at its rails."
 
 [capabilities.temperature_v1]
 summary = "Latest temperature sensor reading."

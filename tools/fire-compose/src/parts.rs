@@ -1088,19 +1088,26 @@ fn accepted(kind: &str, model: &str) -> Vec<&'static str> {
     }
 }
 
-/// Overlay a calibration profile on a part's conversion. A profile
-/// (docs/sensor-calibration.md) names the part and level it was fitted for and
-/// gives parameter values with an evidence class; the part file stays as
-/// published. Returns the report's `calibration` entry.
-fn apply_calibration(
+/// One value of a calibration profile.
+pub struct Calibrated {
+    pub key: String,
+    pub value: Value,
+    pub class: &'static str,
+    pub how: String,
+}
+
+/// Read a calibration profile (docs/sensor-calibration.md) for one part at
+/// one level. It names the part and level it was fitted for and gives
+/// parameter values with an evidence class; the part file stays as published.
+/// Returns the values and the report's `calibration` entry.
+pub fn read_calibration(
     label: &str,
     kind: &str,
     part: &str,
     level: &str,
     path: &str,
-    keys: &[&'static str],
-    conv: &mut Conversion,
-) -> Result<Json> {
+    keys: &[&str],
+) -> Result<(Vec<Calibrated>, Json)> {
     let full = {
         let p = PathBuf::from(path);
         if p.is_absolute() || p.exists() {
@@ -1139,12 +1146,11 @@ fn apply_calibration(
         .ok_or(format!("{label}.calibration: [parameters] missing in {path}"))?;
     let mut measured = Vec::new();
     let mut applied = serde_json::Map::new();
+    let mut out = Vec::new();
     for (name, entry) in params {
-        let key = keys
-            .iter()
-            .copied()
-            .find(|k| k == name)
-            .ok_or(format!("{label}.calibration: {name} is not a parameter of {level}"))?;
+        if !keys.contains(&name.as_str()) {
+            return Err(format!("{label}.calibration: {name} is not a parameter of {level}"));
+        }
         let t = entry
             .as_table()
             .ok_or(format!("{label}.calibration: parameters.{name} must be a table"))?;
@@ -1176,18 +1182,12 @@ fn apply_calibration(
         } else {
             format!("calibration profile: {how} (dataset {dataset})")
         };
-        conv.entries.retain(|e| e.key != key);
-        conv.put_as(class, key, value, &[], note);
+        out.push(Calibrated { key: name.clone(), value, class, how: note });
         let mut a = serde_json::to_value(t).unwrap_or(Json::Null);
         a["class"] = json!(class);
         applied.insert(name.clone(), a);
     }
-    if !measured.is_empty() {
-        conv.assumed.retain(|a| {
-            !(a.starts_with("pressure drift") && measured.iter().any(|m| m.starts_with("pressureDrift")))
-        });
-    }
-    Ok(json!({
+    Ok((out, json!({
         "path": path,
         "synthetic": head.get("synthetic").and_then(Value::as_bool).unwrap_or(false),
         "label": field("label"),
@@ -1196,7 +1196,43 @@ fn apply_calibration(
         "measured": measured,
         "parameters": applied,
         "datasets": profile.get("datasets").map(|d| serde_json::to_value(d).unwrap_or(Json::Null)).unwrap_or(Json::Null),
-    }))
+    })))
+}
+
+/// The evidence label of a profile: datasheet-derived without measured values.
+pub fn evidence_of(calibration: Option<&Json>) -> &'static str {
+    match calibration {
+        Some(c) if c["measured"].as_array().is_some_and(|m| !m.is_empty()) => {
+            // A profile fitted to synthetic data demonstrates the pipeline; it
+            // is not a measurement of a device and is never labelled as one.
+            if c["synthetic"] == true { "synthetic-calibrated (not a device)" } else { "measurement-calibrated" }
+        }
+        _ => "datasheet-derived",
+    }
+}
+
+fn apply_calibration(
+    label: &str,
+    kind: &str,
+    part: &str,
+    level: &str,
+    path: &str,
+    keys: &[&'static str],
+    conv: &mut Conversion,
+) -> Result<Json> {
+    let (values, report) = read_calibration(label, kind, part, level, path, keys)?;
+    for v in values {
+        let key = *keys.iter().find(|k| **k == v.key).unwrap();
+        conv.entries.retain(|e| e.key != key);
+        conv.put_as(v.class, key, v.value, &[], v.how);
+    }
+    let measured: Vec<String> = report["measured"].as_array().unwrap().iter().filter_map(|m| m.as_str().map(String::from)).collect();
+    if !measured.is_empty() {
+        conv.assumed.retain(|a| {
+            !(a.starts_with("pressure drift") && measured.iter().any(|m| m.starts_with("pressureDrift")))
+        });
+    }
+    Ok(report)
 }
 
 /// Resolve one part use: the level, the parameters it fills (explicit keys
@@ -1365,14 +1401,7 @@ pub fn resolve(
     if kind == "barometer" {
         report["drift"] = json!(if inputs.drift.is_empty() { "relative_accuracy" } else { inputs.drift.as_str() });
     }
-    // A profile fitted to synthetic data demonstrates the pipeline; it is not a
-    // measurement of a device and is never labelled as one.
-    report["evidence"] = json!(match &calibration {
-        Some(c) if c["measured"].as_array().is_some_and(|m| !m.is_empty()) => {
-            if c["synthetic"] == true { "synthetic-calibrated (not a device)" } else { "measurement-calibrated" }
-        }
-        _ => "datasheet-derived",
-    });
+    report["evidence"] = json!(evidence_of(calibration.as_ref()));
     if let Some(c) = calibration {
         report["calibration"] = c;
     }

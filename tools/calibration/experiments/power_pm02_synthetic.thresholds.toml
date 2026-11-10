@@ -1,0 +1,13 @@
+# Acceptance thresholds for the synthetic power-module experiment, fixed
+# before any held-out evaluation. For this synthetic exercise only: a real
+# calibration declares its own from the reference instruments' uncertainty,
+# the logger's characterization and the intended use.
+
+[holdout]
+# Per channel, over each held-out record. The logger's noise is 1 mV rms and
+# its resolution 0.05 mV; with independent errors the residual rms is about
+# 1 mV, so 2 mV allows for parameter error. The mean over thousands of
+# readings scatters by well under 0.1 mV; 1 mV of mean error (about 36 mA,
+# or 18 mV of battery voltage) is a calibration error, not noise.
+mean_error_v = 0.001
+rms_error_v = 0.002

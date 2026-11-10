@@ -236,6 +236,18 @@ sample has been delivered and is valid. Units and frames are in the contract.
 | `precision_landing_v1` | `landing_target_distance_m` | scalar | m | no |
 | `precision_landing_v1` | `landing_target_valid` | scalar | 1 | no |
 
+### `power_module_analog_v1` and `rpm_pulses_v1`
+
+Exported only at the levels that produce them (docs/sensor-calibration.md).
+
+| Capability | Field | Shape | Unit | Meaning |
+|---|---|---|---|---|
+| `power_module_analog_v1` (W2) | `battery_voltage_sense_v` | scalar | V | the module's voltage-sense output, before the ADC |
+| | `battery_current_sense_v` | scalar | V | the module's current-sense output, before the ADC |
+| `rpm_pulses_v1` (R2) | `rpm_pulse_count` | [n] | 1 | rising edges per shaft since the start, exact |
+| | `rpm_last_edge_time_s` | [n] | s | reported time of each shaft's latest edge |
+| | `rpm_edge_times_s` | [n] | s | each shaft's latest `bufferSize` edge times, newest first, shaft-major |
+
 ### `payload_actuation_v1` and `fuel_v1`
 
 `aux_pwm` (input, µs): the payloads' servo pulses (`Systems/Payloads`),

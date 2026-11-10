@@ -65,6 +65,29 @@ pub struct Kind {
 }
 
 const PER_SHAFT: usize = usize::MAX;
+
+/// Outputs only some levels export: (kind, level, its outputs as in Kind::outputs).
+pub const LEVEL_OUTPUTS: &[(&str, &str, &[(&str, &str, usize)])] = &[
+    (
+        "power_module",
+        "W2",
+        &[
+            ("battery_voltage_sense_v", "voltageSense", 0),
+            ("battery_current_sense_v", "currentSense", 0),
+        ],
+    ),
+    (
+        "rpm",
+        "R2",
+        &[
+            ("rpm_pulse_count", "pulseCount", PER_SHAFT),
+            ("rpm_last_edge_time_s", "lastEdgeTime", PER_SHAFT),
+            ("rpm_edge_times_s", "edgeTimes", PER_SHAFT_BUFFER),
+        ],
+    ),
+];
+/// One element per shaft and buffered edge (R2): shafts times `bufferSize`.
+const PER_SHAFT_BUFFER: usize = usize::MAX - 1;
 const P: &str = "ModelicaCPSLibrary.Systems.Peripherals.";
 
 macro_rules! sampled {
@@ -229,6 +252,22 @@ pub const RPM: Kind = Kind {
                 ("maxRpm", Shape::Positive),
             ],
         },
+        Level {
+            level: "R2",
+            model: "pulses",
+            class: "PulseRpm",
+            description: "phase-continuous pulses per shaft: exact edge counts, buffered edge times, rpm from the latest two edges",
+            parameters: &[
+                ("pulsesPerRevolution", Shape::Positive),
+                ("dutyCycle", Shape::Fraction),
+                ("bufferSize", Shape::Count),
+                ("edgeDelay", Shape::Nonnegative),
+                ("edgeJitterStd", Shape::Nonnegative),
+                ("timeout", Shape::Positive),
+                ("seed", Shape::Seed),
+                ("streamId", Shape::Seed),
+            ],
+        },
     ],
     outputs: &[("rpm", "rpm", PER_SHAFT), ("rpm_valid", "validity", 0)],
 };
@@ -275,6 +314,31 @@ pub const POWER_MODULE: Kind = Kind {
                 ("currentNoiseStd", Shape::Nonnegative),
                 ("currentQuantum", Shape::Nonnegative),
                 ("maxCurrent", Shape::Positive),
+            ],
+        },
+        Level {
+            level: "W2",
+            model: "analog",
+            class: "AnalogPowerModule",
+            description: "the module's analog sense voltages (Sensing.PowerModule.AnalogSensor), read through the autopilot's ADC and scaling",
+            parameters: sampled![
+                ("avionicsCurrent", Shape::Nonnegative),
+                ("efficiency", Shape::Fraction),
+                ("propellerDiskArea", Shape::Positive),
+                ("figureOfMerit", Shape::Fraction),
+                ("voltageGain", Shape::Positive),
+                ("voltageOffset", Shape::Real),
+                ("currentGain", Shape::Positive),
+                ("currentOffset", Shape::Real),
+                ("currentGainTempco", Shape::Real),
+                ("outputMin", Shape::Real),
+                ("outputMax", Shape::Positive),
+                ("adcReference", Shape::Positive),
+                ("adcBits", Shape::Count),
+                ("adcNoiseStd", Shape::Nonnegative),
+                ("voltageMultiplier", Shape::Positive),
+                ("ampsPerVolt", Shape::Positive),
+                ("ampsOffset", Shape::Real),
             ],
         },
     ],
@@ -774,10 +838,16 @@ pub fn components(
         if kind.mounted {
             equalities.push((format!("{}.truth", kind.component), reference("truth")));
         }
-        for (export, field, dim) in kind.outputs {
+        let extra = LEVEL_OUTPUTS
+            .iter()
+            .filter(|(k, l, _)| *k == kind.name && *l == level.level)
+            .flat_map(|(_, _, o)| o.iter());
+        for (export, field, dim) in kind.outputs.iter().chain(extra) {
             let dims = match *dim {
                 0 => vec![],
                 PER_SHAFT => vec![shaft_count],
+                PER_SHAFT_BUFFER => vec![shaft_count
+                    * sel.get("bufferSize").and_then(Toml::as_integer).unwrap_or(32) as usize],
                 n => vec![n],
             };
             components.push(Instance {
@@ -858,6 +928,8 @@ struct Entry {
     value: Toml,
     from: Vec<&'static str>,
     how: String,
+    /// Evidence class (parts::EVIDENCE), where the converter classifies it.
+    class: Option<&'static str>,
 }
 
 #[derive(Default)]
@@ -935,7 +1007,13 @@ impl Conversion {
             value: Toml::Float(value),
             from: from.to_vec(),
             how: how.into(),
+            class: None,
         });
+    }
+    /// `put` with an evidence class.
+    fn put_as(&mut self, class: &'static str, key: &'static str, value: f64, from: &[&'static str], how: impl Into<String>) {
+        self.put(key, value, from, how);
+        self.entries.last_mut().unwrap().class = Some(class);
     }
     fn put_value(&mut self, key: &'static str, value: Toml, from: &[&'static str], how: impl Into<String>) {
         self.entries.push(Entry {
@@ -943,6 +1021,7 @@ impl Conversion {
             value,
             from: from.to_vec(),
             how: how.into(),
+            class: None,
         });
     }
     /// A `±` accuracy figure as a 2-sigma bound.
@@ -1107,6 +1186,14 @@ fn rpm(x: &Figures, c: &mut Conversion) {
         let p = ppr.unwrap_or(1.0);
         c.put("maxRpm", f * 60.0 / p, &["max_frequency_hz"], format!("{f} Hz at {p} pulse(s) per revolution"));
     }
+    if ppr.is_none() {
+        c.assumed.push("pulses per revolution: set by the magnets or marks (configuration)".into());
+    }
+    // R2: edge timing. A switching delay or jitter is rarely stated; rise and
+    // fall times bound the edge's sharpness, not its delay.
+    if x.f("edge_delay_us").is_none() {
+        c.assumed.push("R2: edge delay and jitter 0 (not stated; rise/fall times are not delays)".into());
+    }
 }
 
 fn power_module(x: &Figures, c: &mut Conversion) {
@@ -1163,6 +1250,25 @@ fn power_module(x: &Figures, c: &mut Conversion) {
         }
         if adc {
             c.assumed.push("the autopilot's ADC: 12 bits".into());
+        }
+        // W2: the module's analog transfer functions, and the autopilot's
+        // scaling as its setup page gives it.
+        if let Some((s, key)) = x.any(&["voltage_scale", "voltage_divider_ratio"]) {
+            c.put_as("derived", "voltageGain", 1.0 / s, &[key], format!("1 / {s} (the divider)"));
+            c.put_as("specified", "voltageMultiplier", s, &[key], "the autopilot's voltage multiplier (BATT_VOLT_MULT)");
+        }
+        if let Some((s, key)) = x.any(&["current_scale", "current_scale_a_per_v"]) {
+            c.put_as("derived", "currentGain", 1.0 / s, &[key], format!("1 / {s} A/V"));
+            c.put_as("specified", "ampsPerVolt", s, &[key], "the autopilot's amps per volt (BATT_AMP_PERVLT)");
+        }
+        if x.f("adc_reference_v").is_some() {
+            c.put_as("specified", "outputMax", vref, &["adc_reference_v"], "outputs designed for this ADC range");
+            c.put_as("specified", "adcReference", vref, &["adc_reference_v"], "ADC full scale");
+        }
+        c.put_value("adcBits", Toml::Integer(12), &[], "the autopilot's ADC: 12 bits");
+        c.entries.last_mut().unwrap().class = Some("assumed");
+        if x.f("zero_current_offset_v").is_none() {
+            c.assumed.push("W2: zero-current and zero-voltage offsets 0 (not stated)".into());
         }
     }
 }
@@ -1351,7 +1457,11 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
             }));
             sel.insert("battery".into(), Toml::Table(pack));
         }
+        let calibration = sel.remove("calibration");
         let Some(Toml::String(wanted)) = sel.remove("part") else {
+            if calibration.is_some() {
+                return Err(format!("peripherals.{name}.calibration: needs a part"));
+            }
             out.insert(name.clone(), Toml::Table(sel));
             continue;
         };
@@ -1360,7 +1470,8 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
             Some(l) => kind
                 .level(l)
                 .ok_or_else(|| format!("peripherals.{name}: no level {l:?}"))?,
-            None => kind.levels.last().unwrap(),
+            // The sampled level when there is one: W2 (analog) is chosen explicitly.
+            None => kind.levels.iter().find(|l| l.model == "sampled").unwrap_or(kind.levels.last().unwrap()),
         };
         let x = Figures { part: &part, explicit: &sel };
         let mut c = Conversion::default();
@@ -1378,6 +1489,20 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
             _ => {}
         }
         let accepted: Vec<&str> = level.parameters.iter().map(|p| p.0).collect();
+        let cal = match &calibration {
+            None => None,
+            Some(v) => {
+                let path = v.as_str().ok_or(format!("peripherals.{name}.calibration: expected a path"))?;
+                let (values, rep) = crate::parts::read_calibration(&format!("peripherals.{name}"), name, &id,
+                                                                   level.level, path, &accepted)?;
+                for v in values {
+                    let key = *accepted.iter().find(|k| **k == v.key).unwrap();
+                    c.entries.retain(|e| e.key != key);
+                    c.entries.push(Entry { key, value: v.value, from: vec![], how: v.how, class: Some(v.class) });
+                }
+                Some(rep)
+            }
+        };
         let mut derived = serde_json::Map::new();
         let mut used = std::collections::BTreeSet::new();
         for e in &c.entries {
@@ -1390,7 +1515,11 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
                 derived.insert(e.key.into(), json!({"value": "explicit in the configuration", "from": e.from, "how": e.how}));
                 continue;
             }
-            derived.insert(e.key.into(), json!({"value": e.value, "from": e.from, "how": e.how}));
+            let mut d = json!({"value": e.value, "from": e.from, "how": e.how});
+            if let Some(class) = e.class {
+                d["class"] = json!(class);
+            }
+            derived.insert(e.key.into(), d);
             sel.insert(e.key.into(), e.value.clone());
         }
         sel.insert("model".into(), Toml::String(level.model.into()));
@@ -1415,14 +1544,19 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
                 not_stated.insert((*figure).into(), json!(format!("not stated: {parameter} stays at the library default")));
             }
         }
-        reports.push(json!({
+        let mut report = json!({
             "kind": name, "part": id,
             "name": part.get("name").and_then(Toml::as_str).unwrap_or(&id),
             "source": part.get("source").and_then(Toml::as_str).unwrap_or(""),
             "level": level.level, "model": level.model,
             "parameters": derived, "assumed": c.assumed,
             "not_represented": not_represented, "not_stated": not_stated,
-        }));
+            "evidence": crate::parts::evidence_of(cal.as_ref()),
+        });
+        if let Some(cal) = cal {
+            report["calibration"] = cal;
+        }
+        reports.push(report);
         out.insert(name.clone(), Toml::Table(sel));
     }
     root.insert("peripherals".into(), Toml::Table(out));

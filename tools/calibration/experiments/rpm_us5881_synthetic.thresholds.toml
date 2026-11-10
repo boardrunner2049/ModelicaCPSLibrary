@@ -1,0 +1,13 @@
+# Acceptance thresholds for the synthetic rpm experiment, fixed before any
+# held-out evaluation. Synthetic only; a real experiment derives them from the
+# reference encoder's timing uncertainty and the consumer's needs.
+
+[holdout]
+# Mean timing error over a held-out record of about 1800 edges. With 3 us of
+# jitter the mean scatters by about 0.1 us in each of training and held-out;
+# 0.5 us is beyond three sigma of their difference and a small fraction of a
+# pulse period at any speed tested (555 us at 9000 rpm).
+mean_error_s = 0.0000005
+# The held-out spread over the calibrated jitter: within about +-20 %
+# (the standard error of a standard deviation from ~1800 edges is under 2 %).
+std_ratio = [0.8, 1.25]
