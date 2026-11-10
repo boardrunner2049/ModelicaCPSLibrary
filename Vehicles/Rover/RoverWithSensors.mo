@@ -14,6 +14,10 @@ model RoverWithSensors "Rover with the default ideal sensor suite; no protocol/f
   Systems.Sensing.SensorSuite sensors(rImu_b = imuPosition_b, R_bImu = R_bImu, R_bMag = R_bMag,
     rGnss_b = gnssPosition_b, rBarometer_b = barometerPosition_b);
   output Interfaces.SensorMeasurements measurements;
+  output Real barometerSampleTime(unit="s") = sensors.barometerSampleTime "Barometer timing, see Systems.Sensing.Barometer.PartialSensor";
+  output Real barometerDeliveryTime(unit="s") = sensors.barometerDeliveryTime;
+  output Integer barometerSequence = sensors.barometerSequence;
+  output Boolean barometerValid = sensors.barometerValid;
 equation
   sensors.p_w = body.p_w;
   sensors.v_w = body.v_w;

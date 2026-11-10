@@ -5,4 +5,5 @@ Imu
 Magnetometer
 Gnss
 Barometer
+BarometerTiming
 ExternalWrench

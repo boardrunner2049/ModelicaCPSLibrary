@@ -27,6 +27,10 @@ model SensorSuite "Four-sensor assembly with independently replaceable IMU, magn
   input Real pressure(unit="Pa") "Ambient pressure at the local origin (NED z = 0) [Pa]";
   input Real temperature(unit="K") "Ambient temperature at the local origin [K]";
   output ModelicaCPSLibrary.Interfaces.SensorMeasurements measurements;
+  output Real barometerSampleTime(unit="s") "Acquisition time of the delivered barometer reading; -1 before the first";
+  output Real barometerDeliveryTime(unit="s") "Delivery time of that reading; -1 before the first";
+  output Integer barometerSequence "Delivered barometer readings; increments on each new one";
+  output Boolean barometerValid "A valid barometer reading has been delivered";
 
   replaceable model ImuModel = IMU.Sensor constrainedby IMU.PartialSensor;
   ImuModel imu( r_b=rImu_b, R_bs=R_bImu,
@@ -71,4 +75,8 @@ equation
   measurements.temperature = barometer.temperature;
   measurements.altitude = barometer.altitude;
   measurements.climbRate = barometer.climbRate;
+  barometerSampleTime = barometer.sampleTime;
+  barometerDeliveryTime = barometer.deliveryTime;
+  barometerSequence = barometer.sequence;
+  barometerValid = barometer.valid;
 end SensorSuite;

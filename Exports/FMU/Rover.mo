@@ -18,6 +18,10 @@ equation
   wheelSpeed = plant.wheelSpeed;
   truth = plant.truth;
   measurements = plant.measurements;
+  baro_sample_time_s = plant.barometerSampleTime;
+  baro_delivery_time_s = plant.barometerDeliveryTime;
+  barometerSequence = plant.barometerSequence;
+  barometerValid = plant.barometerValid;
   annotation(Documentation(info = "<html><p>Steering and throttle are centred channels: the midpoint
 of <code>pwm_min</code>..<code>pwm_max</code> is straight ahead and zero throttle; <code>pwm_max</code>
 is full right and full forward, <code>pwm_min</code> full left and full reverse. Elements 2 and 4

@@ -7,4 +7,8 @@ equation
   temperature = ambientTemperature + temperatureBias;
   altitude = altitude_w + altitudeBias;
   climbRate = climbRate_w;
+  sampleTime = time;
+  deliveryTime = time;
+  sequence = 0;
+  valid = true;
 end Sensor;

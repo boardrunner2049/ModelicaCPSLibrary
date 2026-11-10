@@ -16,7 +16,11 @@ from cp_vehicle_interface.contract import LIBRARY_ROOT  # noqa: E402
 from cp_vehicle_interface.descriptor import platform_tuple, sha256  # noqa: E402
 
 CONTRACT = load_contract()
-ALL = list(CONTRACT.capabilities)
+# The capabilities every exported vehicle provides. The peripheral and payload
+# capabilities (rangefinder_v1, ..., payload_actuation_v1) are optional: only a
+# vehicle composed with that device exports them.
+ALL = ["pwm_actuation_v1", "kinematic_state_v1", "imu_v1", "magnetometer_v1", "gnss_v1", "barometer_v1",
+       "barometer_timing_v1", "external_wrench_v1"]
 BUILT = LIBRARY_ROOT / "build" / "vehicle-interface"
 
 
@@ -52,7 +56,8 @@ def standard_variables(n_pwm=4):
                     ("accel", 3), ("gyro", 3), ("mag", 3), ("gps", 3), ("vel_ned", 3)):
         v[name] = var(name, next(vr), dims=[n])
     for name in ("yaw_deg", "baro_pressure_pa", "baro_temperature_c", "baro_altitude_m",
-                 "baro_climb_rate_mps"):
+                 "baro_climb_rate_mps", "baro_sample_time_s", "baro_delivery_time_s", "baro_sequence",
+                 "baro_valid"):
         v[name] = var(name, next(vr))
     for name in ("external_force_frd", "external_moment_frd"):
         v[name] = var(name, next(vr), causality="input", start=[0, 0, 0], dims=[3])

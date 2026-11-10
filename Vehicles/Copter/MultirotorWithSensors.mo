@@ -9,6 +9,10 @@ model MultirotorWithSensors "Default ideal sensors with independently replaceabl
     rImu_b=geometry.imuPosition_C-chassis.cg_C,R_bImu=geometry.R_bImu,R_bMag=geometry.R_bMag,
     rGnss_b=geometry.gnssPosition_C-chassis.cg_C,rBarometer_b=geometry.barometerPosition_C-chassis.cg_C);
   output Interfaces.SensorMeasurements measurements;
+  output Real barometerSampleTime(unit="s") = sensors.barometerSampleTime "Barometer timing, see Systems.Sensing.Barometer.PartialSensor";
+  output Real barometerDeliveryTime(unit="s") = sensors.barometerDeliveryTime;
+  output Integer barometerSequence = sensors.barometerSequence;
+  output Boolean barometerValid = sensors.barometerValid;
 initial equation
   assert(max(abs(transpose(geometry.R_bImu)*geometry.R_bImu-identity(3)))<1e-9,"IMU mount must be a proper rotation");
     // and abs(Modelica.Math.Matrices.det(geometry.R_bImu)-1)<1e-9

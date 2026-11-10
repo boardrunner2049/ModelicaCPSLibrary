@@ -1,24 +1,23 @@
 within ModelicaCPSLibrary.Systems.Sensing.Barometer;
 model SampledSensor "B1: sampled pressure and temperature with white noise, Gauss-Markov pressure drift, quantization and delivery latency"
   extends PartialSensor;
-  parameter Real samplePeriod(unit="s") = 0.02 "Acquisition period (50 Hz)";
-  parameter Real startTime(unit="s") = 0 "First acquisition, at or after simulation start";
-  parameter Integer latencySamples(min=0) = 0 "Delivery delay in sample periods";
-  parameter Integer seed = 1;
-  parameter Integer streamId = 301;
-  parameter Real pressureNoiseStd(unit="Pa") = 0 "White noise per sample";
-  parameter Real pressureDriftStd(unit="Pa") = 0 "Stationary standard deviation of the drift";
-  parameter Real pressureDriftTau(unit="s") = 300 "Drift correlation time";
-  parameter Real pressureQuantum(unit="Pa") = 0 "Pressure resolution; 0 for none";
-  parameter Real temperatureNoiseStd(unit="K") = 0;
-  parameter Real temperatureQuantum(unit="K") = 0 "Temperature resolution; 0 for none";
-  output Real sampleTime(unit="s") "Acquisition epoch of the delivered sample; -1 before the first";
-  output Integer sequence "Delivered samples";
-  output Boolean valid "A sample has been delivered";
+  parameter Real samplePeriod(unit="s") = 0.02 "Acquisition period (50 Hz); the part's measurement times bound it [configuration]";
+  parameter Real startTime(unit="s") = 0 "First acquisition, at or after simulation start [configuration]";
+  parameter Integer latencySamples(min=0) = 0 "Delivery delay in sample periods; structural (sizes the queue), fixed when the model is compiled [assumed]";
+  parameter Integer seed = 1 "Noise stream seed [configuration]";
+  parameter Integer streamId = 301 "Noise stream id [configuration]";
+  parameter Real pressureNoiseStd(unit="Pa") = 0 "White noise per sample [datasheet]";
+  parameter Real pressureDriftStd(unit="Pa") = 0 "Stationary standard deviation of the drift; no datasheet states a drift process [assumed]";
+  parameter Real pressureDriftTau(unit="s") = 300 "Drift correlation time [assumed]";
+  parameter Real pressureQuantum(unit="Pa") = 0 "Pressure resolution; 0 for none [datasheet]";
+  parameter Real temperatureNoiseStd(unit="K") = 0 "White temperature noise per sample [assumed]";
+  parameter Real temperatureQuantum(unit="K") = 0 "Temperature resolution; 0 for none [datasheet]";
   output Real pressureDrift(unit="Pa") "Diagnostic truth of the drift";
 protected
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first acquisition rather than by a start value, so that seed
+  // and streamId stay settable in an exported FMU: Rumoca evaluates a start
+  // value at compile time. The draws are the same as a start-value seeding.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
   discrete Real normal[3](each start=0,each fixed=true);
   discrete Real drift(start=0,fixed=true);
   discrete Boolean initialized(start=false,fixed=true);
@@ -30,7 +29,7 @@ initial equation
     and pressureQuantum>=0 and temperatureQuantum>=0,"Invalid barometer error parameters");
 equation
   when sample(startTime,samplePeriod) then
-    (normal,rngState)=normalDraw(3,pre(rngState));
+    (normal,rngState)=seededNormalDraw(3,pre(rngState),pre(initialized),streamId,seed);
     drift=if not pre(initialized) then pressureDriftStd*normal[1]
       else phi*pre(drift)+pressureDriftStd*sqrt(1-phi^2)*normal[1];
     initialized=true;
@@ -50,6 +49,7 @@ equation
   altitude=delivery.y[3];
   climbRate=delivery.y[4];
   sampleTime=delivery.sampleTime;
+  deliveryTime=delivery.deliveryTime;
   sequence=delivery.sequence;
   valid=delivery.valid;
 end SampledSensor;

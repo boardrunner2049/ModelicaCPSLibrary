@@ -464,6 +464,15 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             "values.measurements".into(),
             reference("plant.measurements"),
         ));
+        // barometer_timing_v1
+        for (name, source) in [
+            ("baro_sample_time_s", "plant.barometerSampleTime"),
+            ("baro_delivery_time_s", "plant.barometerDeliveryTime"),
+            ("barometerSequence", "plant.barometerSequence"),
+            ("barometerValid", "plant.barometerValid"),
+        ] {
+            equalities.push((name.into(), reference(source)));
+        }
     } else {
         for name in ["measurements", "force_b", "moment_b"] {
             equalities.push((name.into(), reference(&format!("plant.{name}"))));

@@ -12,6 +12,8 @@ archived under `deprecated/legacy_enu_flu/ModelicaCPSLibrary`; they are not acti
 - Magnetometer: `transpose(R_bs)*transpose(R_wb)*magneticField_w`, in Tesla.
 - GNSS: antenna position and velocity already resolved in NED.
 - Barometer: ambient Pa/K and geometric Up-positive altitude/climb rate; no pressure-height inversion.
+  Every level outputs `sampleTime`, `deliveryTime`, `sequence` and `valid` (the timing contract in
+  `Barometer.PartialSensor`, docs/sensor-calibration.md); the suite passes them on as `barometer*`.
 
 `R_ab` converts components by `v_a=R_ab*v_b`. Standalone `R_bs=identity(3)`
 aligns the sensor with body FRD. Vehicle geometry defaults to

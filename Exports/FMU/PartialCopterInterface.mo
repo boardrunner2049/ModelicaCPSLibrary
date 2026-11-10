@@ -7,6 +7,7 @@ partial model PartialCopterInterface "Multirotor vehicle interface v1 export; th
   extends VehicleInterface.Magnetometer;
   extends VehicleInterface.Gnss;
   extends VehicleInterface.Barometer;
+  extends VehicleInterface.BarometerTiming;
   extends VehicleInterface.ExternalWrench;
   parameter Vehicles.Copter.Geometry geometry;
   output Real rotorSpeed[geometry.nRotors] "Diagnostic shaft speeds [rad/s]";

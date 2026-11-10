@@ -27,6 +27,10 @@ equation
   thrust = plant.thrust;
   truth = plant.truth;
   measurements = plant.measurements;
+  baro_sample_time_s = plant.barometerSampleTime;
+  baro_delivery_time_s = plant.barometerDeliveryTime;
+  barometerSequence = plant.barometerSequence;
+  barometerValid = plant.barometerValid;
   annotation(Documentation(info = "<html><p>Control surfaces are centred channels (midpoint of
 <code>pwm_min</code>..<code>pwm_max</code> is neutral, <code>pwm_max</code> full positive deflection:
 roll right, nose up, nose right). Throttle runs from <code>pwm_min</code> (off) to

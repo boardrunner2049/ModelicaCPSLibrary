@@ -7,6 +7,7 @@ partial model PartialSensedVehicleInterface "Vehicle interface v1 state and sens
   extends VehicleInterface.Magnetometer;
   extends VehicleInterface.Gnss;
   extends VehicleInterface.Barometer;
+  extends VehicleInterface.BarometerTiming;
   extends VehicleInterface.ExternalWrench;
   parameter Real R_bImu[3, 3] = identity(3) "IMU frame to body, as mounted in the plant";
   parameter Real R_bMag[3, 3] = identity(3) "Magnetometer frame to body, as mounted in the plant";

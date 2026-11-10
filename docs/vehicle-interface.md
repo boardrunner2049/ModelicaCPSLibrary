@@ -163,6 +163,18 @@ measurement.
 | `baro_altitude_m` | m | no | Up-positive altitude above the ground plane |
 | `baro_climb_rate_mps` | m/s | no | Up-positive climb rate |
 
+### `barometer_timing_v1`
+
+When the reading in `barometer_v1` was acquired and delivered, in simulation
+time (docs/sensor-calibration.md, "Timing contract"). Exported by every vehicle.
+
+| Field | Unit | Required | Meaning |
+|---|---|---|---|
+| `baro_sample_time_s` | s | yes | Acquisition time of the delivered reading; -1 before the first |
+| `baro_delivery_time_s` | s | yes | Delivery time (acquisition plus latency); -1 before the first |
+| `baro_sequence` | 1 | yes | Delivered readings, an exact integer; a new reading exactly when it increments |
+| `baro_valid` | 1 | yes | 1 once a valid reading has been delivered |
+
 ### `external_wrench_v1`
 
 | Field | Shape | Unit | Frame | Meaning |
@@ -188,6 +200,41 @@ current; consumed charge and state of charge), `temperature_v1`,
 velocity), `visual_odometry_v1`, `beacon_v1` and `precision_landing_v1`
 (angles and distance to the target). Each has a `*_valid` field, 1 when a
 sample has been delivered and is valid. Units and frames are in the contract.
+
+| Capability | Field | Shape | Unit | Required |
+|---|---|---|---|---|
+| `rangefinder_v1` | `rangefinder_distance_m` | scalar | m | yes |
+| `rangefinder_v1` | `rangefinder_valid` | scalar | 1 | no |
+| `airspeed_v1` | `airspeed_differential_pressure_pa` | scalar | Pa | yes |
+| `airspeed_v1` | `airspeed_temperature_k` | scalar | K | no |
+| `airspeed_v1` | `airspeed_valid` | scalar | 1 | no |
+| `optical_flow_v1` | `flow_rate_xy` | [2] | rad/s | yes |
+| `optical_flow_v1` | `flow_body_rate_xy` | [2] | rad/s | no |
+| `optical_flow_v1` | `flow_valid` | scalar | 1 | no |
+| `rpm_v1` | `rpm` | [n] | rev/min | yes |
+| `rpm_v1` | `rpm_valid` | scalar | 1 | no |
+| `battery_v1` | `battery_voltage_v` | scalar | V | yes |
+| `battery_v1` | `battery_current_a` | scalar | A | no |
+| `battery_v1` | `battery_consumed_ah` | scalar | A.h | no |
+| `battery_v1` | `battery_remaining` | scalar | 1 | no |
+| `battery_v1` | `battery_valid` | scalar | 1 | no |
+| `temperature_v1` | `temperature_k` | scalar | K | yes |
+| `temperature_v1` | `temperature_valid` | scalar | 1 | no |
+| `external_ahrs_v1` | `ahrs_quaternion` | [4] | 1 | yes |
+| `external_ahrs_v1` | `ahrs_rate_frd` | [3] | rad/s | no |
+| `external_ahrs_v1` | `ahrs_accel_frd` | [3] | m/s2 | no |
+| `external_ahrs_v1` | `ahrs_position_ned` | [3] | m | no |
+| `external_ahrs_v1` | `ahrs_velocity_ned` | [3] | m/s | no |
+| `external_ahrs_v1` | `ahrs_valid` | scalar | 1 | no |
+| `visual_odometry_v1` | `odometry_position_ned` | [3] | m | yes |
+| `visual_odometry_v1` | `odometry_velocity_ned` | [3] | m/s | no |
+| `visual_odometry_v1` | `odometry_quaternion` | [4] | 1 | no |
+| `visual_odometry_v1` | `odometry_valid` | scalar | 1 | no |
+| `beacon_v1` | `beacon_position_ned` | [3] | m | yes |
+| `beacon_v1` | `beacon_valid` | scalar | 1 | no |
+| `precision_landing_v1` | `landing_target_angle` | [2] | rad | yes |
+| `precision_landing_v1` | `landing_target_distance_m` | scalar | m | no |
+| `precision_landing_v1` | `landing_target_valid` | scalar | 1 | no |
 
 ### `payload_actuation_v1` and `fuel_v1`
 

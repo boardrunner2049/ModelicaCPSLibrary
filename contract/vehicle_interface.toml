@@ -262,6 +262,41 @@ required = false
 unit = "m/s"
 meaning = "Up-positive climb rate."
 
+[capabilities.barometer_timing_v1]
+summary = "When the barometer reading in barometer_v1 was acquired and delivered."
+[[capabilities.barometer_timing_v1.fields]]
+name = "baro_sample_time_s"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "s"
+meaning = "Simulation time at which the delivered reading was acquired; -1 before the first delivery. A continuous (B0) barometer reports the current time."
+[[capabilities.barometer_timing_v1.fields]]
+name = "baro_delivery_time_s"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "s"
+meaning = "Simulation time at which the delivered reading became available (acquisition plus latency); -1 before the first delivery."
+[[capabilities.barometer_timing_v1.fields]]
+name = "baro_sequence"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "1"
+meaning = "Delivered readings so far, an exact integer; a new reading was delivered exactly when it increments, so a consumer stepping coarser than the sample period can count missed readings. 0 before the first delivery, and always 0 for a continuous (B0) barometer."
+[[capabilities.barometer_timing_v1.fields]]
+name = "baro_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "1"
+meaning = "1 once a valid reading has been delivered, else 0; before it the barometer_v1 values are placeholders."
+
 [capabilities.external_wrench_v1]
 summary = "Host-supplied non-gravity wrench acting on the vehicle."
 [[capabilities.external_wrench_v1.fields]]
