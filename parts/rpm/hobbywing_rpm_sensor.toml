@@ -1,0 +1,15 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Hobbywing RPM Sensor for brushless motors"
+kind = "rpm"
+manufacturer = "Hobbywing"
+source = "User Manual of RPM Sensor, HW-SM824DUL-RPM Sensor-20120606, https://support.hobbywingdirect.com/hc/article_attachments/20213835763859"
+notes = "Phase-voltage (electrical) RPM sensor: leads A and B connect to any 2 motor wires (no polarity); detects voltage changes on the motor wires and outputs an RPM signal on the white wire. Works with different motor KV and PWM drive methods; typical use is Mikado V-Bar RPM input. RPM range is stated 'for 2 poles brushless motor' (i.e. electrical RPM); output pulses per mechanical revolution therefore scale with motor pole count, and the output waveform/pulses-per-rev is not specified. Supply: spec list says 3.5-8.4 V (1-2S LiPo) while wiring text says red wire to 3.3 V or 5 V."
+rpm_range = [1000, 300000]                    # for 2-pole brushless motor (Specifications item 6)
+motor_voltage_range_cells = [2, 14]           # LiPo, voltage range of motor wires (item 5)
+supply_voltage_v = [3.5, 8.4]                 # working voltage, 1-2S LiPo (item 3)
+current_ma = [1, 5]                           # (item 4)
+operating_temperature_c = [0, 50]             # (item 7)
+dimensions_mm = [23, 10, 2]                   # (item 1)
+mass_g = 6                                    # including input and output wires (item 2)
+interface = "3-wire: black GND, red supply, white RPM signal out"  # (How to Use)
+not_stated = ["max_frequency_hz (only rpm range given; 300000 rpm on a 2-pole motor = 5 kHz electrical)", "pulses_per_rev of output", "response_time_us", "output signal type/levels"]

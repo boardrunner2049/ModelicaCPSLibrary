@@ -1,0 +1,22 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "PixArt PMW3901MB-TXQT"
+kind = "optical_flow"
+manufacturer = "PixArt Imaging Inc."
+source = "PMW3901MB-TXQT Optical Motion Tracking Chip Product Datasheet, Version 1.00, 20 Mar 2017, https://wiki.bitcraze.io/_media/projects:crazyflie2:expansionboards:pot0189-pmw3901mb-txqt-ds-r1.00-200317_20170331160807_public.pdf"
+notes = "Table 3 (Recommended Operating Conditions) extracts with ambiguous min/typ/max columns for Working Range (80 mm), Effective Viewing Angle (42 deg), Illuminance (110 lux) and Speed (7.4 rad/s); values recorded without asserting the column. The 110 lux row is annotated 'Tested under florescent light on crimson carpet, light grey vinyl & light grey cement surfaces.' Page 1 states working range 80 mm to infinity. PixArt does not guarantee performance beyond recommended operating limits. Requires lens assembly LN03-ZSZ. Public datasheet does not give frame rate or pixel array size."
+fov_deg = 42                                  # effective viewing angle VA (Table 3, p8)
+working_range_m = [0.08, inf]               # 80 mm to infinity (Key Parameters p1; Table 3)
+min_height_m = 0.08                           # working range lower bound Z = 80 mm (Table 3)
+max_speed_rad_s = 7.4                         # Speed S (Table 3, p8)
+illuminance_lux = 110                         # Table 3 test condition row (see notes)
+motion_data_bits = 16                         # 16-bit motion data registers (p1)
+supply_voltage_v = [1.8, 2.1]                 # VDD; VDDIO 1.8-3.6 V (p1, Table 3); typ 2.0 V
+vddio_v = [1.8, 3.6]                          # (Table 3)
+current_ma = 9                                # IDD_RUN average, run mode (Table 4, p9)
+current_power_down_ua = 12                    # IPD (Table 4)
+motion_delay_after_reset_ms = 50              # tMOT-RST min (Table 5, p10)
+interface = "4-wire SPI @ 2 MHz max"          # (p1, Table 3)
+operating_temperature_c = [0, 40]             # (Table 3)
+storage_temperature_c = [-40, 85]             # (Table 2)
+package_dimensions_mm = [6, 6, 2.28]          # 28-pin COB with lens assembly (p1)
+not_stated = ["frame_rate_hz", "resolution (pixels)", "update_rate_hz", "max speed in m/s"]

@@ -1,0 +1,27 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "TE Connectivity MS4525DO-DS5AI001DP"
+kind = "airspeed"
+manufacturer = "TE Connectivity (Measurement Specialties)"
+source = "MS4525DO datasheet, SENSOR SOLUTIONS /// MS4525DO 07/2023 (17 pages), mirror https://file1.elecfans.com/web2/M00/C9/5F/wKgaomYch8OAEfRKABRHVGwga68328.pdf (te.com DocumentDelivery blocked automated download); ordering code decoded from Ordering Information p17"
+notes = "Part code 4525DO-DS5AI001DP decodes (p17) as: DS dual side port, 5 = 5.0 VDC supply, A = output type 10% to 90%, I = I2C address 0x28, 001 = 1 psi, D = differential, P = thru-hole. For a differential 1 psi part the range is -1..+1 psi; the Pa values below are unit conversions of the stated psi range (1 psi = 6894.757 Pa), not datasheet numbers. TEB includes accuracy, thermal errors over compensated range, span/offset calibration tolerances; valid only at calibrated supply voltage. Accuracy is max deviation from BFSL at 25 C (nonlinearity, hysteresis, non-repeatability). Output is not ratiometric to supply. Datasheet gives an Extended Temperature Multiplier chart for errors outside -10..85 C (graph only). A TE product-page PDF for this exact part number (resources.ampheo.com) erroneously lists '300 psi' (the overpressure figure) as the range."
+pressure_range_psi = [-1.0, 1.0]              # 001 range, differential (Standard Ranges p2; Ordering p17)
+pressure_range_pa = [-6894.757, 6894.757]     # conversion of +/-1 psi (not a datasheet figure)
+output_counts_at_pmin = 1638                  # Type A: 10% of 16383 counts = PMIN (Transfer Function p5)
+output_counts_at_pmax = 14746                 # Type A: 90% = PMAX (p5)
+accuracy_percent_span = 0.25                  # +/-0.25 %span, BFSL at 25 C (Performance Specs p4, note 2)
+total_error_band_percent_span = 1.0           # +/-1 %span over compensated range (p4, notes 3,7)
+long_term_stability_percent_span = 0.5        # offset & span, typ (p4)
+resolution_bits = 14                          # pressure output (p1)
+temperature_resolution_bits = 11              # temperature output (p1)
+temperature_output_range_c = [-50, 150]       # 0 counts = -50 C, 2047 counts = 150 C (Temperature Output vs Counts, p5)
+update_time_ms = 0.5                          # typ (p4, note 6)
+startup_time_ms = 8.4                         # start time to data ready after POR, max (p4)
+compensated_temperature_range_c = [-10, 85]   # (p4)
+operating_temperature_range_c = [-25, 105]    # (p4)
+storage_temperature_range_c = [-40, 125]      # (Absolute Max Ratings p3)
+supply_voltage_v = 5.0                        # '5' supply option (p17); abs max 2.7-5.5 V (p3)
+overpressure_psi = 300                        # common-mode / both ports, not to exceed (p3)
+burst_pressure_psi = 20                       # range 001, DS package, port 1 (Table 1 p3)
+interface = "I2C, address 0x28"               # interface type I (p17)
+mass_g = [1.43, 2.02]                         # min..max weight across package styles (p4)
+not_stated = ["noise_pa (rms)", "pressure_resolution_pa as a figure", "temperature_accuracy_c", "supply current (only 3 mA output-current abs max and ~0.6 uA low-power standby)", "response_time_ms beyond update time"]

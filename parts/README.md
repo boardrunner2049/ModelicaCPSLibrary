@@ -109,3 +109,29 @@ reads are the ones in the files here.
 | imu | TDK InvenSense ICM-42688-P, ICM-20602; Bosch BMI088 |
 | barometer | Bosch BMP388, TE MS5611-01BA03, Infineon DPS310 |
 | magnetometer | iSentek IST8310, PNI RM3100, QST QMC5883L |
+| rangefinder | Benewake TFmini Plus, TF02-Pro; LightWare SF11/C; Garmin LIDAR-Lite v3HP; MaxBotix MB1242 |
+| airspeed | TE MS4525DO; Sensirion SDP33; Amphenol All Sensors DLVR-L10D |
+| optical_flow | PixArt PMW3901, PAW3902; Matek 3901-L0X; ARK Flow; Cheerson CX-OF |
+| rpm | Hobbywing RPM sensor; Honeywell SS41F; Melexis US5881 |
+| power_module | Holybro PM02 V3, PM02D; Mauch HS-200-HV |
+| temperature | TE TSYS01; Microchip MCP9600; Sensirion SHT31 |
+| external_ahrs | VectorNav VN-100, VN-300; MicroStrain 3DM-GX5-25, 3DM-GQ7; Inertial Labs INS-U |
+| visual_odometry | Intel RealSense T265; ModalAI VOXL 2 VIO; Luxonis OAK-D |
+| beacon | Marvelmind Super-MP-3D; Nooploop LinkTrack P-A |
+| precision_landing | IR-LOCK sensor + MarkOne; OpenMV Cam H7 R2 |
+
+## Peripheral parts
+
+The peripherals (`[peripherals.KIND] part = ...`, `Systems/Peripherals`) are
+converted by `tools/fire-compose/src/peripherals.rs`: rates to sample periods
+(at most 100 Hz, the drivers' polling), ± accuracies to 2-sigma noise or
+drift, 1-sigma repeatability to noise, resolutions and LSBs to quanta,
+ranges to limits, noise densities over the output bandwidth. As for the
+sensors, every figure the level cannot represent and every figure the
+datasheet does not state is reported:
+
+```sh
+tools/fire-compose/target/debug/fire-compose part rangefinder tfmini
+tools/fire-compose/target/debug/fire-compose part external_ahrs vn_300 --json
+```
+

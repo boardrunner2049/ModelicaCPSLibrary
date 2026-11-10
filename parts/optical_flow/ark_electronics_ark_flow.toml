@@ -1,0 +1,25 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "ARK Electronics ARK Flow"
+kind = "optical_flow"
+manufacturer = "ARK Electronics"
+source = "ARK Flow hardware docs https://docs.arkelectron.com/sensor/ark-flow/hardware ; PX4 user guide ARK Flow page https://docs.px4.io/main/en/dronecan/ark_flow.html"
+notes = "DroneCAN module: PixArt PAW3902 flow sensor + Broadcom AFBR-S50LV85D ToF distance sensor + IMU (ICM-42688-P rev2+, BMI088 rev1), 40 mW IR LED illumination. The 12.4 x 6.2 deg / 32 pixel FoV belongs to the AFBR-S50 distance sensor (PX4 page lists it under the distance sensor). Update rates are the PX4 page's 'should arrive at' values for the DroneCAN messages. Max range depends on surface texture/reflectivity and ambient light."
+flow_sensor = "PixArt PAW3902"
+range_sensor = "Broadcom AFBR-S50LV85D"
+working_range_m = [0.08, inf]               # flow sensor, 80 mm to infinity (ARK hardware docs)
+min_height_m = 0.08                           # (ARK hardware docs)
+max_speed_rad_s = 7.4                         # (ARK docs; PX4 page)
+illuminance_min_lux = 9                       # >9 lux (ARK docs)
+update_rate_hz = 100                          # flow data (PX4 page)
+range_update_rate_hz = 40                     # distance data (PX4 page)
+range_sensor_max_m = 30                       # typical (ARK docs; PX4 page)
+range_sensor_fov_deg = [12.4, 6.2]            # 32 pixels (PX4 page)
+range_sensor_wavelength_nm = 850              # (PX4 page)
+range_sensor_ambient_light_max_klux = 200     # (PX4 page)
+ir_led_power_mw = 40                          # (PX4 page)
+supply_voltage_v = 5                          # (ARK hardware docs)
+current_ma = 71                               # average; 76 mA max (ARK hardware docs)
+interface = "DroneCAN, 2x 4-pin JST-GH CAN; 6-pin JST-SH debug"  # (ARK docs)
+dimensions_mm = [30, 30, 14]                  # (ARK docs)
+mass_g = 5                                    # (ARK hardware docs)
+not_stated = ["flow fov_deg (module docs)", "frame_rate_hz of flow sensor", "resolution (pixels) of flow sensor"]

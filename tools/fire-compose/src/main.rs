@@ -198,6 +198,15 @@ fn run() -> Result<()> {
                 }
                 return Ok(());
             }
+            if fire_compose::peripherals::kind(&kind).is_some() {
+                let report = fire_compose::peripherals::report(&kind, &part, level.as_deref(), &explicit)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                } else {
+                    print!("{}", parts::summary(&report));
+                }
+                return Ok(());
+            }
             let mut sel = toml::map::Map::new();
             sel.insert("part".into(), toml::Value::String(part));
             for (k, v) in [("level", level), ("mode", mode), ("tolerances", tolerances)] {

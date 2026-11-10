@@ -1,0 +1,19 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "MaxBotix MB1242 I2CXL-MaxSonar-EZ4"
+kind = "rangefinder"
+manufacturer = "MaxBotix Inc."
+source = "I2CXL-MaxSonar-EZ Series datasheet (MB1202/1212/1222/1232/1242), PD11848k, Copyright 2005-2021, mirror https://cdn.robotshop.com/media/m/max/rb-max-31/pdf/i2cxl-maxsonar-ez-datasheet.pdf (maxbotix.com rate-limited automated access)"
+notes = "Ultrasonic sonar. Detects objects from 0 cm (objects 0-1 mm may not be detected) but reports range from 20 cm for MB1242; large targets closer than 20 cm typically range as 20 cm. MaxBotix does not guarantee reliability closer than 20 cm. No target size compensation (large targets may read closer, small targets farther). MB1242 = EZ4: highest noise tolerance, narrowest beam, rejects small clutter; intended for large targets. Beam pattern given only as graphics. Datasheet recommends 100 ms between readings (10 Hz); read rate 40 Hz possible for up-close objects, 15 Hz at full range. Minimum operating voltage vs temperature is a graph (p6)."
+range_min_m = 0.20                            # minimum reported distance, MB1242 (p4-5)
+range_max_m = 7.65                            # 765 cm (p1)
+resolution_m = 0.01                           # 1 cm (p1)
+update_rate_hz = 10                           # recommended 100 ms between readings (p1 footnote 4; command table p3)
+update_rate_max_hz = 40                       # 'up to every 25mS (40Hz rate) for up-close objects' (p1)
+update_rate_full_range_hz = 15                # full range (p1)
+ultrasonic_frequency_khz = 42                 # (p1)
+supply_voltage_v = [3.0, 5.5]                 # (p1-2)
+current_ma = 2.7                              # average at 3.3 V (50 mA peak); 4.4 mA average at 5 V (100 mA peak) (Pin Out, p2)
+current_peak_ma = 100                         # at 5 V, during sonar transmit (p2)
+interface = "I2C, default address 224 (8-bit) / 112 (7-bit); up to 400 kHz with clock stretching, 50 kHz without"  # (p2)
+operating_temperature_c = [0, 65]             # (p1)
+not_stated = ["accuracy_m / accuracy bands", "beam divergence / fov_deg as a number (graphs only)", "mass_g (not in extracted text)", "range at specified target reflectivity (target-size dependent)"]

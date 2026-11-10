@@ -1,0 +1,24 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Microchip MCP9600"
+kind = "temperature"
+manufacturer = "Microchip Technology"
+source = "MCP960X/L0X/RL0X Thermocouple EMF to Temperature Converter datasheet, DS20005426G (2015-2021), https://ww1.microchip.com/downloads/en/DeviceDoc/MCP960X-Data-Sheet-20005426.pdf"
+notes = "Thermocouple amplifier with cold-junction compensation; supports types K, J, T, N, S, E, B, R. Hot-junction accuracy TH = TC + Tdelta, VDD = 3.3 V. Tdelta accuracy is vs NIST ITS-90 with TC = 0 C. Measured range depends on thermocouple type (type K Tdelta -200..+1372 C). Sampling time ('Sampling Rate' tCONV in the table, units ms) depends on ADC resolution."
+accuracy_c = 1.5                              # hot junction max +/-1.5 (typ +/-0.5), TA 0..85 C (DC Characteristics p3)
+accuracy_wide_c = 3.0                         # hot junction max +/-3.0 (typ +/-1), TA -40..125 C (p3)
+cold_junction_accuracy_c = 1.0                # max +/-1.0 (typ 0.5), TA 0..85 C; +/-2.0 over -40..125 C (p3)
+delta_accuracy_c = 0.5                        # junction delta max +/-0.5 (typ 0.25), type K, TA 0..85 C (p3)
+resolution_c = 0.0625                         # TC and TH, max resolution (p5)
+conversion_time_ms = [[18, 320], [16, 80], [14, 20], [12, 5]]  # [adc_bits, typ ms] at TA 25 C (p5)
+calculation_time_ms = 12                      # temperature calculation time typ (p5)
+range_c = [-200, 1372]                        # type K hot-junction Tdelta range (p3)
+ambient_range_c = [-40, 125]                  # device operating ambient (p3)
+voltage_resolution_uv = 2                     # 18-bit (p5)
+input_range_mv = [-250, 250]                  # differential ADC input range (p5)
+offset_error_uv = 2                           # typ (p5)
+gain_error_percent_fs = 0.04                  # max, TA 0..85 C (MCP9600/01) (p5)
+supply_voltage_v = [2.7, 5.5]                 # (p1)
+current_ua = 300                              # typ operating (p1)
+shutdown_current_ua = 2                       # typ (p1)
+interface = "I2C compatible, 100 kHz, up to 8 devices per bus"  # (p1)
+not_stated = ["response time (depends on thermocouple)", "mass_g"]

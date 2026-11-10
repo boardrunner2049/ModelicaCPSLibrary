@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "PixArt PAW3902JF-TXQT"
+kind = "optical_flow"
+manufacturer = "PixArt Imaging Inc."
+source = "EPS Global (PixArt distributor) product listing, https://www.epsglobal.com/products/semiconductors/sensing-and-haptics/optical-motion-tracking/paw3902jf-txqt ; corroborated by ARK Flow hardware docs https://docs.arkelectron.com/sensor/ark-flow/hardware"
+notes = "PixArt's PAW3902 datasheet is only available on request (not public); figures are from the distributor listing. A search snippet suggested the 7.4 rad/s / >9 lux figures might belong to the PAW3903E1 entry on the EPS category page, but the PAW3902JF-TXQT product page itself and ARK's PAW3902 docs both state 7.4 rad/s and >9 lux. ARK/PX4 docs also quote 'working range from 80mm up to 30m' in one place and '80 mm to infinity' in another."
+fov_deg = 42                                  # view angle (EPS listing)
+working_range_m = [0.08, inf]               # 80 mm up to infinity (EPS listing; ARK hardware docs)
+min_height_m = 0.08                           # (EPS listing)
+max_speed_rad_s = 7.4                         # (EPS listing; ARK docs)
+illuminance_min_lux = 9                       # low-light tracking >9 lux (EPS listing; ARK docs)
+current_ma = 6                                # run mode (EPS listing)
+package = "28-pin QFN, 6 x 6 x 3.08 mm"       # (EPS listing)
+not_stated = ["frame_rate_hz", "resolution (pixels)", "supply_voltage_v", "interface", "update_rate_hz"]

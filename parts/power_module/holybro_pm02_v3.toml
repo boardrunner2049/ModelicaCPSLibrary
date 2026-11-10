@@ -1,0 +1,19 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Holybro PM02 V3 (12S analog power module)"
+kind = "power_module"
+manufacturer = "Holybro"
+source = "Holybro docs: Power Module Comparison https://docs.holybro.com/power-module-and-pdb/power-module-comparison and Analog Power Module Setup https://docs.holybro.com/power-module-and-pdb/power-module/analog-power-module-setup ; PX4 user guide 'Holybro PM02 (V3) Power Module' https://docs.px4.io/main/en/power_module/holybro_pm02.html"
+notes = "No PDF datasheet published; figures from manufacturer docs. Burst rating conflicts: Holybro comparison table 60 A cont / 100 A burst (PCB rating); PX4 page 'Max current 120A (<60 Sec)'. Voltage divider/A-per-V apply to all Holybro analog PMs except PM08. PX4 page: 'Voltage and current measurement configured for 3.3V ADC'. Holybro product page (holybro.com) was rate-limited and could not be read."
+input_voltage_range_cells = [2, 12]           # 2-12S (comparison table)
+max_current_a = 60                            # PCB continuous rating (comparison table; PX4 'rated current 60A')
+burst_current_a = 100                         # PCB burst rating (comparison table); PX4 page says 120 A (<60 s)
+max_current_sensing_a = 120                   # (comparison table; PX4 page)
+voltage_scale = 18.182                        # voltage divider (PX4) = BATT_VOLT_MULT (ArduPilot) (Analog PM Setup)
+current_scale = 36.364                        # amps per volt (PX4) = BATT_AMP_PERVLT (ArduPilot) (Analog PM Setup)
+adc_reference_v = 3.3                         # 'configured for 3.3V ADC' (PX4 page)
+output_5v_v = 5.2                             # switching regulator (comparison table)
+output_5v_a = 3                               # max (comparison table)
+interface = "Analog; XT60 and 6-pin GHR 1.25 mm"  # (comparison table)
+dimensions_mm = [25, 25, 10]                  # (comparison table)
+mass_g = 20                                   # (comparison table; PX4 page)
+not_stated = ["input_voltage_range_v (only cell count)", "current_accuracy_percent", "voltage_accuracy_percent", "current sense element / zero-current offset voltage"]

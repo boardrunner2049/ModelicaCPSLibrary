@@ -1,0 +1,19 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Honeywell SS41F (bipolar Hall-effect latch)"
+kind = "rpm"
+manufacturer = "Honeywell Sensing and Control"
+source = "SS41F/SS41G Series Bipolar Hall-Effect Digital Position Sensor ICs, 005889-2-EN, (c) 2010, mirror https://www.rcscomponents.kiev.ua/datasheets/honeywell-ss41f-datasheet.pdf (Honeywell/Mouser copies blocked automated download)"
+notes = "Bipolar sensor for ring magnets with alternating N/S poles; Honeywell lists 'Speed and RPM sensing' and 'Tachometer, counter pickup' as applications. Table 1 = SS41F at Vs 4.5-24 V, 20 mA load, 25 C. SS41G (Table 2) is tested at 25 C and 125 C: Bop max 250 G and Brp min -250 G over -40..150 C. Rise/fall time units: the micro sign is lost in text extraction ('s'); values are microseconds (consistent with 10 us power-up settling note). Output leakage unit likewise uA. May power up in either state inside the differential zone; allow 10 us after supply reaches rated value. Pulses per revolution depend on the ring-magnet pole count (application-defined)."
+operate_point_gauss = [40, 150]               # Bop typ 40, max 150 at 25 C (Table 1)
+release_point_gauss = [-150, -40]             # Brp min -150, typ -40 at 25 C (Table 1)
+operate_point_mt = [4.0, 15.0]                # same as above, 1 mT = 10 G (unit conversion)
+release_point_mt = [-15.0, -4.0]              # unit conversion
+differential_min_gauss = 40                   # (Table 1)
+rise_time_us = 0.5                            # typ; max 1.5, Vs = 4.5 V (Table 1, see notes on unit)
+fall_time_us = 0.2                            # typ; max 1.5 (Table 1)
+power_up_settle_us = 10                       # recommended (Notice, p2)
+supply_voltage_v = [4.5, 24.0]                # (Table 1); reverse-polarity protected, abs max +/-28 V (Table 3)
+current_ma = 6.8                              # typ; max 10.0 (Table 1)
+output = "open-collector current sinking, 20 mA max; Vsat 0.4 V max at 15 mA"  # (Table 1)
+operating_temperature_c = [-40, 150]          # (Table 1)
+not_stated = ["max_frequency_hz", "response_time_us (other than rise/fall)", "pulses_per_rev (application dependent)"]

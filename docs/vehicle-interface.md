@@ -176,6 +176,19 @@ points. The multirotor export wires them to the plant's `externalForce_b` and
 geometry and two-way contact are not part of version 1, and each physical
 effect needs exactly one owner (the model or the host), never both.
 
+### Peripherals: `rangefinder_v1` ... `precision_landing_v1`
+
+Optional readings of the devices a configuration adds under
+`[peripherals.KIND]` (`Systems/Peripherals`, its README): `rangefinder_v1`
+(`rangefinder_distance_m` as the device reports it), `airspeed_v1`
+(differential pressure, air temperature), `optical_flow_v1` (flow and body
+rates), `rpm_v1` (one element per shaft), `battery_v1` (measured voltage and
+current; consumed charge and state of charge), `temperature_v1`,
+`external_ahrs_v1` (quaternion, rates, specific force, NED position and
+velocity), `visual_odometry_v1`, `beacon_v1` and `precision_landing_v1`
+(angles and distance to the target). Each has a `*_valid` field, 1 when a
+sample has been delivered and is valid. Units and frames are in the contract.
+
 ### Legacy profile `fastdyn_legacy`
 
 An FMU without the marker is refused unless the host **explicitly** selects
@@ -462,9 +475,8 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   aileron/elevator/throttle/rudder plane; remap outputs in the firmware, e.g.
   ArduPilot `SERVOn_FUNCTION`) and their drives are fixed plant equations;
   skid-steer, elevon and V-tail variants are not modelled.
-- GNSS G2 (`GNSS.ObservableSensor`, needs satellite-state inputs) and the
-  range sensor are in the library but not selectable in a vehicle; a range
-  sensor needs a contract capability. The fixed-wing propeller has one level
+- GNSS G2 (`GNSS.ObservableSensor`, needs satellite-state inputs) is in the
+  library but not selectable in a vehicle. The fixed-wing propeller has one level
   (thrust lag); the multirotor rotor one (quadratic blade). Sensor and
   actuator parameters are illustrative, not identified devices. Their parameters are representative (the plane's aerodynamics are
   the published last_letter Skywalker 2013 coefficients), not identified from

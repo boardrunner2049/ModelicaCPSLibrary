@@ -1,0 +1,18 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Nooploop LinkTrack P-A (UWB)"
+kind = "beacon"
+manufacturer = "Nooploop (Shenzhen Nooploop Technology)"
+source = "LinkTrack Datasheet V2.3 (Chinese), (c) 2023 Nooploop, https://ftp.nooploop.com/downloads/linktrack/LinkTrack_Datasheet_V2.3_zh.pdf (Key Features p5; Table 8 'Typical Specifications' p19). No English datasheet found on nooploop.com download page."
+notes = "UWB TWR positioning (LP mode: tag/anchor/console). Accuracy columns (Table 8) per axis set: 1D '10cm@accuracy, 5cm@std dev'; 2D '10cm@accuracy, 5cm@R99'; 3D '30cm@accuracy, 15cm@std dev'. Table note: data from Chapter 4 experiments; 3D accuracy refers to the Z axis, 2D accuracy to X/Y axes. Max comm. range is 'measured in open environment', recommended range derated for occlusion/reflection. Values shared across LTP-A/AS2/AC (120 m max, 40 m recommended); LTP-AS: 80/25 m; LTP-B: 500/300 m, 34.3 g; LTPS (older 'PS'): 350/150 m, 3.9 g. 'DT' data-transfer mode latency <0.5 ms is for the radio link, not position output. Capacity example: 40 tags/8 anchors/1 console @50 Hz (p5)."
+position_accuracy_2d_m = 0.10               # 2D (X/Y) typical, "10cm@accuracy" (precision 5 cm @R99), Table 8 (p19); p5 "typical 1D/2D positioning accuracy 10cm"
+position_accuracy_3d_z_m = 0.30             # 3D: Z axis, "30cm@accuracy" (15 cm std dev), Table 8 (p19); p5 "typical 3rd-dimension accuracy 30cm"
+ranging_accuracy_m = 0.10                   # DR_MODE0 typical ranging accuracy 10 cm (p5)
+update_rate_hz = 200                        # positioning/ranging refresh "up to 200Hz" (p5)
+max_range_m = 120                           # LTP-A typical max communication distance, open environment, Table 8 (p19); p5 "120m@LTP-AC, 500m@LTP-B"
+recommended_range_m = 40                    # LTP-A recommended application distance, Table 8 (p19)
+mass_g = 34                                 # LTP-A body; external antenna 9.2 g, Table 8 (p19)
+dimensions_mm = [46.3, 56, 12]              # LTP-A body, Table 8 (p19)
+power_w = 1.23                              # LTP-A, Table 8 (p19)
+supply_voltage_v = [3.6, 5.5]               # Table 8 (p19)
+operating_temp_c = [-20, 85]                # Table 8 (p19)
+not_stated = ["latency_ms (positioning output)", "2D/3D accuracy confidence definition beyond the labels above"]

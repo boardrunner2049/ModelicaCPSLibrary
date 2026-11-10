@@ -1,0 +1,26 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Sensirion SHT31-DIS"
+kind = "temperature"
+manufacturer = "Sensirion AG"
+source = "Datasheet SHT3x-DIS, Version 7, December 2022, https://sensirion.com/media/documents/213E6A3B/63A5A569/Datasheet_SHT3x_DIS.pdf"
+notes = "Humidity + temperature sensor. Max accuracy tolerances given only as graphs (Figure 3 RH, Figure 9 T). Repeatability is 3 sigma of consecutive measurements (a measure of noise). Temperature response time depends strongly on design-in. Timing values from Table 4 (2.4-5.5 V); at 2.15-<2.4 V max durations are 4.5/6.5/15.5 ms (Table 5). Periodic mode supports 0.5, 1, 2, 4, 10 measurements per second."
+accuracy_c = 0.2                              # typ, 0..90 C (Table 2, p2)
+resolution_c = 0.01                           # typ (Table 2)
+repeatability_c = [0.15, 0.08, 0.04]          # typ 3-sigma for low / medium / high repeatability (Table 2)
+conversion_time_ms = 12.5                     # high repeatability typ, max 15 (Table 4, p4)
+conversion_time_modes_ms = [[2.5, 4], [4.5, 6], [12.5, 15]]  # [typ, max] for low / medium / high repeatability (Table 4)
+range_c = [-40, 125]                          # specified range (Table 2)
+response_time_s = 2                           # tau63 '>2 s' (Table 2, note 8)
+long_term_drift_c_per_year = 0.03             # max '<0.03' (Table 2)
+humidity_accuracy_percent_rh = 2              # typ (Table 1)
+humidity_resolution_percent_rh = 0.01         # (Table 1)
+humidity_response_time_s = 8                  # tau63 at 25 C, 1 m/s airflow (Table 1)
+humidity_range_percent_rh = [0, 100]          # (Table 1)
+update_rate_max_hz = 10                       # periodic mode 10 mps (Sec 4.5 command table)
+supply_voltage_v = [2.15, 5.5]                # (p1)
+current_measuring_ua = 600                    # typ; max 1500 (Table 3)
+current_average_ua = 1.7                      # 1 measurement/s, lowest repeatability, single shot (Table 3)
+power_up_time_ms = 1                          # max; typ 0.5 (Table 4)
+interface = "I2C up to 1 MHz, two selectable addresses"  # (p1)
+package = "8-pin DFN 2.5 x 2.5 x 0.9 mm"      # (p1)
+not_stated = ["accuracy_c max as a number (graph only)", "mass_g"]

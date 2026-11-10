@@ -1,0 +1,33 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Sensirion SDP33"
+kind = "airspeed"
+manufacturer = "Sensirion AG"
+source = "Preliminary Datasheet SDP33 Digital Differential Pressure Sensor, Version 0.2, November 2022, https://sensirion.com/file/datasheet_sdp33"
+notes = "Datasheet is labelled Preliminary. All specs at 25 C, VDD = 3.3 V, absolute pressure 966 mbar unless noted. Zero-point and span accuracy both include repeatability; total accuracy = zero-point + span. Temperature reading is bulk-silicon temperature, not gas temperature. SDP33 supply min is 3.0 V (SDP31/SDP32 in SDP3x-Digital v1.1 datasheet: 2.7 V). For SDP31 (+/-500 Pa) and SDP32 (+/-125 Pa) see SDP3x-Digital datasheet v1.1 Nov 2022 (https://sensirion.com/file/datasheet_sdp3x-d)."
+pressure_range_pa = [-1500, 1500]             # (Sec 2.1 p2)
+zero_point_accuracy_pa = 0.2                  # (Sec 2.1)
+span_accuracy_percent_reading = [[-500, 500, 3.0], [-1500, 1500, 6.0]]  # [from_pa, to_pa, % of reading] (Sec 2.1)
+zero_point_repeatability_pa = 0.1             # (Sec 2.1)
+span_repeatability_percent_reading = [[-500, 500, 0.5], [-1500, 1500, 3.0]]  # [from_pa, to_pa, % of reading] (Sec 2.1)
+span_shift_percent_reading_per_10c = 1.0      # < 1% of reading per 10 C (Sec 2.1)
+offset_stability_pa_per_year = 0.03           # < 0.03 Pa/year (Sec 2.1)
+response_time_ms = 3                          # flow step response tau63 < 3 ms (Sec 2.1)
+resolution_bits = 16                          # differential pressure (Sec 2.1)
+pressure_scale_factor_per_pa = 20             # output count / 20 = Pa (Sec 6.5.1 Scale Factors)
+update_rate_hz = 2000                         # continuous mode typ; min 1800, max 2200 (Sec 3.2)
+temperature_update_rate_min_hz = 112.5        # continuous mode, at least every 16 pressure values (Sec 3.2)
+triggered_measurement_time_ms = 45            # typ; 40-50 (Sec 3.2)
+power_up_time_ms = 25                         # max (Sec 3.2)
+temperature_range_c = [-40, 85]               # measurement / calibrated range (Sec 2.1, 2.2)
+temperature_accuracy_c = 2                    # -10..+60 C; 3 C over -40..+85 C (Sec 2.2)
+temperature_resolution_bits = 16              # (Sec 2.2)
+temperature_repeatability_c = 0.1             # (Sec 2.2)
+temperature_scale_factor_per_c = 200          # (Sec 6.5.1)
+supply_voltage_v = [3.0, 5.5]                 # typ 3.3 V (Sec 3.1)
+current_ma = 3.8                              # measuring, typ; max 5.5 mA (Sec 3.1)
+current_idle_ma = 0.05                        # typ; max 0.7 (Sec 3.1)
+overpressure_bar = 1                          # allowable during operation (Sec 3.3)
+burst_pressure_bar = 3                        # rated, min (Sec 3.3)
+interface = "I2C, default address 0x21 (0x22/0x23 via ADDR resistor), SCL 400 kHz typ / 1 MHz max"  # (Sec 3.2, 4.3)
+mass_g = 0.2                                  # max (Sec 3.3)
+not_stated = ["pressure_resolution_pa as a stated figure (1 count = 1/20 Pa from scale factor)", "noise_pa (rms)", "total_error_band_percent_fss (accuracy given as zero-point + % of reading instead)"]

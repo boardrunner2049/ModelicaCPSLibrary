@@ -1,0 +1,90 @@
+# The quad (configs/quad.toml) with every peripheral sensor at its sampled
+# level: Tier A of ArduPilot's optional hardware (Systems/Peripherals).
+schema_version = 3
+model_name = "QuadPeripherals"
+
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12] # Feet start 2 cm above the ground.
+q_start = [0.7071067811865476, 0.0, 0.0, 0.7071067811865476]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"
+
+# Shared VirtualIO PWM calibration for both P0 and P1.
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0
+
+[peripherals.rangefinder]
+level = "L1"
+position = [0.0, 0.0, 0.05]
+orientation = "down"
+maxRange = 12.0
+noiseStd = 0.02
+
+[peripherals.airspeed]
+level = "A1"
+position = [0.15, 0.0, 0.0]
+pressureNoiseStd = 1.0
+
+[peripherals.optical_flow]
+level = "F1"
+position = [0.0, 0.0, 0.05]
+flowNoiseStd = 0.01
+
+[peripherals.rpm]
+level = "R1"
+pulsesPerRevolution = 7
+
+[peripherals.power_module]
+level = "W1"
+battery = { cells = 4, capacity = 5.2, resistance = 0.02 }
+currentNoiseStd = 0.05
+
+[peripherals.temperature]
+level = "T1"
+
+[peripherals.external_ahrs]
+level = "E1"
+attitudeDriftStd = 0.005
+
+[peripherals.visual_odometry]
+level = "V1"
+driftFraction = 0.01
+
+[peripherals.beacon]
+level = "U1"
+horizontalNoiseStd = 0.02
+
+[peripherals.precision_landing]
+level = "K1"
+target = [0.0, 0.0, 0.0]

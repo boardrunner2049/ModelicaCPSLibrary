@@ -163,6 +163,32 @@ void CPVehicle::start()
              model_mag ? ", magnetometer" : "", model_gnss ? ", GNSS" : "",
              model_baro ? ", barometer" : "",
              field_set ? "set from SITL's WMM at home" : "the model's own");
+    has_rangefinder = cpv_has_capability(vehicle, "rangefinder_v1");
+    has_airspeed = cpv_has_capability(vehicle, "airspeed_v1");
+    has_flow = cpv_has_capability(vehicle, "optical_flow_v1");
+    has_rpm = cpv_has_capability(vehicle, "rpm_v1");
+    has_battery = cpv_has_capability(vehicle, "battery_v1");
+    has_temperature = cpv_has_capability(vehicle, "temperature_v1");
+    has_ahrs = cpv_has_capability(vehicle, "external_ahrs_v1");
+    has_odometry = cpv_has_capability(vehicle, "visual_odometry_v1");
+    has_beacon = cpv_has_capability(vehicle, "beacon_v1");
+    has_precland = cpv_has_capability(vehicle, "precision_landing_v1");
+    if (has_rpm) {
+        double rpm_values[max_channels];
+        for (size_t n = 1; n <= max_channels && rpm_count == 0; n++) {
+            if (cpv_get_field(vehicle, "rpm", rpm_values, n) == CPV_OK) {
+                rpm_count = n;
+            }
+        }
+        // AP_RPM_SITL reads the shafts of the motor mask
+        motor_mask = rpm_count >= 32 ? 0xFFFFFFFFU : (1U << rpm_count) - 1;
+    }
+    ::printf("cpvehicle: peripherals from the model:%s%s%s%s%s%s%s%s%s%s\n",
+             has_rangefinder ? " rangefinder" : "", has_airspeed ? " airspeed" : "",
+             has_flow ? " optical-flow" : "", has_rpm ? " rpm" : "",
+             has_battery ? " battery" : "", has_temperature ? " temperature" : "",
+             has_ahrs ? " external-AHRS" : "", has_odometry ? " visual-odometry" : "",
+             has_beacon ? " beacon" : "", has_precland ? " precision-landing" : "");
     if (!is_zero(sitl->wind_speed)) {
         ::printf("cpvehicle: SIM_WIND_SPD is ignored; the model provides no wind input\n");
     }
@@ -232,6 +258,135 @@ void CPVehicle::update(const struct sitl_input &input)
     time_advance();
     update_mag_field_bf();
     read_model_sensors();
+    read_peripherals();
+}
+
+void CPVehicle::field(const char *name, double *values, size_t count) const
+{
+    const cpv_status_t status = cpv_get_field(vehicle, name, values, count);
+    if (status >= CPV_UNSUPPORTED) {
+        fail(name, status);
+    }
+}
+
+/*
+  The model's peripherals replace SITL's simulation of those devices: the
+  rangefinder, RPM and battery through the Aircraft's own outputs, the others
+  through model_sensors, which the SITL drivers read (hooks.patch).
+ */
+void CPVehicle::read_peripherals()
+{
+    double v[16];
+    auto &m = model_sensors;
+    // NED from the model's origin (home) to a location
+    auto located = [this](const double *ned) {
+        Location loc = home;
+        loc.offset(ned[0], ned[1]);
+        loc.alt = home.alt - int32_t(ned[2] * 100.0);
+        return loc;
+    };
+    if (has_rangefinder) {
+        // The device's report: out of range reads as such, no return as no data.
+        field("rangefinder_distance_m", v, 1);
+        rangefinder_m[0] = v[0] >= 0 ? float(v[0]) : nanf("");
+    }
+    if (has_rpm) {
+        field("rpm", v, MIN(rpm_count, ARRAY_SIZE(v)));
+        for (size_t i = 0; i < rpm_count && i < ARRAY_SIZE(v); i++) {
+            rpm[i] = v[i];
+        }
+    }
+    if (has_battery) {
+        field("battery_voltage_v", v, 1);
+        battery_voltage = v[0];
+        field("battery_current_a", v, 1);
+        battery_current = v[0];
+    }
+    if (has_airspeed) {
+        field("airspeed_differential_pressure_pa", v, 1);
+        m.airspeed_present = true;
+        m.airspeed_pressure_pa = v[0];
+    }
+    if (has_flow) {
+        double ok;
+        field("flow_valid", &ok, 1);
+        field("flow_rate_xy", v, 2);
+        field("flow_body_rate_xy", v + 2, 2);
+        m.flow_present = true;
+        m.flow_valid = ok > 0.5;
+        m.flow_rate = Vector2f(v[0], v[1]);
+        m.flow_body_rate = Vector2f(v[2], v[3]);
+    }
+    if (has_temperature) {
+        field("temperature_k", v, 1);
+        m.temperature_present = true;
+        m.temperature_c = v[0] - 273.15;
+    }
+    if (has_odometry) {
+        double ok;
+        field("odometry_valid", &ok, 1);
+        field("odometry_position_ned", v, 3);
+        field("odometry_velocity_ned", v + 3, 3);
+        field("odometry_quaternion", v + 6, 4);
+        m.vision_present = true;
+        m.vision_valid = ok > 0.5;
+        m.vision_location = located(v);
+        m.vision_position_ned = Vector3d(v[0], v[1], v[2]);
+        m.vision_velocity_ned = Vector3f(v[3], v[4], v[5]);
+        m.vision_attitude = Quaternion(v[6], v[7], v[8], v[9]);
+    }
+    if (has_beacon) {
+        double ok;
+        field("beacon_valid", &ok, 1);
+        field("beacon_position_ned", v, 3);
+        m.beacon_present = true;
+        m.beacon_valid = ok > 0.5;
+        m.beacon_location = located(v);
+    }
+    if (has_precland) {
+        double ok;
+        field("landing_target_valid", &ok, 1);
+        field("landing_target_angle", v, 2);
+        field("landing_target_distance_m", v + 2, 1);
+        m.precland_present = true;
+        m.precland_valid = ok > 0.5;
+        // A downward camera (PLND_ORIENT 25): its axes are the body's.
+        Vector3f los(tanf(v[0]), tanf(v[1]), 1.0f);
+        m.precland_los_body = los.normalized();
+        m.precland_distance_m = v[2];
+    }
+    if (has_ahrs) {
+        double ok;
+        field("ahrs_valid", &ok, 1);
+        field("ahrs_quaternion", v, 4);
+        field("ahrs_rate_frd", v + 4, 3);
+        field("ahrs_accel_frd", v + 7, 3);
+        field("ahrs_position_ned", v + 10, 3);
+        double vel[3];
+        field("ahrs_velocity_ned", vel, 3);
+        m.ahrs_present = true;
+        m.ahrs_valid = ok > 0.5;
+        auto &a = m.ahrs;
+        const Location loc = located(v + 10);
+        a.latitude = loc.lat * 1.0e-7;
+        a.longitude = loc.lng * 1.0e-7;
+        a.altitude = home.alt * 0.01 - v[12];
+        a.speedN = vel[0];
+        a.speedE = vel[1];
+        a.speedD = vel[2];
+        a.quaternion = Quaternion(v[0], v[1], v[2], v[3]);
+        float roll, pitch, yaw;
+        a.quaternion.to_euler(roll, pitch, yaw);
+        a.rollDeg = degrees(roll);
+        a.pitchDeg = degrees(pitch);
+        a.yawDeg = wrap_360(degrees(yaw));
+        a.rollRate = degrees(v[4]);
+        a.pitchRate = degrees(v[5]);
+        a.yawRate = degrees(v[6]);
+        a.xAccel = v[7];
+        a.yAccel = v[8];
+        a.zAccel = v[9];
+    }
 }
 
 /*

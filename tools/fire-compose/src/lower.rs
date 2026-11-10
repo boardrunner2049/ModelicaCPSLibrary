@@ -441,6 +441,17 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
             equalities.push((name.into(), reference(source)));
         }
     }
+    crate::peripherals::components(c, &mut components, &mut equalities)?;
+    if crate::peripherals::supplies_propulsion(c) {
+        // The power module's pack is the propulsion supply.
+        for (name, value) in equalities.iter_mut() {
+            if name == "escs.dcVoltage" {
+                *value = Value::Array(vec![reference("powerModule.battery.voltage"); nr]);
+            } else if name == "bus.sourceVoltage" {
+                *value = reference("powerModule.battery.openCircuitVoltage");
+            }
+        }
+    }
     if vio {
         equalities.push((
             "values.measurements".into(),

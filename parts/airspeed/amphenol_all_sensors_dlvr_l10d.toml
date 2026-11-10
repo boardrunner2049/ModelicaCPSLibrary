@@ -1,0 +1,35 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Amphenol All Sensors DLVR-L10D"
+kind = "airspeed"
+manufacturer = "Amphenol All Sensors"
+source = "DLVR Series Low Voltage Digital Pressure Sensors, DS-0300 / DCN 11279 / Rev J, https://allsensors.com/hubfs/Product-Data-Sheets/DS-0300.pdf"
+notes = "All parameters at 3.3 V +/-5% or 5.0 V +/-5% (per option) and 25 C. Pa range is stated as approximate (Note A). TEB = offset, span, linearity, pressure hysteresis, temperature effect on offset and span (note 2), over the compensated range. Timing/current figures are characterized, not 100% tested (note 5). Speed/power option (F/N/L/S) is a factory part-number option; Noise Reduced gives approx 1/2 bit noise reduction vs Fast (p4). Transfer function: P(inH2O) = 1.25 * ((Pout - 8192)/2^14) * FSS, FSS = 2 x full scale = 20 inH2O for L10D (p3)."
+pressure_range_inh2o = [-10, 10]              # (Standard Pressure Ranges, p1)
+pressure_range_pa = [-2500, 2500]             # approximate per Note A (p1)
+proof_pressure_kpa = 50                       # 200 inH2O (p1)
+burst_pressure_kpa = 75                       # 300 inH2O (p1)
+output_span_counts = 6554                     # +/-6,554 counts (p1/p2)
+output_offset_counts = 8192                   # at zero differential pressure (p2)
+total_error_band_percent_span = 0.75          # max; typ +/-0.30 (L05x-L60x group, p2)
+total_error_band_typ_percent_span = 0.30      # typ (p2)
+span_temperature_shift_percent_fss = 0.20     # typ, relative to 25 C (p2)
+offset_temperature_shift_percent_fss = 0.20   # typ (p2)
+offset_warmup_shift_percent_fss = 0.15        # first hour (p2)
+offset_position_sensitivity_percent_fss = 0.05  # +/-1 g (p2)
+offset_long_term_drift_percent_fss = 0.15     # one year (p2)
+linearity_hysteresis_percent_fss = 0.25       # LxxD, at half FS, BSL (p2)
+resolution_bits = 14                          # output resolution; no missing codes 13 typ / 12 min (p2)
+update_time_ms = [[0.50, 1.15], [1.3, 3.1], [6.5, 9.5]]  # [typ, max] for Fast, Noise Reduced, Low Power options (p2)
+response_delay_wake_pressure_ms = 0.46        # sleep-wake pressure typ; max 0.53 (p2)
+response_delay_wake_all_ms = 1.10             # typ; max 1.40 (p2)
+power_on_to_first_reading_ms = 6.0            # 6.0 ms + 1 update period (p2)
+temperature_resolution_bits = 11              # (p2)
+temperature_accuracy_c = 2                    # overall accuracy typ (p2)
+temperature_compensated_range_c = [0, 70]     # commercial; industrial -20..85 (p1)
+temperature_range_c = [-25, 85]               # operating (p1)
+storage_temperature_c = [-40, 125]            # (p1)
+supply_voltage_v = 3.3                        # standard; 5 V option (p1); abs max 6 Vdc
+current_ma = 3.5                              # 3.3 V Fast typ, max 4.3; Noise Reduced 3.6/4.5; Low Power 0.72/0.9; 5 V Fast 5.0/6.0 (p2)
+common_mode_pressure_psig = 10                # max rating (p1)
+interface = "I2C standard (400 kHz), SPI option on 8-lead packages"  # (p1, p3, p4)
+not_stated = ["noise_pa (rms)", "pressure_resolution_pa as a figure", "mass_g", "I2C address (not in extracted text)"]

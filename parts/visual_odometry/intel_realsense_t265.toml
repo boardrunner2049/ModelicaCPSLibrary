@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Intel RealSense Tracking Camera T265"
+kind = "visual_odometry"
+manufacturer = "Intel Corporation"
+source = "Intel RealSense Tracking Camera Datasheet (T265 / T261), Document 572522-004, Revision 004, September 2019; archived copy of https://www.intelrealsense.com/wp-content/uploads/2019/09/Intel_RealSense_Tracking_Camera_Datasheet_Rev004_release.pdf (also on Mouser)"
+notes = "Discontinued product. Drift figure is a footnote (fn2, p19) whose reference mark is not attached to any table row in the PDF: '<1% drift observed in repeated testing in multiple use cases and environments' (AR/VR head-mounted indoors; wheeled robots WITH wheel odometry integrated). It does not say drift of what quantity; Intel product page calls it '<1% closed loop drift under intended use conditions'. Datasheet lists 'Low latency' as a feature (p7) but gives no number. Only diagonal FOV published."
+drift_percent = 1.0                 # "<1% drift" (upper bound), test conditions above, footnote 2 (p19)
+output_rate_hz = 200                # 6DoF pose data to host at 200 Hz average (not uniformly spaced), Table 3-3 note 1 (p12)
+fov_diag_deg = 173                  # Fisheye FOV (degrees) D:173, Table 3-2 (p11)
+camera_frame_rate_hz = 30           # fisheye imagers monochrome at 30 FPS (p12, 3.2.2)
+resolution_px = [848, 800]          # Active pixels 848 x 800, Table 3-4 (p12)
+stereo_baseline_mm = 64             # 64 +/- 0.15 mm, Table 3-2 (p11)
+imu_accel_range_g = 4               # +/-4 g, Table 3-3 (p12)
+imu_accel_rate_hz = 62.5            # Table 3-3 (p12)
+imu_gyro_range_dps = 2000           # Table 3-3 (p12)
+imu_gyro_rate_hz = 200              # Table 3-3 (p12)
+mass_g = 60                         # T265 nominal (min 57, max 63), Table 3-13 (p17)
+mass_t261_module_g = 22             # T261 bare module, nominal (p16)
+dimensions_mm = [108.0, 24.5, 12.5] # T265 nominal W x H x D, Table 3-13 (p17)
+supply_current_ma = 300             # T261 module ICC nom/max 300 mA at 5 V, Table 3-12 (p17)
+not_stated = ["latency_ms", "fov_h_deg", "fov_v_deg"]

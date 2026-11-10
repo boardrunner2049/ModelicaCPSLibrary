@@ -1,0 +1,13 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Cheerson CX-OF"
+kind = "optical_flow"
+manufacturer = "Cheerson"
+source = "No manufacturer datasheet found. ArduPilot wiki https://ardupilot.org/copter/docs/common-cheerson-cxof.html ; ArduPilot driver libraries/AP_OpticalFlow/AP_OpticalFlow_CXOF.cpp (master) https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_OpticalFlow/AP_OpticalFlow_CXOF.cpp"
+notes = "Figures below are from ArduPilot documentation/driver, not a Cheerson document. Forum posts (not used) claim a PixArt PMW3900-family sensor, 3.3 V / 11 mA. Pixel scaling is the ArduPilot driver constant used to convert raw counts to flow, not a published spec."
+supply_voltage_v = 3.3                        # 'Connect ... VDD (aka VCC or 3.3V) to a 3.3V power source' (wiki)
+interface = "UART TX only, 19200 baud, 9-byte frames (header 0xFE, footer 0xAA)"  # ArduPilot driver
+tested_altitude_m = 40                        # 'successfully tested to altitudes of about 40m' (wiki)
+ardupilot_flow_delay_ms = 80                  # recommended EK2/EK3_FLOW_DELAY (wiki)
+ardupilot_pixel_scaling = 1.76e-3             # CXOF_PIXEL_SCALING (driver)
+ardupilot_timeout_s = 0.3                     # CXOF_TIMEOUT_SEC (driver)
+not_stated = ["fov_deg", "frame_rate_hz", "update_rate_hz", "max_speed", "min_height_m", "resolution (pixels)", "current_ma", "mass_g"]

@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Mauch HS-200-HV (Mauch 076)"
+kind = "power_module"
+manufacturer = "Mauch Electronic"
+source = "No Mauch datasheet reachable (mauch-electronic.com webstore returned no content). ArduPilot wiki 'MAUCH Power Monitor' https://ardupilot.org/copter/docs/common-mauch-power-modules.html (written with Mauch content) ; IR-LOCK reseller listing https://irlock.com/products/mauch-076-hs-200-hv"
+notes = "Hall-effect sensor board (IR-LOCK: 'Allegro Hall Sensor ACS-200U'); MCP601 op-amp for offset shifting (ArduPilot). Per-unit calibration: voltage divider and amperes-per-volt are printed on each sensor's final test result sheet and must be entered as BATT_VOLT_MULT / BATT_AMP_PERVLT; no nominal values published. Burst/over-current at 85 C conflicts within the ArduPilot page (800 A vs 900 A). Board needs a separate Mauch LV/HV BEC for power; BEC figures below are for the HV BEC."
+input_voltage_range_cells = [4, 14]           # HV = 4-14S (ArduPilot)
+input_voltage_max_v = 60                      # (ArduPilot)
+max_current_a = 200                           # continuous, no time limit (ArduPilot)
+burst_current_a = 1200                        # 1 s @ 25 C; 800 A (or 900 A) @ 85 C (ArduPilot)
+voltage_divider_ratio = 18                    # 1% resistor divider 18:1 for HV (ArduPilot); calibrated value on test sheet
+hv_bec_output_v = 5.3                         # +/-0.05 V, 3 A (ArduPilot, HV BEC)
+output_5v_a = 3                               # HV BEC (ArduPilot)
+hv_bec_ripple_uv = 80                         # at 1.5 A (ArduPilot)
+hv_bec_mass_g = 20                            # with cables and shrink tube, 53 x 21 x 14 mm (ArduPilot)
+interface = "Analog voltage + current; DF-13 6-pin cable to autopilot; 2x 10 cm AWG10 leads"  # (IR-LOCK)
+not_stated = ["current_scale (A/V) nominal", "voltage_scale exact (only 18:1 nominal)", "current sensitivity mV/A", "zero-current offset", "current_accuracy_percent", "voltage_accuracy_percent", "mass_g of sensor board"]

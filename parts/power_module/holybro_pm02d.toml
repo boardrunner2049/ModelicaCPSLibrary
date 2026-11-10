@@ -1,0 +1,55 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Holybro PM02D (digital power module)"
+kind = "power_module"
+manufacturer = "Holybro"
+source = "Holybro docs: Power Module Comparison https://docs.holybro.com/power-module-and-pdb/power-module-comparison and Digital Power Module (PM) Setup https://docs.holybro.com/power-module-and-pdb/power-module/digital-power-module-pm-setup ; PX4 user guide https://docs.px4.io/main/en/power_module/holybro_pm02d.html ; TI INA226 datasheet SBOS547C (rev. Aug 2026) https://www.ti.com/lit/ds/symlink/ina226.pdf ; TI INA228 datasheet SLYS021A (rev. May 2022) https://www.ti.com/lit/ds/symlink/ina228.pdf"
+notes = "Two versions: LV (2-6S, TI INA226, I2C addr 65 = 0x41) and HV (2-12S, TI INA228, I2C addr 69 = 0x45) per Holybro setup page (ArduPilot BATT_I2C_ADDR; HV needs ArduPilot 4.4+). PX4 page describes the current version as max 36 V input, up to 6S, INA228, and says an out-of-production 6S version used INA226 (conflicts with Holybro's LV/HV split). PX4: current/voltage dividers should not be set; defaults 'accurate within 5%'. Shunt resistance not published. Burst: Holybro table 100 A; PX4 '120A (<60S)'. IC figures below are from the TI datasheets (25 C, VS = 3.3 V)."
+input_voltage_range_cells_lv = [2, 6]         # LV (comparison table)
+input_voltage_range_cells_hv = [2, 12]        # HV (comparison table)
+input_voltage_max_v = 36                      # PX4 page (6S version)
+max_current_a = 60                            # PCB continuous (comparison table; PX4 rated current)
+burst_current_a = 100                         # PCB burst (comparison table); PX4: 120 A (<60 s)
+max_current_sensing_a_lv = 164                # (comparison table; PX4)
+max_current_sensing_a_hv = 327                # (comparison table)
+current_accuracy_percent = 5                  # PX4: default scaling 'accurate within 5%' (not a Holybro spec)
+output_5v_v = 5.2                             # (comparison table)
+output_5v_a = 3                               # max (comparison table)
+interface = "I2C; XT60 and 6-pin Molex CLIK-Mate 2.0 mm"  # (comparison table; PX4)
+i2c_address_lv = 0x41                         # BATT_I2C_ADDR = 65 (Holybro digital setup)
+i2c_address_hv = 0x45                         # BATT_I2C_ADDR = 69 (Holybro digital setup)
+dimensions_mm = [25, 25, 10]                  # (comparison table)
+mass_g = 20                                   # (comparison table; PX4)
+not_stated = ["shunt resistance (module)", "voltage_accuracy_percent (module)", "current_accuracy_percent from Holybro", "voltage_scale / current_scale (digital; set by firmware)"]
+
+[ina226]                                      # LV version sense IC (TI SBOS547C, Sec 5.5 Electrical Characteristics)
+adc_bits = 16                                 # ADC native resolution
+shunt_voltage_range_mv = [-81.9175, 81.92]
+shunt_voltage_lsb_uv = 2.5
+bus_voltage_lsb_mv = 1.25
+bus_voltage_range_v = [0, 36]                 # ADC full-scale 40.96 V, do not exceed 36 V
+shunt_offset_uv = 2.5                         # typ +/-2.5, max +/-10
+shunt_offset_drift_uv_per_c = 0.02            # typ; max 0.1
+shunt_gain_error_percent = 0.02               # typ; max 0.1
+shunt_gain_error_drift_ppm_per_c = 10         # typ; max 50
+bus_offset_mv = 1.25                          # typ +/-1.25, max +/-7.5
+bus_gain_error_percent = 0.02                 # typ; max 0.1
+conversion_time_us = [140, 204, 332, 588, 1100, 2116, 4156, 8244]  # typ, CT bits 000..111
+supply_current_ua = 330                       # typ; max 420
+
+[ina228]                                      # HV version sense IC (TI SLYS021A, Sec 6.5 Electrical Characteristics)
+adc_bits = 20
+shunt_voltage_range_mv = [-163.84, 163.84]    # ADCRANGE = 0; +/-40.96 mV with ADCRANGE = 1
+shunt_voltage_lsb_nv = 312.5                  # ADCRANGE = 0; 78.125 nV with ADCRANGE = 1
+bus_voltage_lsb_uv = 195.3125
+bus_voltage_range_v = [0, 85]
+shunt_offset_uv = 0.3                         # typ +/-0.3, max +/-1 (TCT > 280 us)
+shunt_offset_drift_nv_per_c = 2               # typ; max 10
+shunt_gain_error_percent = 0.01               # typ; max 0.05 (VCM = 24 V)
+shunt_gain_error_drift_ppm_per_c = 20         # max
+bus_offset_mv = 1                             # typ +/-1, max +/-2.5
+bus_gain_error_percent = 0.01                 # typ; max 0.05
+power_total_measurement_error_percent = 0.5   # max, full scale, -40..125 C
+conversion_time_us = [50, 84, 150, 280, 540, 1052, 2074, 4120]  # typ, conversion time field 0h..7h
+die_temperature_accuracy_c = 1                # max at 25 C (typ 0.15); max 2 over -40..125 C
+supply_current_ua = 640                       # typ; max 750
+

@@ -43,6 +43,7 @@ pub fn catalog() -> Value {
             "gnss": sensor_levels(&sensors::GNSS),
         },
         "parts": parts::catalog(),
+        "peripherals": crate::peripherals::catalog(),
     })
 }
 

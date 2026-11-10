@@ -285,6 +285,292 @@ unit = "N.m"
 frame = "body FRD, about the combined CG"
 meaning = "Added to the plant's own moments. Zero is no effect. Held between communication points."
 
+[capabilities.rangefinder_v1]
+summary = "Latest rangefinder reading (a rangefinder peripheral)."
+[[capabilities.rangefinder_v1.fields]]
+name = "rangefinder_distance_m"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "m"
+meaning = "Slant range along the boresight, as the device reports it: 0 below its minimum range, beyond its maximum more than the maximum, -1 for no return."
+[[capabilities.rangefinder_v1.fields]]
+name = "rangefinder_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when the reading is valid (a return within range), else 0."
+
+[capabilities.airspeed_v1]
+summary = "Latest differential-pressure airspeed sensor reading (pitot-static)."
+[[capabilities.airspeed_v1.fields]]
+name = "airspeed_differential_pressure_pa"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "Pa"
+meaning = "Total minus static pressure; negative for reverse flow."
+[[capabilities.airspeed_v1.fields]]
+name = "airspeed_temperature_k"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "K"
+meaning = "Static air temperature at the sensor."
+[[capabilities.airspeed_v1.fields]]
+name = "airspeed_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a sample has been delivered, else 0."
+
+[capabilities.optical_flow_v1]
+summary = "Latest optical flow reading."
+[[capabilities.optical_flow_v1.fields]]
+name = "flow_rate_xy"
+type = "Float64"
+causality = "output"
+shape = [2]
+required = true
+unit = "rad/s"
+meaning = "Image flow rates about the sensor x and y axes (ArduPilot convention: x = -v_y/range + p, y = v_x/range + q)."
+[[capabilities.optical_flow_v1.fields]]
+name = "flow_body_rate_xy"
+type = "Float64"
+causality = "output"
+shape = [2]
+required = false
+unit = "rad/s"
+meaning = "Sensor x and y angular rates the flow includes."
+[[capabilities.optical_flow_v1.fields]]
+name = "flow_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a surface is in range (quality good), else 0."
+
+[capabilities.rpm_v1]
+summary = "Latest shaft speeds (an RPM sensor per shaft)."
+[[capabilities.rpm_v1.fields]]
+name = "rpm"
+type = "Float64"
+causality = "output"
+shape = ["n"]
+required = true
+unit = "rev/min"
+meaning = "Element k: shaft k (rotor k of a multirotor, rear wheels of a rover)."
+[[capabilities.rpm_v1.fields]]
+name = "rpm_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a sample has been delivered, else 0."
+
+[capabilities.battery_v1]
+summary = "Battery pack and power module: measured voltage and current."
+[[capabilities.battery_v1.fields]]
+name = "battery_voltage_v"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "V"
+meaning = "Measured pack terminal voltage."
+[[capabilities.battery_v1.fields]]
+name = "battery_current_a"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "A"
+meaning = "Measured discharge current."
+[[capabilities.battery_v1.fields]]
+name = "battery_consumed_ah"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "A.h"
+meaning = "Charge drawn since the start (truth)."
+[[capabilities.battery_v1.fields]]
+name = "battery_remaining"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "State of charge, 0..1 (truth; a smart battery reports it)."
+[[capabilities.battery_v1.fields]]
+name = "battery_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a sample has been delivered, else 0."
+
+[capabilities.temperature_v1]
+summary = "Latest temperature sensor reading."
+[[capabilities.temperature_v1.fields]]
+name = "temperature_k"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "K"
+meaning = "Temperature at the sensor."
+[[capabilities.temperature_v1.fields]]
+name = "temperature_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a sample has been delivered, else 0."
+
+[capabilities.external_ahrs_v1]
+summary = "Latest external AHRS/INS solution."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_quaternion"
+type = "Float64"
+causality = "output"
+shape = [4]
+required = true
+unit = "1"
+meaning = "Scalar-first quaternion, body FRD to NED."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_rate_frd"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = false
+unit = "rad/s"
+meaning = "Body angular rate."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_accel_frd"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = false
+unit = "m/s2"
+meaning = "Specific force at the unit."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_position_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = false
+unit = "m"
+meaning = "Unit position from the geodetic origin."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_velocity_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = false
+unit = "m/s"
+meaning = "Unit velocity."
+[[capabilities.external_ahrs_v1.fields]]
+name = "ahrs_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a solution has been delivered, else 0."
+
+[capabilities.visual_odometry_v1]
+summary = "Latest visual odometry pose (odometry frame: NED at the origin)."
+[[capabilities.visual_odometry_v1.fields]]
+name = "odometry_position_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m"
+meaning = "Camera position."
+[[capabilities.visual_odometry_v1.fields]]
+name = "odometry_velocity_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = false
+unit = "m/s"
+meaning = "Camera velocity."
+[[capabilities.visual_odometry_v1.fields]]
+name = "odometry_quaternion"
+type = "Float64"
+causality = "output"
+shape = [4]
+required = false
+unit = "1"
+meaning = "Scalar-first quaternion, body FRD to the odometry frame."
+[[capabilities.visual_odometry_v1.fields]]
+name = "odometry_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a pose has been delivered, else 0."
+
+[capabilities.beacon_v1]
+summary = "Latest beacon (indoor positioning) fix (beacon frame: NED at the origin)."
+[[capabilities.beacon_v1.fields]]
+name = "beacon_position_ned"
+type = "Float64"
+causality = "output"
+shape = [3]
+required = true
+unit = "m"
+meaning = "Tag position."
+[[capabilities.beacon_v1.fields]]
+name = "beacon_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when a fix has been delivered, else 0."
+
+[capabilities.precision_landing_v1]
+summary = "Latest landing-target sighting."
+[[capabilities.precision_landing_v1.fields]]
+name = "landing_target_angle"
+type = "Float64"
+causality = "output"
+shape = [2]
+required = true
+unit = "rad"
+meaning = "atan(x/z), atan(y/z) of the target in the camera axes (z the boresight)."
+[[capabilities.precision_landing_v1.fields]]
+name = "landing_target_distance_m"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "m"
+meaning = "Distance to the target."
+[[capabilities.precision_landing_v1.fields]]
+name = "landing_target_valid"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "1 when the target is in view, else 0."
+
 # An FMU without the marker is accepted only when the host explicitly selects
 # this profile; the checker then warns. It describes the exports of FastDyn's
 # FastDyn.Copter/Rover/Plane wrappers before migration. Removal is decided

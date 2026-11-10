@@ -62,12 +62,19 @@ public:
 private:
     void start();
     void read_model_sensors();
+    void read_peripherals();
+    void field(const char *name, double *values, size_t count) const;
     void fail(const char *what, cpv_status_t status) const;
 
     static constexpr uint8_t max_channels = 32;  // sitl_input.servos
     cpv_vehicle_t *vehicle;
     bool started;
     bool model_mag = false, model_gnss = false, model_baro = false;  // the model has these sensors
+    // Peripherals the model has (Systems.Peripherals; contract capabilities)
+    bool has_rangefinder = false, has_airspeed = false, has_flow = false, has_rpm = false,
+         has_battery = false, has_temperature = false, has_ahrs = false, has_odometry = false,
+         has_beacon = false, has_precland = false;
+    size_t rpm_count = 0;
     uint64_t start_time_us;
     size_t channel_count;
     int8_t channel_source[max_channels];  // SITL servo index per FMU pwm element, -1: none

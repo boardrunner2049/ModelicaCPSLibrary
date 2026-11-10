@@ -1,0 +1,14 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "ModalAI VOXL 2 (QVIO with tracking camera)"
+kind = "visual_odometry"
+manufacturer = "ModalAI"
+source = "VOXL 2 Feature Matrix https://docs.modalai.com/voxl2-feature-matrix/ ; M0149 Tracking Module Datasheet https://docs.modalai.com/M0149 ; M0014 Tracking Module Datasheet https://docs.modalai.com/M0014/ (accessed 2026-11)"
+notes = "ModalAI publishes NO official VIO drift/accuracy/latency/output-rate specification. ModalAI staff (Chad Sweet) stated on the forum (https://forum.modalai.com/topic/587/quantification-of-qvio-performance-compared-to-other-options/1, 2021-12-02) that VIO systems 'typically achieve 1-1.5% drift over distance ... something we see pretty consistently with the qvio-server'; this is an informal forum statement, so it is NOT recorded as drift_percent. Current tracking camera is M0149 (OnSemi AR0144, 1280x800 global shutter); its page title says 166 deg but table and text say 162 deg diagonal (table values used). Older M0014 (OV7251, EOL): 640x480, D166/H133/V100 deg, 30/60/90 Hz implemented on VOXL (sensor up to 120 Hz). ArduPilot support: VOXL 2 via VISO_TYPE=3 (ArduPilot 4.6+)."
+fov_diag_deg = 162                  # M0149 FOV (D x H x V) 162 x 132 x 82 deg (M0149 spec table)
+fov_h_deg = 132                     # M0149 spec table
+fov_v_deg = 82                      # M0149 spec table
+resolution_px = [1280, 800]         # M0149 spec table
+mass_g = 16                         # VOXL 2 board weight "16g" (Feature Matrix); tracking camera not included
+dimensions_mm = [70, 36]            # VOXL 2 board "70mm x 36mm" (Feature Matrix)
+power_w = [0.1, 7]                  # VOXL 2 power consumption "0.1 - 7W" (Feature Matrix)
+not_stated = ["drift_percent (official)", "output_rate_hz", "latency_ms", "M0149 camera frame rate", "camera mass_g"]

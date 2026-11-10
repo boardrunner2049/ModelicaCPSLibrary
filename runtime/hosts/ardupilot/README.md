@@ -217,9 +217,26 @@ lands. The models start facing north, so use home heading 0.
   Magnetic Model at home. A model without those parameters (built before
   them) keeps SITL's compass; a model without a GNSS or barometer keeps
   SITL's. SITL prints which sensors are the model's at start.
-- **Not modelled by the vehicle here.** Battery voltage is a constant
-  `SIM_BATT_VOLTAGE`. Wind (`SIM_WIND_*`) is ignored and reported at start.
-  Payloads and clamps are not supported.
+- **Peripherals.** The vehicle's `[peripherals]` (`Systems/Peripherals`)
+  replace SITL's simulation of those devices: the rangefinder
+  (`rangefinder_m`), RPM (`rpm`, with the shafts in the motor mask) and
+  battery (`battery_voltage`, `battery_current`) through the Aircraft's own
+  outputs; airspeed, optical flow, temperature (TSYS01), visual odometry
+  (the vicon simulator), beacons, precision landing and the external AHRS
+  serial simulators (VectorNav, MicroStrain, InertialLabs) through
+  `sitl_fdm::model_sensors` (`hooks.patch`). `devices.py` sets the driver
+  parameters (`build/vehicle-interface/NAME.devices.parm`) and SITL's serial
+  devices (SERIAL5 and up; SERIAL3/4 are SITL's GPS). SITL prints which
+  peripherals are the model's at start.
+- **Devices SITL simulates.** A run file's `[sitl] devices = [...]` switches
+  on the rest of ArduPilot's optional hardware that SITL simulates itself or
+  that needs no simulation (ADS-B, gripper, parachute, winch, sprayer,
+  landing gear, gimbal, camera, generator, EFI fuel, relay, buttons, buzzer,
+  safety switch, Remote ID, OSD, smart battery, ...; `devices.py` lists them
+  with their notes). Their servos get outputs 9-16.
+- **Not modelled by the vehicle here.** Without a power module, battery
+  voltage is a constant `SIM_BATT_VOLTAGE`. Wind (`SIM_WIND_*`) is ignored
+  and reported at start.
 - **Failures.** Any runtime error stops SITL (`AP_HAL::panic`) with the
   reason. It never continues on stale physics.
 - **Channel order.** `configs/quad.toml` is wired in ArduCopter's Quad-X order

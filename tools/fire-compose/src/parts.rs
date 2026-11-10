@@ -856,7 +856,12 @@ fn normalized(s: &str) -> String {
 /// Every part file: (kind, id, table).
 pub fn all() -> Vec<(String, String, Table)> {
     let mut out = Vec::new();
-    for kind in KINDS.iter().map(|k| k.0).chain(crate::powertrain::KINDS) {
+    for kind in KINDS
+        .iter()
+        .map(|k| k.0)
+        .chain(crate::powertrain::KINDS)
+        .chain(crate::peripherals::KINDS.iter().map(|k| k.name))
+    {
         let Ok(dir) = std::fs::read_dir(directory().join(kind)) else {
             continue;
         };

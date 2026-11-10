@@ -1,0 +1,20 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Matek Optical Flow & Lidar 3901-L0X"
+kind = "optical_flow"
+manufacturer = "Matek Systems"
+source = "Matek 3901-L0X product page, https://www.mateksys.com/?portfolio=3901-l0x (no datasheet PDF)"
+notes = "Module = PixArt PMW3901 flow sensor + ST VL53L0X ToF lidar, MSP protocol over UART. Page advises keeping the lens >2 cm above ground at startup for initialization; altitude hold 0-2 m when VL53L0X enabled. Mass stated only for F051 version."
+flow_sensor = "PixArt PMW3901"
+range_sensor = "ST VL53L0X"
+fov_deg = 42                                  # PMW3901 (product page)
+range_sensor_fov_deg = 27                     # VL53L0X (product page)
+working_range_m = [0.08, 2.0]                 # 'Working Range: 8cm~200cm' (product page)
+min_height_m = 0.08                           # lower bound of working range
+range_sensor_max_m = 2.0                      # VL53L0X max range (product page)
+illuminance_min_lux = 60                      # 'Minimum Illumination >60Lux' (product page)
+supply_voltage_v = [4.5, 5.5]                 # (product page)
+current_ma = 40                               # power consumption (product page)
+interface = "UART, MSP protocol"              # (product page)
+dimensions_mm = [36, 12]                      # F051 version; L051 version 36 x 13 (product page)
+mass_g = 2                                    # F051 version (product page)
+not_stated = ["frame_rate_hz", "update_rate_hz", "max_speed_rad_s", "resolution (pixels)"]

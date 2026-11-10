@@ -1,0 +1,29 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Garmin LIDAR-Lite v3HP"
+kind = "rangefinder"
+manufacturer = "Garmin"
+source = "LIDAR-Lite v3HP Operation Manual and Technical Specifications, April 2020, GUID-1EAC1F92-654C-4E02-9B6D-0FDC7A0DB1BF v2, https://static.garmin.com/pumac/LIDAR-Lite_v3HP_Instructions_EN.pdf"
+notes = "Accuracy typical; nonlinearity present below 1 m. Mean error +/-1% of distance max and ripple +/-1% of distance max (apply >= 2 m column). Update rate >1 kHz typical at 70% reflective target with reduced sensitivity at high update rates. Wiring section says sensor operates at 4.75-5.5 Vdc, max 6 Vdc (spec table says 4.5-5.5). IPX7: bare wire portion not water resistant."
+range_max_m = 40.0                            # 70% reflective target (Specifications, p1)
+accuracy_bands = [[0.0, 2.0, 0.05], [2.0, 40.0, 0.025]]  # meters, typical; <2 m +/-5 cm, >=2 m +/-2.5 cm (Specifications p1)
+accuracy_mean_percent_max = 1.0               # >= 2 m: mean +/-1% of distance max (p1)
+accuracy_ripple_percent_max = 1.0             # >= 2 m: ripple +/-1% of distance max (p1)
+resolution_m = 0.01                           # +/-1 cm (p1)
+update_rate_hz = 1000                         # "greater than 1 kHz typical", 70% reflective target (p1)
+beam_divergence_mrad = 8                      # (Laser specifications table, p2)
+beam_diameter_at_aperture_mm = [12, 2]        # (p2)
+wavelength_nm = 905                           # nominal (p2)
+laser_peak_power_w = 1.3                      # total laser power peak (p2)
+laser_pulse_width_us = 0.5                    # 50% duty cycle (p2)
+laser_pulse_train_rep_frequency_khz = [10, 20]  # nominal (p2)
+laser_energy_per_pulse_nj_max = 280           # <280 nJ (p2)
+supply_voltage_v = [4.5, 5.5]                 # 5 Vdc nominal (p1)
+current_ma = 85                               # during an acquisition (p1)
+current_idle_ma = 65                          # (p1)
+startup_time_ms = 22                          # registers initialized after roughly 22 ms (Interface/Initialization, p3)
+interface = "I2C (fast-mode 400 kb/s, default 7-bit addr 0x62, 3.3 V internal, 5 V tolerant) / PWM (10 us per cm) / external trigger"  # (p1, p3)
+operating_temperature_c = [-20, 60]           # (p1)
+ip_rating = "IPX7"                            # IEC 60529 (p1)
+dimensions_mm = [40.18, 54.99, 35]            # L x W x H (p1)
+mass_g = 38                                   # (p1)
+not_stated = ["range_min_m", "fov_deg (divergence given in mRad)", "range at other reflectivities", "max update rate figure beyond '>1 kHz typical'"]

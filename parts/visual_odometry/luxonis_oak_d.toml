@@ -1,0 +1,16 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Luxonis OAK-D"
+kind = "visual_odometry"
+manufacturer = "Luxonis"
+source = "OAK-D Spec Sheet (6 pages, undated), https://cdn.shopify.com/s/files/1/0630/8950/8583/files/OAK-D_Spec_Sheet.pdf"
+notes = "OAK-D is a stereo depth/AI camera; Luxonis publishes NO VIO drift/accuracy/latency figures. ArduPilot's OAK-D VIO page (https://ardupilot.org/copter/docs/common-vio-oak-d.html) runs VINS-Fusion on a Raspberry Pi companion with the OAK-D/OAK-D Pro and suggests VISO_DELAY_MS=50 (a configuration value, not a measured latency). Figures below are the stereo (OV9282) pair used for VIO, from p2 'Camera Specification'. IMU: BNO085 (most units made Q2 2021-Q2 2023 have BMI270 instead)."
+fov_diag_deg = 89                   # Stereo pair DFOV (p2 Camera Specification)
+fov_h_deg = 80                      # Stereo pair HFOV (p2)
+fov_v_deg = 55                      # Stereo pair VFOV (p2)
+resolution_px = [1280, 800]         # Stereo pair 1MP (p2)
+camera_frame_rate_hz_max = 120      # Stereo pair max framerate 120 FPS (p2)
+stereo_baseline_mm = 75             # 7.5 cm (p4, Stereo depth perception)
+depth_ideal_range_m = [0.7, 8]      # "Ideal range: 70cm - 8m" (p4)
+mass_g = 115                        # total with enclosure (p3, Dimensions and Weight)
+mass_pcba_g = 43                    # OAK-D-PCBA (p3)
+not_stated = ["drift_percent", "output_rate_hz (VIO)", "latency_ms"]

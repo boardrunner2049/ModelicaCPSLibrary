@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Marvelmind Indoor 'GPS' Starter Set Super-MP-3D (Super-Beacons)"
+kind = "beacon"
+manufacturer = "Marvelmind Robotics"
+source = "Super-Beacon Specifications sheet, Version 1.2, 07.01.2024, https://marvelmind.com/pics/specs_super_beacon.pdf ; Marvelmind Indoor Navigation System Operating Manual v2026_08_27, https://marvelmind.com/pics/marvelmind_navigation_system_manual.pdf (sec 1.1 Key Capabilities p17; sec 11.5 p256) ; Starter Set Super-MP-3D product page https://marvelmind.com/product/starter-set-super-mp-3d/"
+notes = "Ultrasonic TOF trilateration with 915/868 MHz radio. Set = 4 stationary + 1 mobile Super-Beacon + Modem HW v5.1. Accuracy is stated as 'Differential precision +/-2 cm' and 'Absolute: 1-3% of the distance to the beacons' (no 2D/3D split, no sigma). Update rate is a Dashboard setting 1/20 Hz to 40 Hz ultrasonic-only; in NIA it is shared among mobile beacons (e.g. 16 Hz/2 = 8 Hz). The 100 Hz ultrasonic+IMU fusion (and NMEA 100 Hz streaming for ArduPilot) is stated only for discontinued Beacons HW v4.9-IMU; a licensed option (MMSW0021, Super-Beacon-4 and newer, IA only) claims 5-25 ms latency at 100-500 Hz (manual p300). Mobile beacon needs line of sight to >=3 (3D) / >=2 (2D) stationary beacons within 30 m (manual p16). HW v4.9 (comparison sheet https://marvelmind.com/pics/marvelmind_beacons_comparison.pdf): range up to 20 m with Beacon v4.9 RX, 55x55x33(64) mm, 62/75 g."
+position_accuracy_m = 0.02                  # "Differential precision: +/-2cm" (manual p17; spec sheet 'Precision'); product page: "typical accuracy of +/-2cm even before additional sensor fusion or filtering"
+position_accuracy_absolute_percent_of_distance = [1, 3]   # "Absolute: 1-3% of the distance to the beacons" (manual p17; spec sheet)
+update_rate_hz = [0.05, 40]                 # "1/20Hz to 40Hz (Ultrasonic based only)", settable, depends on distances/mobile count/radio profile (manual p17)
+update_rate_imu_fusion_hz = 100             # "100Hz with ultrasonic + IMU fusion enabled (Only for Beacons HW v4.9-IMU-Discontinued)" (manual p17)
+max_range_m = 50                            # Distance between beacons "up to 50 meters" (Mini-RX or Super-Beacon to Super-Beacon with RX4 only), indoor (manual p17); spec sheet "Distance measurement: Up to 50m 1D"
+max_range_horn_m = 100                      # "up to 100 meters with horn" (manual p17); spec sheet says "Up to 120m 1D (With Marvelmind Horn)"
+recommended_beacon_spacing_m = 30           # "Recommended distance is 30 meters" (manual p17)
+coverage_area_m2 = 1000                     # "Reaches up to 1000m2 with the Starter Set configurations" (manual p17)
+latency_ms = [12, 150]                      # manual sec 11.5 p256: ~12 ms from mobile beacon via USB with IMU fusion, no averaging; ~150 ms with 30 m submap, 7 Hz ultrasonic, no averaging (~2 s with Real-Time Player 16)
+mass_g = 59                                 # mobile Super-Beacon incl. 1000 mAh battery, housing, 50 mm antenna (manual p17); spec sheet says "~57g"
+mass_bare_board_g = 27                      # manual p17
+dimensions_mm = [55, 55, 33]                # 55x55x65 mm with 50 mm antenna (spec sheet; manual p17)
+battery_mah = 1000                          # manual p17 (spec sheet: Li-Ion 900-1000 mAh)
+radio_output_power_mw = 10                  # "<10 mW" (spec sheet)
+not_stated = ["position_accuracy 2D vs 3D split", "accuracy confidence level/sigma"]

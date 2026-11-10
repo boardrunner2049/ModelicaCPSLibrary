@@ -11,20 +11,25 @@ is either a vehicle configuration (fire-compose schema) or a run file:
     speedup = 1
     home = [40.414929, -86.932387, 149.0, 0.0]   # lat, lon, alt (m), heading (deg)
     parameters = ["extra.parm"] # added after the defaults, relative to this file
+    devices = ["adsb", "gripper"] # ArduPilot optional hardware SITL simulates (devices.py)
 
     [physics]                   # the vehicle configuration (as configs/*.toml)
     schema_version = 3
     vehicle = "rover"
     ...
 
-Prints NAME, CONFIG, TABLE, KIND, AUTOPILOT, WAF_TARGET, SPEEDUP, HOME_LOCATION and
+Prints NAME, CONFIG, TABLE, KIND, AUTOPILOT, WAF_TARGET, SPEEDUP, HOME_LOCATION,
 PARAMETERS (comma-separated: the autopilot's defaults, the vehicle kind's
-cpvehicle parameters, then the run file's).
+cpvehicle parameters, the devices' (build/vehicle-interface/NAME.devices.parm:
+the vehicle's [peripherals] and the run's devices), then the run file's),
+SERIAL (SITL --serialN devices) and NOTES.
 """
 from __future__ import annotations
 
 from pathlib import Path
 import re
+
+import devices as optional
 import shlex
 import sys
 import tomllib
@@ -70,7 +75,7 @@ def resolve(target: str) -> dict[str, str]:
         physics, table = doc, ""
         if "sitl" in doc:
             fail(f"{path}: put the vehicle under [physics] when the file has [sitl]")
-    unknown = set(sitl) - {"name", "speedup", "home", "parameters"}
+    unknown = set(sitl) - {"name", "speedup", "home", "parameters", "devices"}
     if unknown:
         fail(f"{path}: unknown [sitl] keys {sorted(unknown)}")
     name = sitl.get("name") or re.sub(r"[^a-z0-9_]", "_", path.stem.lower())
@@ -80,20 +85,32 @@ def resolve(target: str) -> dict[str, str]:
     if kind not in KINDS:
         fail(f"{path}: unknown vehicle kind {kind!r}")
     autopilot, waf_target, parameters = KINDS[kind]
+    home = sitl.get("home", [40.414929, -86.932387, 149.0, 0.0])
+    if len(home) != 4:
+        fail(f"{path}: [sitl] home is [lat, lon, alt, heading]")
+    try:
+        plan = optional.resolve(physics, list(sitl.get("devices", [])), home)
+    except ValueError as e:
+        fail(f"{path}: {e}")
+    if plan.params:
+        out = ROOT / "build" / "vehicle-interface"
+        out.mkdir(parents=True, exist_ok=True)
+        parm = out / f"{name}.devices.parm"
+        parm.write_text("".join(f"{k} {v}\n" for k, v in plan.params.items()))
+        parameters = [*parameters, parm]
     for extra in sitl.get("parameters", []):
         p = (path.parent / extra).resolve()
         if not p.is_file():
             fail(f"{path}: parameter file {p} not found")
         parameters = [*parameters, p]
-    home = sitl.get("home", [40.414929, -86.932387, 149.0, 0.0])
-    if len(home) != 4:
-        fail(f"{path}: [sitl] home is [lat, lon, alt, heading]")
     return {
         "NAME": name, "CONFIG": str(path), "TABLE": table, "KIND": kind,
         "AUTOPILOT": autopilot, "WAF_TARGET": waf_target,
         "SPEEDUP": str(sitl.get("speedup", 1)),
         "HOME_LOCATION": ",".join(str(x) for x in home),
         "PARAMETERS": ",".join(str(p) for p in parameters),
+        "SERIAL": " ".join(plan.serial),
+        "NOTES": "; ".join(plan.notes),
     }
 
 

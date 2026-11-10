@@ -1,0 +1,21 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "IR-LOCK Sensor (Pixy CMUcam5 with IR-LOCK filter) + MarkOne Beacon V3.0"
+kind = "precision_landing"
+manufacturer = "IR-LOCK (sensor based on Charmed Labs / CMU Pixy CMUcam5)"
+source = "IR-LOCK docs 'Sensor Field of View (FOV)' https://irlock.readme.io/v1.0/docs/sensor-field-of-view-fov ; MarkOne Beacon V3.0 product page https://irlock.com/products/markone-beacon-v3-0-beta (archived 2026-09-30) ; IR-LOCK Sensor kit product page https://irlock.com/products/ir-lock-sensor-precision-landing-kit (archived 2026-09-30) ; 'Detection Characteristics and Specifications - MarkOne Beacon V2.0' PDF (2017) https://cdn.shopify.com/s/files/1/0599/7905/files/MarkOne2_Detection_Characteristics_and_Specifications.pdf ; Pixy (CMUcam5) overview https://docs.pixycam.com/wiki/doku.php?id=wiki:v1:overview ; ArduPilot https://ardupilot.org/copter/docs/precision-landing-irlock.html"
+notes = "IR-LOCK sensor = Pixy CMUcam5 with IR-LOCK filter and 3.6 mm lens pre-installed. FOV with that lens is IR-LOCK's 'approximately 60 x 35 deg'; the stock Pixy lens is 75 x 47 deg (Pixy docs), not applicable to the IR-LOCK default lens. Frame rate/resolution are Pixy's processing figures (Pixy docs), not restated by IR-LOCK. Detection range: V3.0 product page '15+ meters' (ArduPilot: 15 m); the V2.0 PDF gives 20 m max at phi=0 (on-axis), detection half-angle 35 deg, outdoors in sunlight with sensor firmware MarkOneBeta_1.0.1, and notes range extends further with reduced detection rate. ArduPilot requires a rangefinder for IR-LOCK precision landing. Beacon IR wavelength is not published."
+fov_h_deg = 60                       # "approximately 60 degrees", default 3.6 mm lens (IR-LOCK FOV doc)
+fov_v_deg = 35                       # "approximately 35 degrees", default 3.6 mm lens (IR-LOCK FOV doc)
+lens_focal_length_mm = 3.6           # IR-LOCK FOV doc; V2.0 PDF
+frame_rate_hz = 50                   # Pixy processes a frame every 1/50 s (20 ms) (Pixy v1 overview)
+resolution_px = [640, 400]           # Pixy processed frame 640x400 (Pixy v1 overview); image sensor OV9715 1280x800
+detection_range_max_m = 15           # MarkOne V3.0 "Max Detection Range: 15+ meters" (lower bound) (V3.0 product page); ArduPilot: "detection range of 15 meters"
+detection_range_max_v2_m = 20        # MarkOne V2.0, max detection range at phi=0 deg, outdoors in sunlight (V2.0 PDF)
+detection_half_angle_v2_deg = 35     # MarkOne V2.0 detection half angle phi (V2.0 PDF)
+beacon_beam_angle_deg = 70           # "Beam Angle: ~70 degrees" (V3.0 product page)
+beacon_supply_voltage_v = [10.2, 14] # V3.0 product page (3S LiPo)
+beacon_current_a = 0.25              # "0.25A @ 12V" (V3.0 product page)
+beacon_pcb_dimensions_mm = [100, 50, 8]  # V3.0 product page
+sensor_mass_g = 21.5                 # "Sensor Weight: 21.5 g" (sensor kit product page); bare Pixy docs list 27 g
+pixy_power_ma = 140                  # Pixy typical (Pixy v1 overview)
+not_stated = ["beacon wavelength_nm", "latency_ms", "IR-LOCK-specific frame rate/resolution (only Pixy generic figures)"]

@@ -64,8 +64,10 @@ esac
 suffix=; [[ $instance == 0 ]] || suffix=-$instance
 work=${RUN_WORK:-$HOME/.cache/cpvehicle-run/$NAME$suffix}
 mkdir -p "$work" && cd "$work"
+read -r -a serial <<< "${SERIAL:-}"
+[[ -n ${NOTES:-} ]] && echo "devices: $NOTES"
 "$ap/build/sitl/bin/$AUTOPILOT" --model "cpvehicle:$NAME" --defaults "$PARAMETERS" \
-  --home "$HOME_LOCATION" --speedup "$speedup" -I"$instance" -w > sitl.log 2>&1 &
+  --home "$HOME_LOCATION" --speedup "$speedup" -I"$instance" -w "${serial[@]}" > sitl.log 2>&1 &
 sitl=$!
 pids=($sitl)
 # SITL can ignore SIGTERM while blocked on its MAVLink socket: escalate.

@@ -40,6 +40,9 @@ pub struct ResolvedFireConfig {
     pub gnss: Table,
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub acoustic: Table,
+    /// [peripherals]: optional devices (crate::peripherals), each its model and keys.
+    #[serde(skip_serializing_if = "Table::is_empty")]
+    pub peripherals: Table,
     /// Rover/fixed-wing plant modifiers; only the values the configuration sets.
     #[serde(skip_serializing_if = "Table::is_empty")]
     pub plant: Table,
@@ -564,6 +567,11 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     }
     let (expanded, parts) =
         crate::parts::expand(raw.as_table().ok_or("configuration must be a table")?)?;
+    let (expanded, parts) = {
+        let (mut expanded, mut parts) = (expanded, parts);
+        crate::peripherals::expand(&mut expanded, &mut parts)?;
+        (expanded, parts)
+    };
     let mut c = resolve_root(Value::Table(expanded))?;
     c.parts = parts;
     Ok(c)
@@ -611,6 +619,7 @@ fn resolve_root(raw: Value) -> Result<ResolvedFireConfig> {
         "barometer",
         "gnss",
         "vulnerabilities",
+        "peripherals",
     ];
     table(&raw, &allowed, "config")?;
     let acquisition = acquisition(root)?;
@@ -673,6 +682,7 @@ fn resolve_root(raw: Value) -> Result<ResolvedFireConfig> {
     let imu = crate::imu::resolve(&section(root, "imu"), &models)?;
     let [magnetometer, barometer, gnss] = crate::sensors::resolve_all(root, &models)?;
     let acoustic = crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?;
+    let peripherals = crate::peripherals::resolve(&section(root, "peripherals"), vehicle)?;
     Ok(ResolvedFireConfig {
         schema_version: version,
         acquisition,
@@ -694,6 +704,7 @@ fn resolve_root(raw: Value) -> Result<ResolvedFireConfig> {
         barometer,
         gnss,
         acoustic,
+        peripherals,
         plant: Table::new(),
         parts: Vec::new(),
     })

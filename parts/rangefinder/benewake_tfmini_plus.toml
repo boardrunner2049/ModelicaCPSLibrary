@@ -1,0 +1,33 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "Benewake TFmini Plus"
+kind = "rangefinder"
+manufacturer = "Benewake (Beijing) Co., Ltd."
+source = "TFmini Plus LiDAR datasheet PD-TFmini-Plus-Datasheet-A07 (c)2024, https://en.benewake.com/uploadfiles/2024/04/20240426135842086.pdf (same figures as SJ-PM-TFmini Plus A07, https://files.waveshare.com/upload/e/e9/SJ-PM-TFmini_Plus-01_A07_Datasheet.pdf)"
+notes = "Accuracy footnote: standard test condition 25 C indoors, whiteboard 90% reflectivity; changed conditions may increase error. FOV is stated as 'a theoretical reference value'. Frame rate settable only to 1000/n Hz. I2C mode frame rate limited to 1-100 Hz. Light source is LED (not laser)."
+range_min_m = 0.1                             # 90% and 10% reflectivity (Specifications, p1)
+range_max_m = 12.0                            # 90% reflectivity, also at 70 klux ambient (p1)
+range_max_10pct_reflectivity_m = 4.0          # 10% reflectivity, also at 70 klux (p1)
+accuracy_m = 0.05                             # +/-5 cm for 0.1-5 m (p1, footnote 1)
+accuracy_percent = 1.0                        # +/-1% for 5-12 m (p1)
+accuracy_bands = [[0.1, 5.0, 0.05], [5.0, 12.0, 1.0]]  # first band meters, second band percent of distance (p1)
+resolution_m = 0.01                           # distance resolution 1 cm (p1)
+update_rate_hz = 100                          # default frame rate, UART (Configurable Parameters table, p3)
+update_rate_max_hz = 1000                     # UART, adjustable 1-1000 Hz (p1)
+update_rate_max_i2c_hz = 100                  # I2C, adjustable 1-100 Hz (p1)
+repeatability_1sigma_m = 0.03                 # UART <3 cm @100 Hz (p1)
+repeatability_1sigma_i2c_m = 0.04             # I2C <4 cm @100 Hz (p1)
+ambient_light_immunity_klux = 70              # (p2)
+fov_deg = 3.6                                 # theoretical reference value (p2, footnote 4)
+wavelength_nm = 850                           # central wavelength, LED source (p2)
+supply_voltage_v = [4.5, 5.5]                 # 5 V +/- 0.5 V (p2)
+current_ma = 110                              # average current <=110 mA (p2)
+current_peak_ma = 140                         # peak current (p2)
+power_mw = 550                                # typical; low-power mode <100 mW (p2)
+interface = "UART (LVTTL 3.3 V, default 115200 baud, 9600-921600) / I2C (slave, <=400 kbps, default addr 0x10) / I/O"  # (p2-3)
+operating_temperature_c = [-20, 60]           # (p2)
+storage_temperature_c = [-20, 75]             # (p2)
+ip_rating = "IP65"                            # (p2)
+dimensions_mm = [35, 18.5, 21]                # (p2)
+mass_g = 12                                   # 12 g +/- 1 g (p2)
+cable_length_m = 0.3                          # (p2)
+not_stated = ["beam_divergence_deg (only FOV given)", "range_min/max at other reflectivities", "accuracy at 10% reflectivity"]

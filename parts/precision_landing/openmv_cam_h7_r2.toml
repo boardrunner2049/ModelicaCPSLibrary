@@ -1,0 +1,17 @@
+# Datasheet figures as published; tools/fire-compose/src/peripherals.rs converts them.
+name = "OpenMV Cam H7 R2 (MT9M114)"
+kind = "precision_landing"
+manufacturer = "OpenMV LLC"
+source = "OpenMV Cam H7 R2 product page https://openmv.io/products/openmv-cam-h7-r2 (archived 2026-08-09; product listed as no longer in production)"
+notes = "Alternative AprilTag-capable camera (runs MicroPython on STM32H743; AprilTag detection on-board). ArduPilot's precision landing page lists AprilTag via a companion computer generically; no OpenMV-specific ArduPilot page was found. Page inconsistency: text says 'comes with a 2.1mm lens' while 'Lens Info' lists focal length 2.8 mm with lens HFOV 70.8 / VFOV 55.6 deg; the 'Actual FoV with MT9M114 image sensor' figures are used below. Frame rate is sensor capture rate, not AprilTag detection rate (not stated)."
+fov_h_deg = 47.5                     # "Actual FoV with MT9M114 image sensor: D57.7 H47.5 V36.6" (product page, Lens Info)
+fov_v_deg = 36.6                     # same
+fov_diag_deg = 57.7                  # same
+resolution_px = [640, 480]           # MT9M114 grayscale/Bayer max 640x480 (product page)
+frame_rate_hz = 40                   # 40 FPS above 320x240; 80 FPS at/below 320x240 (product page)
+frame_rate_qvga_hz = 80              # product page
+mass_g = 16                          # "Weight: 16 g" (product page)
+current_active_ma = 160              # Active, no uSD card, @ 3.3 V (product page)
+supply_voltage_v = [3.6, 5]          # VIN (product page)
+operating_temp_c = [-20, 70]         # product page
+not_stated = ["detection_range_max_m (depends on tag size; not specified)", "AprilTag processing rate", "latency_ms"]

@@ -24,6 +24,30 @@ index b1a54e45e3..782dfe5533 100644
          if cfg.options.enable_sfml_audio:
              if not cfg.check_SFML_Audio(env):
                  cfg.fatal("Failed to find SFML Audio libraries")
+diff --git a/libraries/AC_PrecLand/AC_PrecLand_SITL.cpp b/libraries/AC_PrecLand/AC_PrecLand_SITL.cpp
+index fc7f48057d..67a0c23bf9 100644
+--- a/libraries/AC_PrecLand/AC_PrecLand_SITL.cpp
++++ b/libraries/AC_PrecLand/AC_PrecLand_SITL.cpp
+@@ -13,6 +13,19 @@ void AC_PrecLand_SITL::init()
+ // update - give chance to driver to get updates from sensor
+ void AC_PrecLand_SITL::update()
+ {
++    const auto &model = _sitl->state.model_sensors;
++    if (model.precland_present) {
++        // the vehicle model's landing-target camera
++        _state.healthy = true;
++        if (model.precland_valid) {
++            _los_meas_body = model.precland_los_body;
++            _distance_to_target = model.precland_distance_m;
++            _los_meas_time_ms = AP_HAL::millis();
++            _have_los_meas = true;
++        }
++        _have_los_meas = _have_los_meas && AP_HAL::millis() - _los_meas_time_ms <= 1000;
++        return;
++    }
+     _state.healthy = _sitl->precland_sim.healthy();
+ 
+     if (_state.healthy && _sitl->precland_sim.last_update_ms() != _los_meas_time_ms) {
 diff --git a/libraries/AP_Baro/AP_Baro_SITL.cpp b/libraries/AP_Baro/AP_Baro_SITL.cpp
 index cd914632a3..721f173ad8 100644
 --- a/libraries/AP_Baro/AP_Baro_SITL.cpp
@@ -44,6 +68,25 @@ index cd914632a3..721f173ad8 100644
      const auto drift_delta_t_ms = now - last_drift_delta_t_ms;
      last_drift_delta_t_ms = now;
      total_alt_drift += _sitl->baro[_instance].drift * drift_delta_t_ms * 0.001f;
+diff --git a/libraries/AP_Beacon/AP_Beacon_SITL.cpp b/libraries/AP_Beacon/AP_Beacon_SITL.cpp
+index 2e2971363c..73c64c403b 100644
+--- a/libraries/AP_Beacon/AP_Beacon_SITL.cpp
++++ b/libraries/AP_Beacon/AP_Beacon_SITL.cpp
+@@ -70,6 +70,14 @@ void AP_Beacon_SITL::update(void)
+     current_loc.lat = sitl->state.latitude * 1.0e7f;
+     current_loc.lng = sitl->state.longitude * 1.0e7f;
+     current_loc.alt = sitl->state.altitude * 1.0e2;
++    const auto &model = sitl->state.model_sensors;
++    if (model.beacon_present) {
++        // the vehicle model's beacon tag
++        if (!model.beacon_valid) {
++            return;
++        }
++        current_loc = model.beacon_location;
++    }
+ 
+     // where the beacon system origin is located
+     Location beacon_origin;
 diff --git a/libraries/AP_HAL_SITL/SITL_cmdline.cpp b/libraries/AP_HAL_SITL/SITL_cmdline.cpp
 index 042bb2ce7f..590bbbbed2 100644
 --- a/libraries/AP_HAL_SITL/SITL_cmdline.cpp
@@ -66,6 +109,41 @@ index 042bb2ce7f..590bbbbed2 100644
      { "blimp",              Blimp::create },
      { "novehicle",          NoVehicle::create },
  #if AP_SIM_STRATOBLIMP_ENABLED
+diff --git a/libraries/AP_HAL_SITL/sitl_airspeed.cpp b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+index cf3e666aa1..717ecf9a7a 100644
+--- a/libraries/AP_HAL_SITL/sitl_airspeed.cpp
++++ b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+@@ -51,6 +51,11 @@ void SITL_State::_update_airspeed(float true_airspeed)
+             airspeed = 340.29409348 * sqrt(5 * (pow((tube_pressure / SSL_AIR_PRESSURE + 1), 2.0/7.0) - 1.0));
+         }
+         float airspeed_pressure = (airspeed * airspeed) / arspd.ratio;
++        const auto &model = _sitl->state.model_sensors;
++        if (i == 0 && model.airspeed_present) {
++            // the vehicle model's airspeed sensor: its differential pressure
++            airspeed_pressure = model.airspeed_pressure_pa;
++        }
+ 
+         // flip sign here for simulating reversed pitot/static connections
+         if (arspd.signflip) {
+diff --git a/libraries/AP_OpticalFlow/AP_OpticalFlow_SITL.cpp b/libraries/AP_OpticalFlow/AP_OpticalFlow_SITL.cpp
+index d238254313..0f1dcebb25 100644
+--- a/libraries/AP_OpticalFlow/AP_OpticalFlow_SITL.cpp
++++ b/libraries/AP_OpticalFlow/AP_OpticalFlow_SITL.cpp
+@@ -94,6 +94,14 @@ void AP_OpticalFlow_SITL::update(void)
+     // poll to provide a delta angle across the interface.
+     state.bodyRate = Vector2f(gyro.x, gyro.y);
+ 
++    const auto &model = _sitl->state.model_sensors;
++    if (model.flow_present) {
++        // the vehicle model's flow sensor
++        state.flowRate = model.flow_rate;
++        state.bodyRate = model.flow_body_rate;
++        state.surface_quality = model.flow_valid ? 255 : 0;
++    }
++
+     optflow_data[next_optflow_index++] = state;
+     if (next_optflow_index >= optflow_delay+1) {
+         next_optflow_index = 0;
 diff --git a/libraries/SITL/SIM_Aircraft.cpp b/libraries/SITL/SIM_Aircraft.cpp
 index 634334404b..dd6bc25a31 100644
 --- a/libraries/SITL/SIM_Aircraft.cpp
@@ -201,11 +279,143 @@ index d51521cf3b..31698fa5e7 100644
      const uint32_t now_ms = AP_HAL::millis();
  
      if (now_ms < 20000) {
+diff --git a/libraries/SITL/SIM_InertialLabs.cpp b/libraries/SITL/SIM_InertialLabs.cpp
+index 632254fc39..bce5215da9 100644
+--- a/libraries/SITL/SIM_InertialLabs.cpp
++++ b/libraries/SITL/SIM_InertialLabs.cpp
+@@ -27,7 +27,7 @@ InertialLabs::InertialLabs() : SerialDevice::SerialDevice()
+ 
+ void InertialLabs::send_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+ 
+     pkt.msg_len = sizeof(pkt)-2;
+ 
+diff --git a/libraries/SITL/SIM_MicroStrain.cpp b/libraries/SITL/SIM_MicroStrain.cpp
+index 7cbff8263c..fcf5711399 100644
+--- a/libraries/SITL/SIM_MicroStrain.cpp
++++ b/libraries/SITL/SIM_MicroStrain.cpp
+@@ -85,7 +85,7 @@ void MicroStrain::send_packet(MicroStrain_Packet packet)
+ 
+ void MicroStrain::send_imu_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+     MicroStrain_Packet packet;
+ 
+     struct timeval tv;
+@@ -143,7 +143,7 @@ void MicroStrain::send_imu_packet(void)
+ 
+ void MicroStrain5::send_gnss_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+     MicroStrain_Packet packet;
+ 
+     struct timeval tv;
+@@ -214,7 +214,7 @@ void MicroStrain5::send_gnss_packet(void)
+ 
+ void MicroStrain5::send_filter_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+     MicroStrain_Packet packet;
+ 
+     struct timeval tv;
+diff --git a/libraries/SITL/SIM_MicroStrain7.cpp b/libraries/SITL/SIM_MicroStrain7.cpp
+index 2bee3bc00d..4e98b34822 100644
+--- a/libraries/SITL/SIM_MicroStrain7.cpp
++++ b/libraries/SITL/SIM_MicroStrain7.cpp
+@@ -30,7 +30,7 @@ using namespace SITL;
+ 
+ void MicroStrain7::send_gnss_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+ 
+     constexpr uint8_t descriptors[2] = {0x91, 0x92};
+     for (uint8_t i = 0; i < ARRAY_SIZE(descriptors); i++) {
+@@ -107,7 +107,7 @@ void MicroStrain7::send_gnss_packet(void)
+ 
+ void MicroStrain7::send_filter_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+     MicroStrain_Packet packet;
+ 
+     struct timeval tv;
+diff --git a/libraries/SITL/SIM_Temperature_TSYS01.cpp b/libraries/SITL/SIM_Temperature_TSYS01.cpp
+index 5785a73152..82d5eefdb6 100644
+--- a/libraries/SITL/SIM_Temperature_TSYS01.cpp
++++ b/libraries/SITL/SIM_Temperature_TSYS01.cpp
+@@ -190,6 +190,11 @@ void SITL::TSYS01::update(const class Aircraft &aircraft)
+ 
+ float SITL::TSYS01::get_sim_temperature() const
+ {
++    const auto &model = AP::sitl()->state.model_sensors;
++    if (model.temperature_present) {
++        // the vehicle model's temperature sensor
++        return model.temperature_c;
++    }
+     float sim_alt = AP::sitl()->state.altitude;
+     sim_alt += 2 * rand_float();
+ 
+diff --git a/libraries/SITL/SIM_VectorNav.cpp b/libraries/SITL/SIM_VectorNav.cpp
+index 545445da46..6e168a6307 100644
+--- a/libraries/SITL/SIM_VectorNav.cpp
++++ b/libraries/SITL/SIM_VectorNav.cpp
+@@ -95,7 +95,7 @@ static void simulation_timeval(struct timeval *tv)
+ 
+ void VectorNav::send_imu_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+ 
+     struct VN_IMU_packet_sim pkt {};
+ 
+@@ -144,7 +144,7 @@ void VectorNav::send_imu_packet(void)
+ 
+ void VectorNav::send_ins_ekf_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+ 
+     struct VN_INS_ekf_packet_sim pkt {};
+ 
+@@ -190,7 +190,7 @@ void VectorNav::send_ins_ekf_packet(void)
+ 
+ void VectorNav::send_ins_gnss_packet(void)
+ {
+-    const auto &fdm = _sitl->state;
++    const auto fdm = external_ahrs_view(_sitl->state);
+ 
+     struct VN_INS_gnss_packet_sim pkt {};
+ 
+diff --git a/libraries/SITL/SIM_Vicon.cpp b/libraries/SITL/SIM_Vicon.cpp
+index ea86270f69..1e69d25042 100644
+--- a/libraries/SITL/SIM_Vicon.cpp
++++ b/libraries/SITL/SIM_Vicon.cpp
+@@ -315,5 +315,14 @@ void Vicon::update(const Location &loc, const Vector3d &position, const Vector3f
+     }
+ 
+     maybe_send_heartbeat();
++    const auto &model = _sitl->state.model_sensors;
++    if (model.vision_present) {
++        // the vehicle model's visual odometry
++        if (model.vision_valid) {
++            update_vicon_position_estimate(model.vision_location, model.vision_position_ned,
++                                           model.vision_velocity_ned, model.vision_attitude);
++        }
++        return;
++    }
+     update_vicon_position_estimate(loc, position, velocity, attitude);
+ }
 diff --git a/libraries/SITL/SITL.h b/libraries/SITL/SITL.h
-index d799945b96..fd91749ecc 100644
+index d799945b96..87065d77a6 100644
 --- a/libraries/SITL/SITL.h
 +++ b/libraries/SITL/SITL.h
-@@ -53,6 +53,19 @@ class StratoBlimp;
+@@ -53,6 +53,46 @@ class StratoBlimp;
  class Glider;
  class FlightAxis;
  
@@ -220,12 +430,39 @@ index d799945b96..fd91749ecc 100644
 +    bool baro_valid;
 +    float baro_pressure_pa;
 +    float baro_temperature_c;
++    // Peripherals (Systems.Peripherals): "present" when the model has the
++    // device, so SITL's own simulation of it is replaced; "valid" per reading.
++    bool airspeed_present;
++    float airspeed_pressure_pa;         // differential, sensor 1
++    bool flow_present, flow_valid;
++    Vector2f flow_rate, flow_body_rate; // rad/s, sensor x/y
++    bool temperature_present;
++    float temperature_c;
++    bool vision_present, vision_valid;
++    Location vision_location;
++    Vector3d vision_position_ned;       // m from home
++    Vector3f vision_velocity_ned;
++    Quaternion vision_attitude;         // body FRD to NED
++    bool beacon_present, beacon_valid;
++    Location beacon_location;           // of the tag
++    bool precland_present, precland_valid;
++    Vector3f precland_los_body;         // unit line of sight to the target, body FRD
++    float precland_distance_m;
++    bool ahrs_present, ahrs_valid;
++    struct {
++        double latitude, longitude, altitude;
++        double speedN, speedE, speedD;
++        double xAccel, yAccel, zAccel;   // m/s/s, body
++        double rollRate, pitchRate, yawRate; // deg/s
++        double rollDeg, pitchDeg, yawDeg;
++        Quaternion quaternion;
++    } ahrs;
 +};
 +
  struct sitl_fdm {
      // this is the structure passed between FDM models and the main SITL code
      uint64_t timestamp_us;
-@@ -77,6 +90,7 @@ struct sitl_fdm {
+@@ -77,6 +117,7 @@ struct sitl_fdm {
      float  rcin[12];         // RC input 0..1
      double range;           // rangefinder value
      Vector3f bodyMagField;  // Truth XYZ magnetic field vector in body-frame. Includes motor interference. Units are milli-Gauss.
@@ -233,6 +470,41 @@ index d799945b96..fd91749ecc 100644
      Vector3f angAccel; // Angular acceleration in degrees/s/s about the XYZ body axes
  
      struct {
+@@ -104,6 +145,34 @@ struct sitl_fdm {
+ 
+ };
+ 
++// The FDM as an external AHRS/INS simulator reports it: the vehicle model's
++// own AHRS solution (SIM_CPVehicle) when the model has one, else the truth.
++static inline sitl_fdm external_ahrs_view(const sitl_fdm &state)
++{
++    sitl_fdm fdm = state;
++    const auto &model = state.model_sensors;
++    if (model.ahrs_present) {
++        const auto &a = model.ahrs;
++        fdm.latitude = a.latitude;
++        fdm.longitude = a.longitude;
++        fdm.altitude = a.altitude;
++        fdm.speedN = a.speedN;
++        fdm.speedE = a.speedE;
++        fdm.speedD = a.speedD;
++        fdm.xAccel = a.xAccel;
++        fdm.yAccel = a.yAccel;
++        fdm.zAccel = a.zAccel;
++        fdm.rollRate = a.rollRate;
++        fdm.pitchRate = a.pitchRate;
++        fdm.yawRate = a.yawRate;
++        fdm.rollDeg = a.rollDeg;
++        fdm.pitchDeg = a.pitchDeg;
++        fdm.yawDeg = a.yawDeg;
++        fdm.quaternion = a.quaternion;
++    }
++    return fdm;
++}
++
+ // number of rc output channels
+ #define SITL_NUM_CHANNELS 32
+ 
 diff --git a/wscript b/wscript
 index f400c74cdb..4024566c35 100644
 --- a/wscript

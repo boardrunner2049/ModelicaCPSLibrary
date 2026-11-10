@@ -407,6 +407,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
             "barometer",
             "gnss",
             "vulnerabilities",
+            "peripherals",
         ],
         "config",
     )
@@ -442,6 +443,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
         barometer: barometer.clone(),
         gnss: gnss.clone(),
         acoustic: crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?,
+        peripherals: crate::peripherals::resolve(&section(root, "peripherals"), kind.name)?,
         models,
         plant: resolve_plant(&section(root, "plant"), kind)?,
         parts: Vec::new(),
@@ -508,6 +510,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     if let Some(sensors) = crate::lower::sensor_modifiers(c)? {
         plant.push(sensors);
     }
+    crate::peripherals::components(c, &mut components, &mut equalities)?;
     if !plant.is_empty() {
         modifiers.push(Modifier::Nested("plant".into(), plant));
     }
