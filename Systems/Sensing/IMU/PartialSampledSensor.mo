@@ -16,8 +16,11 @@ protected
   Sensor ideal(r_b=r_b,R_bs=R_bs);
   Real calibrated[6];
   Real frontEnd[6] "Supplied by the selected sensor physics";
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(p.streamId,p.seed), each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Integer tick(start=-1,fixed=true);
   discrete Integer acquired(start=0,fixed=true);
   discrete Real normal[12](each start=0,each fixed=true);
@@ -45,8 +48,10 @@ equation
   gyro=delivered[4:6];
   when sample(0,tickPeriod) then
     tick=pre(tick)+1;
+    rngSeed=seededState(pre(rngState),pre(rngSeeded),p.streamId,p.seed);
+    rngSeeded=pre(rngSeeded) or enableErrors;
     if enableErrors then
-      (normal,rngState)=normalDraw(pre(rngState));
+      (normal,rngState)=normalDraw(rngSeed);
     else
       normal=zeros(12);
       rngState=pre(rngState);

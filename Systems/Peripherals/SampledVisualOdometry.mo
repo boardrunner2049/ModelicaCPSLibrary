@@ -21,8 +21,11 @@ model SampledVisualOdometry "V1: V0 at the output rate; position drift growing w
   output Real travelled(unit="m") "Diagnostic: path length";
 protected
   VisualOdometry ideal(position_b=position_b,R_bs=R_bs);
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real normal[4](each start=0,each fixed=true);
   discrete Real direction[3](each start=0,each fixed=true);
   discrete Real drift[3](each start=0,each fixed=true);
@@ -37,7 +40,9 @@ protected
 equation
   ideal.truth = truth;
   when sample(startTime, samplePeriod) then
-    (normal, rngState) = Sensing.normalDraw(4, pre(rngState));
+    rngSeed=Sensing.seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal, rngState) = Sensing.normalDraw(4, rngSeed);
+    rngSeeded=true;
     step = if pre(initialized) then sqrt((ideal.position - pre(last))*(ideal.position - pre(last))) else 0;
     for i in 1:3 loop
       direction[i] = if not pre(initialized) then normal[i]

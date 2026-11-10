@@ -50,8 +50,11 @@ protected
   Real los[nSat,3];
   Real up_e[3];
   discrete Real normal[2*nSat](each start=0,each fixed=true);
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real solution[6](each start=0,each fixed=true);
   discrete Real solutionCovariance[6,6](each start=0,each fixed=true);
   discrete Real solutionClock(start=0,fixed=true);
@@ -89,7 +92,9 @@ equation
   satellitesUsed=integer(qualityDelivery.y[4]);
 algorithm
   when sample(startTime,samplePeriod) then
-    (normal,rngState):=normalDraw(2*nSat,pre(rngState));
+    rngSeed:=seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal,rngState):=normalDraw(2*nSat,rngSeed);
+    rngSeeded:=true;
     for i in 1:nSat loop
       visible[i]:=satelliteAvailable[i] and geometricRange[i]>1 and elevation[i]>=elevationMask;
       pseudorange[i]:=(1+satelliteClockDrift[i])*geometricRange[i]+c*(receiverClockBias-satelliteClockBias[i])

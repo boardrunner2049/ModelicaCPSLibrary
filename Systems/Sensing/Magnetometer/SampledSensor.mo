@@ -17,8 +17,11 @@ model SampledSensor "M1: sampled field with soft-iron distortion, hard-iron offs
   output Boolean valid "A sample has been delivered";
   output Real biasState[3](each unit="T") "Diagnostic truth of the bias drift";
 protected
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real normal[6](each start=0,each fixed=true);
   discrete Real drift[3](each start=0,each fixed=true);
   discrete Boolean initialized(start=false,fixed=true);
@@ -30,7 +33,9 @@ initial equation
     "Invalid magnetometer error parameters");
 equation
   when sample(startTime,samplePeriod) then
-    (normal,rngState)=normalDraw(6,pre(rngState));
+    rngSeed=seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal,rngState)=normalDraw(6,rngSeed);
+    rngSeeded=true;
     for j in 1:3 loop
       drift[j]=if not pre(initialized) then biasStd[j]*normal[j]
         else phi[j]*pre(drift[j])+biasStd[j]*sqrt(1-phi[j]^2)*normal[j];

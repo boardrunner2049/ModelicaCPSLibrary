@@ -176,6 +176,16 @@ class Slave:
     def fixed(self) -> list[str]:
         return [v.name for v in self.md.modelVariables if v.causality == "calculatedParameter"]
 
+    def size(self, name: str) -> int:
+        """Elements of a (possibly array) variable: FMI 3 exports arrays natively."""
+        n = 1
+        for d in getattr(self.vars[name], "dimensions", []) or []:
+            if d.start is not None:
+                n *= int(d.start)
+            else:
+                n *= int(self.slave.getUInt64([d.valueReference])[0]) if d.valueReference is not None else 1
+        return n
+
     def _set(self, name: str, value):
         v = self.vars.get(name)
         if v is None:
@@ -183,16 +193,29 @@ class Slave:
         if v.causality not in ("parameter", "input"):
             raise KeyError(f"{name} is {v.causality} ({v.variability}): it cannot be set"
                            + (" — structural, export a variant instead" if v.causality == "calculatedParameter" else ""))
+        n = self.size(name)
+        vals = list(np.ravel(value)) if np.ndim(value) else [value] * n
+        if len(vals) != n:
+            raise ValueError(f"{name}: {len(vals)} values for {n} elements")
         if v.type == "Float64":
-            self.slave.setFloat64([v.valueReference], [float(value)])
+            self.slave.setFloat64([v.valueReference], [float(x) for x in vals])
         elif v.type == "Int32":
-            self.slave.setInt32([v.valueReference], [int(value)])
+            self.slave.setInt32([v.valueReference], [int(x) for x in vals])
         elif v.type == "Boolean":
-            self.slave.setBoolean([v.valueReference], [bool(value)])
+            self.slave.setBoolean([v.valueReference], [bool(x) for x in vals])
         else:
             raise TypeError(f"{name}: {v.type}")
 
+    def get_array(self, name: str) -> np.ndarray:
+        v = self.vars[name]
+        n = self.size(name)
+        fn = {"Float64": self.slave.getFloat64, "Int32": self.slave.getInt32,
+              "Boolean": self.slave.getBoolean}[v.type]
+        return np.array(fn([v.valueReference], nValues=n) if n > 1 else fn([v.valueReference]), dtype=float)
+
     def _get(self, names: list[str]) -> list[float]:
+        if any(self.size(n) > 1 for n in names):
+            return [self.get_array(n) if self.size(n) > 1 else self.get_array(n)[0] for n in names]
         types = {self.vars[n].type for n in names}
         if types <= {"Float64", "Int32", "Boolean"} and len(names) > 1:
             got = {}
@@ -238,8 +261,8 @@ class Slave:
                 self._set(n, v)
             self.slave.doStep(currentCommunicationPoint=t0, communicationStepSize=t1 - t0)
             rows.append(self._get(outputs))
-        data = np.array(rows)
-        return Result(points, {n: data[:, j] for j, n in enumerate(outputs)},
+        cols = {n: np.array([r[j] for r in rows]) for j, n in enumerate(outputs)}
+        return Result(points, cols,
                       {"stop": stop, "step": step, "communication_points": len(points),
                        "parameters": dict(parameters), "fmu": self.path.name})
 

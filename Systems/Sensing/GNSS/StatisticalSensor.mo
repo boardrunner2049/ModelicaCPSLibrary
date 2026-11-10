@@ -9,8 +9,11 @@ model StatisticalSensor "G1: correlated PVT white noise and stationary Gauss-Mar
   input Boolean fixAvailable=true "Scenario receiver availability at acquisition";
   output Real biasState[6] "Diagnostic truth, not receiver quality";
 protected
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real normal[12](each start=0,each fixed=true);
   discrete Real latentBias[6](each start=0,each fixed=true);
   discrete Boolean initialized(start=false,fixed=true);
@@ -19,7 +22,9 @@ initial equation
   assert(min(biasTau)>0,"GNSS bias time constants must be positive");
 equation
   when sample(startTime,samplePeriod) then
-    (normal,rngState)=normalDraw(12,pre(rngState));
+    rngSeed=seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal,rngState)=normalDraw(12,rngSeed);
+    rngSeeded=true;
     for j in 1:6 loop
       latentBias[j]=if not pre(initialized) then normal[j]
         else phi[j]*pre(latentBias[j])+sqrt(1-phi[j]^2)*normal[j];

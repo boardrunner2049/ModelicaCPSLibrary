@@ -22,8 +22,11 @@ model Sampler "Sampled measurement chain per channel: scale error, bias, Gauss-M
   output Integer sequence "Delivered samples";
   output Real sampleTime(unit="s") "Acquisition epoch of the delivered sample; -1 before the first";
 protected
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real normal[2*n](each start=0,each fixed=true);
   discrete Real drift[n](each start=0,each fixed=true);
   discrete Boolean initialized(start=false,fixed=true);
@@ -35,7 +38,9 @@ initial equation
     and min(quantum)>=0,"Invalid sampler error parameters");
 equation
   when sample(startTime,samplePeriod) then
-    (normal,rngState)=Sensing.normalDraw(2*n,pre(rngState));
+    rngSeed=Sensing.seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal,rngState)=Sensing.normalDraw(2*n,rngSeed);
+    rngSeeded=true;
     for i in 1:n loop
       drift[i]=if not pre(initialized) then driftStd[i]*normal[i]
         else exp(-samplePeriod/driftTau[i])*pre(drift[i])

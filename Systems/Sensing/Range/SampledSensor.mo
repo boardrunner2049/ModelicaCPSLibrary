@@ -24,8 +24,11 @@ protected
   Sensor ideal(minRange=minRange,maxRange=maxRange,parallelTolerance=parallelTolerance,
     direction_w=direction_w,planeNormal_w=planeNormal_w,planeOffset=planeOffset);
   SampledDelivery delivery(n=2,samplePeriod=samplePeriod,startTime=startTime,latencySamples=latencySamples);
-  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](
-    start=Modelica.Math.Random.Generators.Xorshift128plus.initialState(streamId,seed),each fixed=true);
+  // Seeded at the first draw (Systems.Sensing.seededState), not by a start
+  // value, so seed and streamId stay settable in an exported FMU.
+  discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0,each fixed=true);
+  discrete Boolean rngSeeded(start=false,fixed=true);
   discrete Real normal[1](each start=0,each fixed=true);
   Real raw;
   Real rounded;
@@ -36,7 +39,9 @@ equation
   ideal.position_w=position_w;
   assert(signalQuality>=0 and signalQuality<=1,"Range signal quality must be in [0,1]");
   when sample(startTime,samplePeriod) then
-    (normal,rngState)=normalDraw(1,pre(rngState));
+    rngSeed=seededState(pre(rngState),pre(rngSeeded),streamId,seed);
+    (normal,rngState)=normalDraw(1,rngSeed);
+    rngSeeded=true;
   end when;
   raw=ideal.distance+bias+temperatureCoefficient*(sensorTemperature-referenceTemperature)
     +(noiseStd+noiseSlope*ideal.distance)*normal[1];
