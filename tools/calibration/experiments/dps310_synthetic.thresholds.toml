@@ -1,0 +1,18 @@
+# Acceptance thresholds for the DPS310 synthetic experiment, fixed before any
+# held-out evaluation (the pipeline reads and hashes this file first).
+# They are for this synthetic exercise only. A real calibration declares its
+# own from the reference instrument's uncertainty and the intended use.
+
+[holdout]
+# |mean error| over a 30 min held-out record. Rationale: with a 3 Pa, 60 s
+# drift, the mean of a 30 min record scatters by about 3*sqrt(2*60/1800) =
+# 0.8 Pa, in both the training estimate of the offset and the held-out record,
+# so their difference has sigma about 1.1 Pa; 2.5 Pa is beyond two sigma and is
+# 0.2 m of height. The reference is exact (synthetic), so it adds nothing.
+mean_error_pa = 2.5
+# Standardized innovations under the profile's own noise model: their spread
+# must be about 1 (the noise model has the right size) ...
+innovation_std = [0.9, 1.1]
+# ... and they must be white (Ljung-Box, 20 lags). A small threshold, because
+# the test runs on every held-out set and quantization is approximated.
+ljung_box_p_min = 0.001
