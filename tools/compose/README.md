@@ -96,6 +96,30 @@ in three groups, each off until picked:
 Fitted peripherals and payloads appear in the garage as labelled modules
 (payloads dashed), and their chips take the camera to them.
 
+## Moving things
+
+Drag parts in the garage; each drop writes its field (body FRD, metres; the
+height stays as typed):
+
+| Drag | Sets |
+|---|---|
+| a motor, outward or inward | `geometry.armLength`: the frame's size (CG to rotor) |
+| IMU, barometer, GNSS (quad) | `geometry.imuPosition_C`, `barometerPosition_C`, `gnssPosition_C` |
+| IMU, barometer, GNSS (rover, plane) | `plant.imuPosition_b`, `barometerPosition_b`, `gnssPosition_b` |
+| the battery (quad) | `[mass.placements.battery]`: its mass (the picked pack's datasheet weight, or type it) placed there: the CG and inertia move |
+| a peripheral or payload module | its `position` (drag it from the bay onto the airframe) |
+
+A tooltip shows the coordinates while dragging. The drawing is to scale for
+positions (the quad at 792 px/m), not for the parts' sizes.
+
+## Provenance
+
+After each check, every field of a fitted peripheral or payload carries a
+mark: *datasheet* (the device's figure; hover for the figures and the
+conversion), *set here*, *assumed* (a conversion had to assume it), a
+library default that should be a datasheet's (red: no device set it), or a
+plain library default. Each card sums them.
+
 ## Where the parts come from
 
 Nothing is restated here (`parts.py`):

@@ -83,6 +83,22 @@ This is source composition, not arbitrary contract-aware RBC linking.
 `check` runs OpenModelica checkModel and translateModel. Use `tools/probe_export.py`
 for actual FMI 2.0 CS generation/stepping. Neither proves Rumoca/FastDyn firmware integration.
 
+## Where things sit
+
+```toml
+[geometry]
+preset = "QuadX"
+armLength = 0.30                   # CG to rotor [m]: sizes the preset's frame (not with armMount)
+imuPosition_C = [0.02, 0.0, -0.01] # sensor mounts from the chassis reference, body FRD [m]
+gnssPosition_C = [-0.05, 0.0, -0.08]
+barometerPosition_C = [0.0, 0.0, 0.0]
+
+[mass.placements.battery]          # aggregate mode: an item of the vehicle's mass placed
+mass = 0.44                        #   elsewhere; the CG and the inertia about it move
+position = [0.03, 0.0, 0.02]       #   (parallel-axis theorem, the item as a point mass)
+from = [0.0, 0.0, 0.0]             #   where the aggregate has it (default the reference)
+```
+
 ## Real parts
 
 Motors, propellers, batteries, ESCs, servos and gearmotors too: `[models.propulsion]`, `[models.servos]`/`[models.steering]`, `[models.drive]` (src/powertrain.rs); see parts/README.md.

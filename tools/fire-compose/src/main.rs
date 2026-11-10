@@ -123,10 +123,9 @@ fn run() -> Result<()> {
             let raw = fs::read_to_string(path).map_err(|e| e.to_string())?;
             let c = config::parse_at(&raw, config_table.as_deref())?;
             if json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&c).map_err(|e| e.to_string())?
-                );
+                let mut v = serde_json::to_value(&c).map_err(|e| e.to_string())?;
+                v["provenance"] = serde_json::Value::Array(fire_compose::provenance::table(&c));
+                println!("{}", serde_json::to_string_pretty(&v).map_err(|e| e.to_string())?);
             } else {
                 println!("Configuration valid: {}", c.model_name);
             }

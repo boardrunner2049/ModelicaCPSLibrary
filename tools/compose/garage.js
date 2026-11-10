@@ -7,7 +7,7 @@
 const Garage = (() => {
   const NS = "http://www.w3.org/2000/svg";
   const VIEW = [0, 0, 800, 420];
-  let svg, caption, chips, shelf, onPick = () => {}, onChoose = () => {}, view = VIEW.slice(), anim = 0;
+  let svg, caption, chips, shelf, onPick = () => {}, onChoose = () => {}, onMove = () => {}, view = VIEW.slice(), anim = 0;
   let focusKey = "overview", info = null;
 
   // --- what the picks say about the drawing ----------------------------------
@@ -17,15 +17,35 @@ const Garage = (() => {
   const cells = (name) => num(/(\d)S\b/, name, 4);
   const mah = (name) => num(/(\d{3,5})\s*mAh/i, name, 4000);
 
+  // --- moving things ------------------------------------------------------------
+  // Drag a sensor, the battery, a module or a motor: its mount (body FRD, m)
+  // or the frame's size goes into the configuration. Each drawing maps body
+  // x, y to the stage at a fixed scale; z stays as configured.
+  const MAP = {
+    quad: { s: 792, toScreen: (x, y) => [400 + 792 * y, 210 - 792 * x], toBody: (X, Y) => [(210 - Y) / 792, (X - 400) / 792] },
+    rover: { s: 400, toScreen: (x, y) => [400 + 400 * x, 210 + 400 * y], toBody: (X, Y) => [(X - 400) / 400, (Y - 210) / 400] },
+    plane: { s: 250, toScreen: (x, y) => [420 + 250 * x, 210 + 250 * y], toBody: (X, Y) => [(X - 420) / 250, (Y - 210) / 250] },
+  };
+  const MOUNT = {
+    quad: { imu: "geometry.imuPosition_C", gnss: "geometry.gnssPosition_C", barometer: "geometry.barometerPosition_C",
+            "propulsion.battery": "mass.placements.battery.position" },
+    rover: { imu: "plant.imuPosition_b", gnss: "plant.gnssPosition_b", barometer: "plant.barometerPosition_b" },
+    plane: { imu: "plant.imuPosition_b", gnss: "plant.gnssPosition_b", barometer: "plant.barometerPosition_b" },
+  };
+  let airframeNow = "quad";
+  const drag = (focus) => { const path = MOUNT[airframeNow][focus]; return path ? ` data-drag="${path}"` : ""; };
+  const vec = (text) => { try { const v = JSON.parse(text); return Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) ? v : null; } catch { return null; } };
+  const round = (x) => Math.round(x * 1000) / 1000;
+
   // --- drawing helpers --------------------------------------------------------
   // a(focus, extra attrs) tags an element: data-focus is what lights it,
   // data-anchor the instance the camera frames when there are several.
   const a = (focus, anchor = false) => `data-focus="${focus}"${anchor ? ' data-anchor=""' : ""}`;
   const chip = (x, y, w, h, focus, label, anchor = true) =>
-    `<g ${a(focus, anchor)}><rect class="g-chip" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/>` +
+    `<g ${a(focus, anchor)}${drag(focus)}><rect class="g-chip" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/>` +
     `<text class="g-tiny" x="${x + w / 2}" y="${y + h + 9}">${label}</text></g>`;
   const puck = (x, y, r, focusG, focusM) =>
-    `<g ${a(focusG, true)}><circle class="g-puck" cx="${x}" cy="${y}" r="${r}"/>` +
+    `<g ${a(focusG, true)}${drag(focusG)}><circle class="g-puck" cx="${x}" cy="${y}" r="${r}"/>` +
     `<path class="g-mark" d="M${x} ${y - r * 0.55} l${r * 0.32} ${r * 0.8} l${-r * 0.32} ${-r * 0.22} l${-r * 0.32} ${r * 0.22} z"/>` +
     `<text class="g-tiny" x="${x}" y="${y + r + 11}">GNSS</text></g>` +
     chip(x + r + 6, y - 6, 12, 12, focusM, "MAG");
@@ -38,7 +58,8 @@ const Garage = (() => {
   function quad(p) {
     const r = propRadius(p.propeller), mr = motorRadius(p.motor);
     const bw = 70 + 50 * Math.min(1, mah(p.battery) / 10000), n = cells(p.battery);
-    const cx = 400, cy = 210, dx = 160, dy = 128;
+    const arm = parseFloat(p.armLength) || 0.25;
+    const cx = 400, cy = 210, dx = MAP.quad.s * arm * Math.SQRT1_2, dy = dx;
     const arms = [[1, -1], [-1, -1], [-1, 1], [1, 1]];   // front right first: the anchor
     let s = "";
     s += `<g ${a("airframe")}>`;
@@ -53,7 +74,7 @@ const Garage = (() => {
       s += `<g ${a("propulsion.esc", i === 0)}><rect class="g-esc" x="${ex - 13}" y="${ey - 8}" width="26" height="16" rx="3" ` +
            `transform="rotate(${Math.atan2(sy * dy, sx * dx) * 180 / Math.PI} ${ex} ${ey})"/></g>`;
     });
-    s += `<g ${a("propulsion.battery", true)}><rect class="g-batt" x="${cx - bw / 2}" y="${cy + 6}" width="${bw}" height="48" rx="6"/>` +
+    s += `<g ${a("propulsion.battery", true)}${drag("propulsion.battery")}><rect class="g-batt" x="${cx - bw / 2}" y="${cy + 6}" width="${bw}" height="48" rx="6"/>` +
          `<rect class="g-strap" x="${cx - bw / 4 - 4}" y="${cy + 2}" width="8" height="56"/>` +
          `<rect class="g-strap" x="${cx + bw / 4 - 4}" y="${cy + 2}" width="8" height="56"/>` +
          `<text class="g-label" x="${cx}" y="${cy + 35}">${n}S</text></g>`;
@@ -65,7 +86,7 @@ const Garage = (() => {
       s += `<g ${a("propulsion.propeller", i === 0)}><circle class="g-disc" cx="${mx}" cy="${my}" r="${r}"/>` +
            `<g class="g-spin ${spin}" style="transform-origin:${mx}px ${my}px">` +
            `<path class="g-blade" d="M${mx - r} ${my} q${r / 2} ${-r * 0.13} ${r} 0 q${r / 2} ${r * 0.13} ${r} 0 q${-r / 2} ${r * 0.13} ${-r} 0 q${-r / 2} ${-r * 0.13} ${-r} 0 z"/></g></g>`;
-      s += `<g ${a("propulsion.motor", i === 0)}><circle class="g-motor" cx="${mx}" cy="${my}" r="${mr}"/>` +
+      s += `<g ${a("propulsion.motor", i === 0)} data-drag="geometry.armLength" data-arm=""><circle class="g-motor" cx="${mx}" cy="${my}" r="${mr}"/>` +
            `<circle class="g-hub" cx="${mx}" cy="${my}" r="${mr * 0.38}"/></g>`;
     });
     return s;
@@ -142,7 +163,7 @@ const Garage = (() => {
       const slot = bay[p.group === "Payloads" ? j++ : i++];
       if (!slot) continue;
       const [x, y] = slot, w = 52, h = 18;
-      s += `<g ${a(p.id, true)}><rect class="${p.group === "Payloads" ? "g-payload" : "g-chip"}" x="${x}" y="${y}" ` +
+      s += `<g ${a(p.id, true)} data-drag="${p.table.join(".")}.position"><rect class="${p.group === "Payloads" ? "g-payload" : "g-chip"}" x="${x}" y="${y}" ` +
            `width="${w}" height="${h}" rx="4"/><text class="g-tiny g-in" x="${x + w / 2}" y="${y + 12.5}">` +
            `${LABEL[p.id] || p.id}</text></g>`;
     }
@@ -301,20 +322,28 @@ const Garage = (() => {
   }
 
   // --- the page's side ---------------------------------------------------------------
-  function mount(stage, pick, choose) {
+  function mount(stage, pick, choose, move) {
     onPick = pick;
     onChoose = choose;
+    onMove = move || (() => {});
     stage.innerHTML = `<svg class="g-svg" viewBox="${VIEW.join(" ")}" role="img" aria-label="The vehicle"></svg>` +
       `<div class="g-caption" aria-live="polite"></div>` +
       `<div class="g-shelf" role="group" aria-label="Real parts" hidden></div>` +
-      `<div class="g-chips" role="toolbar" aria-label="Parts"></div>`;
+      `<div class="g-chips" role="toolbar" aria-label="Parts"></div>` +
+      `<div class="g-tip" hidden></div>`;
+    tip = stage.querySelector(".g-tip");
     svg = stage.querySelector("svg");
     caption = stage.querySelector(".g-caption");
     chips = stage.querySelector(".g-chips");
     shelf = stage.querySelector(".g-shelf");
     new ResizeObserver(() => { if (info) { cancelAnimationFrame(anim); view = frameOf(focusKey);
       svg.setAttribute("viewBox", view.join(" ")); } }).observe(svg);
+    svg.addEventListener("pointerdown", (e) => {
+      const g = e.target.closest("[data-drag]");
+      if (g && info) startDrag(e, g);
+    });
     svg.addEventListener("click", (e) => {
+      if (suppressClick) { suppressClick = false; return; }
       const hit = e.target.closest("[data-focus]");
       const key = hit ? hit.dataset.focus : "overview";
       focus(key);
@@ -329,19 +358,80 @@ const Garage = (() => {
     info = next;
     const p = info.picked;
     const names = { propeller: p.propulsion?.propeller, motor: p.propulsion?.motor,
-                    battery: p.propulsion?.battery || p.drive?.battery };
+                    battery: p.propulsion?.battery || p.drive?.battery,
+                    armLength: (info.values || {})["geometry.armLength"] };
+    airframeNow = info.airframe;
     svg.innerHTML = `<defs><radialGradient id="g-floor"><stop offset="0" class="g-floor-a"/>` +
       `<stop offset="1" class="g-floor-b"/></radialGradient></defs>` +
       `<ellipse cx="400" cy="214" rx="380" ry="196" fill="url(#g-floor)"/>` +
       `<g class="g-vehicle">${DRAW[info.airframe](names)}` +
       `${modules(info.airframe, info.parts, info.levels)}</g>`;
     chipsFor(info.parts.filter((x) => !(x.table && info.levels[x.id]?.id === "off")));
+    placeMoved();
     if (changedFrame) focusKey = "overview";
     light();
     cancelAnimationFrame(anim);
     view = frameOf(focusKey);  // a redraw keeps the camera on its part
     svg.setAttribute("viewBox", view.join(" "));
   }
+
+  // Things with a configured mount are drawn there; the rest where they sit by default.
+  function placeMoved() {
+    const map = MAP[info.airframe];
+    for (const g of svg.querySelectorAll("[data-drag]:not([data-arm])")) {
+      const v = vec((info.values || {})[g.dataset.drag]);
+      g.removeAttribute("transform");
+      if (!v) continue;
+      const b = g.getBBox(), [X, Y] = map.toScreen(v[0], v[1]);
+      g.setAttribute("transform", `translate(${X - (b.x + b.width / 2)} ${Y - (b.y + b.height / 2)})`);
+      g.classList.add("g-placed");
+    }
+  }
+
+  function startDrag(e, g) {
+    const map = MAP[info.airframe], ctm = svg.getScreenCTM().inverse();
+    const at = (ev) => { const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(ctm); return [p.x, p.y]; };
+    const [x0, y0] = at(e), base = g.getAttribute("transform") || "";
+    const b = g.getBBox();
+    let moved = false;
+    tip.hidden = false;
+    const move = (ev) => {
+      const [x, y] = at(ev);
+      if (Math.hypot(x - x0, y - y0) > 3) moved = true;
+      if (!moved) return;
+      if (g.hasAttribute("data-arm")) {
+        const r = Math.hypot(x - 400, y - 210) / map.s;
+        tip.textContent = `arm ${round(r)} m`;
+      } else {
+        g.setAttribute("transform", `${base} translate(${x - x0} ${y - y0})`);
+        const [bx, by] = map.toBody(b.x + b.width / 2 + x - x0 + shiftOf(base)[0], b.y + b.height / 2 + y - y0 + shiftOf(base)[1]);
+        tip.textContent = `x ${round(bx)} m, y ${round(by)} m`;
+      }
+      const r = tip.parentElement.getBoundingClientRect();
+      tip.style.left = `${ev.clientX - r.left + 14}px`; tip.style.top = `${ev.clientY - r.top + 14}px`;
+    };
+    const up = (ev) => {
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", up);
+      tip.hidden = true;
+      if (!moved) return;
+      suppressClick = true;
+      const [x, y] = at(ev);
+      const path = g.dataset.drag;
+      if (g.hasAttribute("data-arm")) {
+        onMove(path, String(round(Math.max(0.05, Math.hypot(x - 400, y - 210) / map.s))));
+      } else {
+        const [bx, by] = map.toBody(b.x + b.width / 2 + x - x0 + shiftOf(base)[0], b.y + b.height / 2 + y - y0 + shiftOf(base)[1]);
+        const old = vec((info.values || {})[path]);
+        onMove(path, `[${round(bx)}, ${round(by)}, ${old ? old[2] : 0}]`);
+      }
+    };
+    svg.setPointerCapture?.(e.pointerId);
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", up);
+  }
+  const shiftOf = (t) => { const m = /translate\(([-\d.e]+) ([-\d.e]+)\)/.exec(t || ""); return m ? [+m[1], +m[2]] : [0, 0]; };
+  let suppressClick = false, tip = null;
 
   function focus(key) {
     if (!svg || key === focusKey) return;

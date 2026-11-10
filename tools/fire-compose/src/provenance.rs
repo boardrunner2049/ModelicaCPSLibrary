@@ -118,6 +118,7 @@ fn text(v: &Toml) -> String {
 
 /// One device's parameters: value and origin.
 fn device(
+    kind: &str,
     component: &str,
     package: &str,
     class: &str,
@@ -158,7 +159,7 @@ fn device(
             "source": source,
         }));
     }
-    json!({"component": component, "class": format!("ModelicaCPSLibrary.{package}.{class}"),
+    json!({"kind": kind, "component": component, "class": format!("ModelicaCPSLibrary.{package}.{class}"),
            "part": report.map(|r| r["name"].clone()).unwrap_or(Json::Null),
            "document": report.map(|r| r["source"].clone()).unwrap_or(Json::Null),
            "parameters": rows})
@@ -173,10 +174,10 @@ pub fn table(c: &ResolvedFireConfig) -> Vec<Json> {
             continue;
         };
         let level = kind.level(sel["model"].as_str().unwrap()).unwrap();
-        out.push(device(kind.component, "Systems.Peripherals", level.class, sel, report(kind.name)));
+        out.push(device(kind.name, kind.component, "Systems.Peripherals", level.class, sel, report(kind.name)));
         if kind.name == "power_module" {
             let pack = sel.get("battery").and_then(Toml::as_table).cloned().unwrap_or_default();
-            let mut d = device("powerModule.battery", "Systems.Power", "Battery", &pack, None);
+            let mut d = device("battery", "powerModule.battery", "Systems.Power", "Battery", &pack, None);
             // A pack named by its part: its figures are the datasheet's.
             if let Some(r) = report("battery") {
                 for row in d["parameters"].as_array_mut().unwrap() {
@@ -207,7 +208,7 @@ pub fn table(c: &ResolvedFireConfig) -> Vec<Json> {
         let Some(sel) = c.payloads.get(kind.name).and_then(Toml::as_table) else {
             continue;
         };
-        out.push(device(kind.component, "Systems.Payloads", kind.class, sel, report(kind.name)));
+        out.push(device(kind.name, kind.component, "Systems.Payloads", kind.class, sel, report(kind.name)));
     }
     out
 }

@@ -206,6 +206,18 @@ def catalog() -> dict:
                      if k in ("geometry", "mass", "rotor", "initial", "landing_gear", "interface")}
             fixed["rotor"] = {k: v for k, v in fixed.get("rotor", {}).items() if k != "J"}
             airframe = table_fields(fixed)
+            # Where things are: frame size, sensor mounts, the battery (drag them in the garage).
+            airframe += [
+                {"path": ["geometry", "armLength"], "value": "", "default": "0.25 (QuadX)",
+                 "description": "CG to rotor [m]: the frame's size"},
+                *[{"path": ["geometry", f"{s}Position_C"], "value": "", "default": "[0, 0, 0]",
+                   "description": f"{t} mount from the chassis reference, body FRD [m]"}
+                  for s, t in (("imu", "IMU"), ("gnss", "GNSS antenna"), ("barometer", "Barometer"))],
+                {"path": ["mass", "placements", "battery", "mass"], "value": "", "default": "not placed",
+                 "description": "the battery's mass [kg] (part of the vehicle's): to place it"},
+                {"path": ["mass", "placements", "battery", "position"], "value": "", "default": "not placed",
+                 "description": "where the battery sits [m]: moves the CG and inertia"},
+            ]
             mounts = {}
         else:
             spec = cc["vehicles"][kind]

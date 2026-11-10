@@ -285,6 +285,72 @@ fn part(v: &Value, label: &str, position: [f64; 3]) -> Result<Value> {
     Ok(Value::Table(p))
 }
 
+/// `[mass.placements.NAME] mass, position, from`: an item of the aggregate
+/// (its mass included in it, at `from`, default the chassis reference) placed
+/// at `position` instead, as a point mass: the aggregate's CG and its inertia
+/// about the CG move (parallel-axis theorem).
+fn place(aggregate: &mut Value, placements: &Value) -> Result<()> {
+    let items = placements
+        .as_table()
+        .ok_or("mass.placements: expected a table of items")?;
+    let get3 = |v: &Value, label: &str| -> Result<[f64; 3]> {
+        array(v, &[3], label)?;
+        let a = v.as_array().unwrap();
+        Ok([0, 1, 2].map(|i| a[i].as_float().or(a[i].as_integer().map(|n| n as f64)).unwrap()))
+    };
+    let total = number(&aggregate["mass"], "mass.aggregate.mass", true, false)?;
+    let mut c = get3(&aggregate["r_C"], "mass.aggregate.r_C")?;
+    let mut inertia = [[0.; 3]; 3];
+    for (i, row) in aggregate["inertia"].as_array().unwrap().iter().enumerate() {
+        for (j, x) in row.as_array().unwrap().iter().enumerate() {
+            inertia[i][j] = x.as_float().or(x.as_integer().map(|n| n as f64)).unwrap();
+        }
+    }
+    // J(d) = |d|^2 E - d d^T: a unit point mass's inertia at offset d.
+    let j = |d: [f64; 3]| {
+        let n = d.iter().map(|x| x * x).sum::<f64>();
+        let mut m = [[0.; 3]; 3];
+        for r in 0..3 {
+            for k in 0..3 {
+                m[r][k] = if r == k { n } else { 0. } - d[r] * d[k];
+            }
+        }
+        m
+    };
+    let sub3 = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    let mut placed = 0.;
+    for (name, item) in items {
+        let label = format!("mass.placements.{name}");
+        let t = table(item, &["mass", "position", "from"], &label)?;
+        let m = number(t.get("mass").ok_or(format!("{label}.mass is required"))?, &label, true, false)?;
+        let to = get3(t.get("position").ok_or(format!("{label}.position is required"))?, &format!("{label}.position"))?;
+        let from = match t.get("from") {
+            Some(v) => get3(v, &format!("{label}.from"))?,
+            None => [0.; 3],
+        };
+        placed += m;
+        if placed >= total {
+            return Err(format!("{label}: the placed items weigh as much as the whole vehicle ({total} kg)"));
+        }
+        // Inertia about the current CG: the item moves from `from` to `to`.
+        let (a, b) = (j(sub3(from, c)), j(sub3(to, c)));
+        let shift = [0, 1, 2].map(|k| m * (to[k] - from[k]) / total);
+        let next = [c[0] + shift[0], c[1] + shift[1], c[2] + shift[2]];
+        let back = j(sub3(next, c));
+        for r in 0..3 {
+            for k in 0..3 {
+                inertia[r][k] += m * (b[r][k] - a[r][k]) - total * back[r][k];
+            }
+        }
+        c = next;
+    }
+    let t = aggregate.as_table_mut().unwrap();
+    t.insert("r_C".into(), vec3(c));
+    t.insert("inertia".into(), mat(inertia));
+    crate::config::inertia(&t["inertia"], "mass.aggregate.inertia (after placements)")?;
+    Ok(())
+}
+
 fn geometry(raw: &Value) -> Result<(String, Table)> {
     let g = table(
         raw,
@@ -297,6 +363,10 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
             "rotorPosition_C",
             "R_br",
             "spinSign",
+            "armLength",
+            "imuPosition_C",
+            "gnssPosition_C",
+            "barometerPosition_C",
         ],
         "geometry",
     )?;
@@ -310,6 +380,16 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
         "OctoX" => (8, 8, 0.35),
         "CoaxialX8" => (4, 8, 0.25),
         _ => return Err("geometry.preset must be QuadX, HexaX, OctoX, or CoaxialX8".into()),
+    };
+    // armLength: the CG-to-rotor distance of the preset's frame [m].
+    let radius = match g.get("armLength") {
+        Some(v) => {
+            if g.contains_key("armMount") || g.contains_key("rotorPosition_C") {
+                return Err("geometry.armLength sizes the preset; it cannot go with armMount or rotorPosition_C".into());
+            }
+            number(v, "geometry.armLength", true, false)?
+        }
+        None => radius,
     };
     let nc = integer(
         g.get("nActuators").unwrap_or(&int(nr)),
@@ -423,7 +503,15 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
     ]
     .into_iter()
     .map(|(k, v)| (k.into(), v))
-    .collect();
+    .collect::<Table>();
+    let mut t = t;
+    // Sensor mounts on the frame, from the chassis reference C [m].
+    for key in ["imuPosition_C", "gnssPosition_C", "barometerPosition_C"] {
+        if let Some(v) = g.get(key) {
+            array(v, &[3], &format!("geometry.{key}"))?;
+            t.insert(key.into(), v.clone());
+        }
+    }
     Ok((preset.into(), t))
 }
 
@@ -437,6 +525,7 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
             "arm",
             "payloads",
             "additional_parts",
+            "placements",
         ],
         "mass",
     )?;
@@ -448,7 +537,7 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
     out.insert("mode".into(), Value::String(mode.into()));
     if mode == "aggregate" {
         if m.keys()
-            .any(|k| !["mode", "aggregate"].contains(&k.as_str()))
+            .any(|k| !["mode", "aggregate", "placements"].contains(&k.as_str()))
         {
             return Err("mass: constituent fields are not permitted in aggregate mode".into());
         }
@@ -463,15 +552,20 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
             .into_iter()
             .collect(),
         );
-        out.insert(
-            "aggregate".into(),
-            part(
-                m.get("aggregate").unwrap_or(&default),
-                "mass.aggregate",
-                [0.; 3],
-            )?,
-        );
+        let mut aggregate = part(
+            m.get("aggregate").unwrap_or(&default),
+            "mass.aggregate",
+            [0.; 3],
+        )?;
+        if let Some(p) = m.get("placements") {
+            place(&mut aggregate, p)?;
+            out.insert("placements".into(), p.clone());
+        }
+        out.insert("aggregate".into(), aggregate);
     } else if mode == "assembled" {
+        if m.contains_key("placements") {
+            return Err("mass.placements: place items in aggregate mode; in assembled mode give each part its r_C".into());
+        }
         if m.contains_key("aggregate") || !m.contains_key("core") || !m.contains_key("arm") {
             return Err("mass: assembled mode requires core and arm, and forbids aggregate".into());
         }
@@ -1182,4 +1276,44 @@ pub(crate) fn resolve_interface_with(
         out.retain(|k, _| t.contains_key(k));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod placement_tests {
+    use super::*;
+
+    fn quad(extra: &str) -> Result<ResolvedFireConfig> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(root).unwrap().replace("[mass.aggregate]", &format!("{extra}\n[mass.aggregate]"));
+        parse_at(&raw, None)
+    }
+
+    #[test]
+    fn a_placed_battery_moves_the_cg_and_the_inertia() {
+        // 1.5 kg vehicle; its 0.5 kg battery from the reference to 0.1 m forward.
+        let c = quad("[mass.placements.battery]\nmass = 0.5\nposition = [0.1, 0.0, 0.0]").unwrap();
+        let a = &c.mass["aggregate"];
+        let x = a["r_C"][0].as_float().unwrap();
+        assert!((x - 0.5 * 0.1 / 1.5).abs() < 1e-12, "CG {x}");
+        // Iyy about the new CG: 0.02 + 0.5 (0.1)^2 - 1.5 (0.1/3)^2 (the rest stays at the reference)
+        let iyy = a["inertia"][1][1].as_float().unwrap();
+        let want = 0.02 + 0.5 * 0.01 - 1.5 * (0.1f64 / 3.).powi(2);
+        assert!((iyy - want).abs() < 1e-12, "Iyy {iyy} vs {want}");
+        assert!((a["inertia"][0][0].as_float().unwrap() - 0.02).abs() < 1e-12, "Ixx unchanged");
+        assert!(quad("[mass.placements.battery]\nmass = 2.0\nposition = [0.1, 0.0, 0.0]").is_err());
+    }
+
+    #[test]
+    fn arm_length_sizes_the_frame_and_sensors_mount_anywhere() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(root).unwrap().replace(
+            "preset = \"QuadX\"",
+            "preset = \"QuadX\"\narmLength = 0.3\nimuPosition_C = [0.02, 0.0, -0.01]",
+        );
+        let c = parse_at(&raw, None).unwrap();
+        let m = &c.geometry["armMount"][0];
+        let r = (m[0].as_float().unwrap().powi(2) + m[1].as_float().unwrap().powi(2)).sqrt();
+        assert!((r - 0.3).abs() < 1e-12, "arm {r}");
+        assert_eq!(c.geometry["imuPosition_C"][0].as_float(), Some(0.02));
+    }
 }

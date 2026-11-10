@@ -119,17 +119,18 @@ def check(choice: dict) -> dict:
         table = ["--config-table", "physics"]
         r = subprocess.run([str(parts.compose_binary()), "validate", f.name, *table],
                            capture_output=True, text=True)
-        reports = []
+        reports, provenance = [], []
         if r.returncode == 0:
             j = subprocess.run([str(parts.compose_binary()), "validate", f.name, *table, "--json"],
                                capture_output=True, text=True)
             if j.returncode == 0:
-                reports = json.loads(j.stdout).get("parts", [])
+                out = json.loads(j.stdout)
+                reports, provenance = out.get("parts", []), out.get("provenance", [])
     finally:
         os.unlink(f.name)
     message = (r.stdout + r.stderr).strip().removeprefix("fire-compose: ")
     return {"ok": r.returncode == 0, "message": message, "toml": text,
-            "model_name": physics["model_name"], "reports": reports}
+            "model_name": physics["model_name"], "reports": reports, "provenance": provenance}
 
 
 class Handler(BaseHTTPRequestHandler):

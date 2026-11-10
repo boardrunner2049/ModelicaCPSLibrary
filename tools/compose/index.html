@@ -59,6 +59,12 @@ ul.devices { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6p
 ul.devices li { display: flex; gap: 8px; align-items: flex-start; }
 ul.devices li.muted { opacity: .55; }
 ul.devices small { color: var(--muted); }
+.prov { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px;
+        font-weight: 600; border: 1px solid currentColor; vertical-align: 1px; }
+.prov-datasheet { color: #2e8b57; } .prov-configuration { color: #3b6fd8; }
+.prov-assumed { color: #c27c0e; } .prov-placeholder { color: #c0392b; }
+.prov-default { color: var(--muted); }
+p.prov-sum { font-size: 12px; }
 button[aria-pressed="true"] .tag { color: inherit; opacity: .8; }
 .airframes { display: flex; gap: 8px; flex-wrap: wrap; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
@@ -201,6 +207,9 @@ body.docked .side { max-height: calc(100vh - var(--t-shown, 42vh) - 24px); overf
 .g-strap { fill: var(--g-dark); opacity: .7; }
 .g-board { fill: var(--g-board); stroke: var(--g-dark); stroke-width: 1; }
 .g-chip { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: .8; }
+[data-drag] { cursor: grab; }
+.g-tip { position: absolute; pointer-events: none; padding: 2px 8px; border-radius: 6px; font-size: 12px;
+         background: var(--panel); border: 1px solid var(--line); box-shadow: 0 2px 6px #0003; }
 .g-payload { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: .8; stroke-dasharray: 3 2; }
 .g-tiny.g-in { fill: var(--g-ink, #e8eef6); font-size: 9px; font-weight: 600; letter-spacing: .04em; }
 .g-servo { fill: var(--g-servo); stroke: var(--g-dark); stroke-width: 1; }
@@ -431,6 +440,42 @@ function showReports() {
   }
 }
 
+// Where each fitted device's parameter values come from (the composer's
+// provenance): a mark by every field, and a count per card.
+const KEY_OF = { position_b: "position", R_bs: "orientation", targetPosition_w: "target" };
+const PROV = { "datasheet": ["datasheet", "from the device's datasheet"],
+  "configuration": ["set here", "set in this configuration"],
+  "assumed": ["assumed", "a conversion had to assume it: the datasheet does not state it"] };
+function showProvenance(prov) {
+  for (const d of prov) {
+    const part = frame().parts.find((p) => p.id === d.kind && p.table);
+    const card = part && document.querySelector(`section.card[data-part="${part.id}"]`);
+    if (!card) continue;
+    const count = {};
+    for (const r of d.parameters) {
+      const key = `${part.table.join(".")}.${KEY_OF[r.parameter] || r.parameter}`;
+      let [label, about] = PROV[r.origin] || [r.tag === "assumed" ? "default · assumed" : `default · ${r.tag}`,
+        r.tag === "datasheet" ? "library default: no device's datasheet set it (a placeholder)"
+          : r.tag === "assumed" ? "library default: a chosen value no datasheet gives"
+          : `library default (${r.tag})`];
+      const cls = r.origin !== "library default" ? r.origin
+        : r.tag === "datasheet" ? "placeholder" : r.tag === "assumed" ? "assumed" : "default";
+      count[cls] = (count[cls] || 0) + 1;
+      const cell = card.querySelector(`tr[data-key^="${CSS.escape(key.toLowerCase())} "] td.key`);
+      if (!cell) continue;
+      cell.querySelector(".prov")?.remove();
+      cell.append(el("span", { class: `prov prov-${cls}`, title: `${about}${r.source ? ": " + r.source : ""}` }, label));
+    }
+    card.querySelector("p.prov-sum")?.remove();
+    const order = [["datasheet", "from the datasheet"], ["configuration", "set here"], ["assumed", "assumed"],
+                   ["placeholder", "datasheet values at the library default"], ["default", "library defaults"]];
+    const parts = order.filter(([k]) => count[k]).map(([k, t]) => `${count[k]} ${t}`);
+    const sum = el("p", { class: "prov-sum about" }, `Provenance: ${parts.join(" · ")}. Hover a mark for its source.`);
+    const table = card.querySelector("details, table.fields");
+    if (table) table.before(sum); else card.append(sum);
+  }
+}
+
 function deviceBlock(part) {
   if (part.slots) return slotBlock(part);
   if (!(part.devices || []).length) return null;
@@ -572,7 +617,7 @@ function garageInfo() {
       if (o) (picked[p.id] = picked[p.id] || {})[k] = o.name;
     }
   }
-  return { airframe: state.airframe, parts: frame().parts, levels, devices, picked,
+  return { airframe: state.airframe, parts: frame().parts, levels, devices, picked, values: state.values,
            chosen: { devices: state.devices, slots: state.slots } };
 }
 
@@ -600,6 +645,18 @@ Garage.mount($("garage"), (key) => {
   // A card on the garage's shelf: install that part.
   const part = frame().parts.find((p) => p.id === partId);
   if (slot) pickSlot(part, slot, id); else pickDevice(part, id);
+}, (path, text) => {
+  // A part dragged in the garage: its mount (or the frame's size) is now this.
+  state.values[path] = text;
+  if (path === "mass.placements.battery.position" && !state.values["mass.placements.battery.mass"]) {
+    // The battery's mass: the picked pack's datasheet weight, if there is one.
+    const id = (state.slots.propulsion || {}).battery;
+    const opt = (frame().parts.find((p) => p.id === "propulsion")?.slots || [])
+      .find((x) => x.key === "battery")?.options.find((o) => o.id === id);
+    const g = parseFloat((opt?.stats || []).find(([k]) => k === "Mass")?.[1]);
+    if (Number.isFinite(g)) state.values["mass.placements.battery.mass"] = String(g / 1000);
+  }
+  render();
 });
 
 function choice() {
@@ -631,6 +688,7 @@ function scheduleCheck(delay = 300) {
     $("toml").textContent = r.toml || "";
     reports = r.reports || [];
     showReports();
+    showProvenance(r.provenance || []);
     $("fly").disabled = !r.ok || (run && run.running);
   }, delay);
 }
