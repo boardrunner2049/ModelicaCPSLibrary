@@ -1,0 +1,10 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Elistair Safe-T 2 tethering station"
+kind = "tether"
+manufacturer = "Elistair"
+source = "sUAS News, 'Elistair Unveils the Safe-T 2, The New Standard for Tethered Drone Stations' (launch release, June 2020): https://www.suasnews.com/2020/06/elistair-unveils-the-safe-t-2-the-new-standard-for-tethered-drone-stations/"
+notes = "No Elistair datasheet was reachable (elistair.com product URL 404). Figures are from the 2020 launch press release. The station uses interchangeable micro-tethers and 'smart adaptive winch control laws', but the release gives no tether mass, diameter, voltage or tension values. A reseller lists 15 kg 'delivery weight', which is not recorded because it may be the shipping weight. ArduPilot's power-tether page documents only a home-made tether."
+max_tether_length_m = 125                      # 'up to 125m / 400 feet of micro-tether'
+max_power_w = 2200                             # '2,2 kW max continuous power'
+peak_power_w = 2800                            # '2,8 kW peak power'
+not_stated = ["tether_mass_per_m_g", "output_voltage_v", "tension control range n", "ground station mass", "tether diameter"]

@@ -1,0 +1,19 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Intelligent Energy IE-SOAR 800W hydrogen fuel cell power module"
+kind = "generator"
+manufacturer = "Intelligent Energy"
+source = "Intelligent Energy 'IE-SOAR 800W' product leaflet (ref 71076, A5, 2022), 'Summary Product Information': https://www.intelligent-energy.com/wp-content/uploads/2022/08/71076_ie-soar-800w-product-leaflet-a5.pdf ; ArduPilot page common-ie650-fuelcell.html for failsafe thresholds"
+notes = "First-generation 800 W module, supported by ArduPilot (GEN_TYPE IE 650/800). A Gen2 datasheet (DEC 2025) gives up to 7500 W peak with a hybrid battery and a 230.5x108.4x119.8 mm module; these figures are not used here. The leaflet gives no runtime or hydrogen consumption, since that depends on cylinder size (max cylinder mass 10 kg, 350 bar). ArduPilot: stack under-voltage failsafe <21.13 V (800 W), tank pressure <15 barg low-action failsafe. The 650 W figures (810 g, 19.6-25.2 V, 1000 W peak) appear only in a third-party-hosted manual and were not recorded."
+rated_power_w = 800                            # 'Maximum continuous power 800W'
+peak_power_w = 2400                            # 'Peak power (with hybrid battery) Up to 2400W'
+output_voltage_v = [24, 48]                    # 'Output voltage (DCDC regulated) configurable between 24V and 48V'
+mass_g = 1450                                  # 'Fuel Cell Power Module Mass 1450g'
+regulator_mass_g = 315                         # 'Hydrogen regulator Mass 315g'
+max_cylinder_pressure_bar = 350                # '350 bar/5000 psi'
+regulator_output_pressure_bar = 0.9            # '0.9 bar +/- 0.1'
+max_cylinder_mass_kg = 10                      # 'Maximum cylinder mass 10kg'
+size_fuel_cell_mm = [210, 105, 105]
+size_control_box_mm = [195, 90, 40]
+operating_temperature_c = [-5, 40]
+max_altitude_m = 5000
+not_stated = ["fuel consumption (g H2/h or L/min)", "runtime"]

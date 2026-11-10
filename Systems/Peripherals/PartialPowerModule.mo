@@ -13,6 +13,8 @@ partial model PartialPowerModule "A battery pack (Power.Battery) feeding the veh
   input Real shaftSpeed[nShafts](each unit="rad/s") = zeros(nShafts);
   input Real thrust(unit="N") = 0 "Thrust of a propulsion model with neither current nor shaft torque";
   input Real airspeed(unit="m/s") = 0 "Axial inflow of that propeller";
+  parameter Integer nSupplies(min=1) = 1 "Power sources besides the pack";
+  input Real supplyPower[nSupplies](each unit="W") = zeros(nSupplies) "What a generator or a power tether can deliver";
   output Real voltage(unit="V") "Measured";
   output Real current(unit="A") "Measured";
   output Real consumed(unit="A.h") "Diagnostic: truth";
@@ -21,13 +23,19 @@ partial model PartialPowerModule "A battery pack (Power.Battery) feeding the veh
   output Real validity "1 if valid, else 0";
   output Real load(unit="A") "Diagnostic: total discharge current";
   output Real power(unit="W") "Diagnostic: electrical power of the shafts and the propeller";
+  output Real demand(unit="W") "The vehicle's electrical demand, for a generator or tether to follow";
+  output Real packCurrent(unit="A") "Out of the pack: the load less what a generator or tether supplies";
+  output Real utilization "Fraction of the sources' capacity drawn: the demand, up to all of it";
 protected
   Real ideal(unit="W") "Momentum-theory power of the thrust";
 equation
   ideal = noEvent(if thrust > 0 then thrust*(airspeed/2 + sqrt(airspeed^2/4 + thrust/(2*1.225*propellerDiskArea))) else 0);
   power = (max(shaftTorque*shaftSpeed, 0) + ideal/figureOfMerit)/efficiency;
   load = avionicsCurrent + magnitudeSum(propulsionCurrent) + power/max(battery.voltage, 1);
-  battery.current = load;
+  demand = load*battery.voltage;
+  utilization = min(1, demand/max(magnitudeSum(supplyPower), 1e-6));
+  packCurrent = load - utilization*magnitudeSum(supplyPower)/max(battery.voltage, 1);
+  battery.current = packCurrent;
   consumed = battery.consumed;
   remaining = battery.soc;
   validity = if valid then 1 else 0;

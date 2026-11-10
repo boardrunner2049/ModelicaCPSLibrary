@@ -198,6 +198,15 @@ fn run() -> Result<()> {
                 }
                 return Ok(());
             }
+            if fire_compose::payloads::kind(&kind).is_some() {
+                let report = fire_compose::payloads::report(&kind, &part, &explicit)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                } else {
+                    print!("{}", parts::summary(&report));
+                }
+                return Ok(());
+            }
             if fire_compose::peripherals::kind(&kind).is_some() {
                 let report = fire_compose::peripherals::report(&kind, &part, level.as_deref(), &explicit)?;
                 if json {

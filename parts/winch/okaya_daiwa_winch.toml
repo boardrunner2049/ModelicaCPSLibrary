@@ -1,0 +1,13 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Daiwa drone winch"
+kind = "winch"
+manufacturer = "Okaya & Co. (Daiwa fishing-reel technology)"
+source = "ArduPilot wiki 'Daiwa Winch', Specifications section: https://ardupilot.org/copter/docs/common-daiwa-winch.html ; manufacturer https://www.okaya.co.jp/en/index.html"
+notes = "The ArduPilot driver (WINCH_TYPE=2) reads line length and speed in telemetry, but the wiki gives no rated line length or speed. Okaya's own spec sheet could not be found online; an ArduPilot forum thread says specs come by request from Okaya's UAV team. The winch has a thread-end detector switch so the line is not pulled too tight."
+mass_g = 630                                  # 'Weight: 630g' (ArduPilot Specifications)
+max_load_kg = 8                               # 'Maximum Payload: 8kg' (ArduPilot Specifications)
+input_voltage_v = [7.2, 22.2]                 # 'Input Voltage: 7.2V ~ 22.2V' (ArduPilot Specifications)
+max_power_w = 55                              # 'Maximum Power: 55W' (ArduPilot Specifications)
+size_mm = [110, 82, 72]                       # 'W:110mm H:82mm D:72mm' (ArduPilot Specifications)
+interface = "4xPWM or UART"                   # ArduPilot Specifications
+not_stated = ["line_length_m", "line_speed_mps", "tension_n / max line tension", "brake/holding torque"]

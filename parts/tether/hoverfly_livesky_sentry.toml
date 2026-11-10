@@ -1,0 +1,16 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Hoverfly LiveSky SENTRY (tethered UAS + unmounted tether kit)"
+kind = "tether"
+manufacturer = "Hoverfly Technologies"
+source = "Hoverfly LiveSky SENTRY brochure (c) 2018, p2 'Specifications': https://cdn.nwe.io/files/x/49/58/ca4aa4532b0613c7bad64ae11977.pdf ; older LiveSky brochure (c) 2016: https://cdn.nwe.io/files/x/6c/a6/04c49ba21623783bd854a965f7fc.pdf"
+notes = "This is a complete tethered drone system, not a tether that fits any drone. The tether carries power plus data/video ('Kevlar strength tether'), the aircraft has a backup battery, and the tether kit has automated reel and tension management (2016 brochure) with no numbers. The 2016 LiveSky Standard ships a '220 ft engineered tether with manual reel'. A 2025 press report describes a larger Sentry (10 kg, 200 m), which is a different configuration and is not recorded."
+max_tether_length_m = 60                       # 'Maximum Altitude: 200 ft (60m) tether' (2018 brochure)
+aircraft_mass_g = 2300                         # 'Weight: 5 lbs (2.3kg) without payload'
+aircraft_size_cm = [50, 50, 27]
+ground_station_mass_g = 18100                  # 'Unmounted Tether Kit Weight: 40 lbs (18.1 kg)'
+ground_station_size_cm = [40, 40, 30.5]
+ground_station_input = "100-240 VAC, 1600 W"   # 'Power: 100-240VAC 1600 watts'
+max_power_w = 1600                             # ground-kit AC input rating (not stated as delivered aircraft power)
+ip_rating = "IP54"
+temperature_c = [-20, 55]
+not_stated = ["tether_mass_per_m_g", "output_voltage_v (aircraft bus)", "tension control range n", "power delivered at aircraft"]

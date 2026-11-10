@@ -1,0 +1,18 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Gremsy T3V3"
+kind = "gimbal"
+manufacturer = "Gremsy"
+source = "Gremsy docs, Gremsy T3V3 > Getting Started > Specification: https://docs.gremsy.com/gimbals/gremsy-t3v3/getting-started/specification (accessed 2026-11-09)"
+notes = "3-axis T3V3; a separate 'Two-Axis T3V3' exists (745 g, same 1700 g payload) and is not this file. The docs page gives one 'Range' row per axis without saying mechanical or controlled. ArduPilot names Gremsy T3 as supported. Power is given as current at 14.5 V; W values are I*V products from the doc's figures."
+mass_g = 1200                                 # 'Weight 2.65 lbs / 1200 g' (Specification)
+payload_max_g = 1700                          # 'Maximum payload 3.75 lbs / 1700 g' (Specification)
+yaw_range_deg = [-345, 345]                   # 'Pan range +/-345 deg' (Specification)
+pitch_range_deg = [-150, 150]                 # 'Tilt range +/-150 deg' (Specification)
+roll_range_deg = [-264, 80]                   # 'Roll range +80 deg / -264 deg' (Specification)
+current_static_a_at_14v5 = 0.3                # 'Static: 300 mA @ 14.5V' (Specification)
+current_dynamic_a_at_14v5 = 0.6               # 'Dynamic: 600 mA @ 14.5V' (Specification)
+current_locked_motor_max_a_at_14v5 = 4.0      # 'Locked Motor Max: 4A @ 14.5V' (Specification)
+power_static_w = 4.35                         # derived: 0.3 A x 14.5 V
+power_dynamic_w = 8.7                         # derived: 0.6 A x 14.5 V
+input_voltage_v = [15, 52]                    # 'Input voltage 15 - 52V' (Specification)
+not_stated = ["max_rate_dps", "angular_vibration_deg (retailers quote +/-0.02 but the Gremsy docs page does not)", "mechanical vs controlled range distinction"]

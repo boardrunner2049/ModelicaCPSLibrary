@@ -1,0 +1,17 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Hobbywing Combo Pump 5L (brushless water pump)"
+kind = "sprayer"
+manufacturer = "Hobbywing Technology"
+source = "Hobbywing product page 'One-piece Brushless Water Pump 5L for Agriculture Drones', model COMBO-PUMP-5L-brushless-10A-14S-V1: https://www.hobbywing.com/en/products/one-piece-brushless-water-pump-5l105 (accessed 2026-11-09)"
+notes = "Pump with integrated ESC, driven by PWM, so it maps to ArduPilot's sprayer pump output (SERVOx_FUNCTION=22). The page labels the 5 L/min figure 'Data of opening' and gives no flow-vs-pressure curve. One reseller lists 120 W, which conflicts with Hobbywing's 60 W. No tank is included."
+flow_rate_lpm = 5                              # 'Flow rate 5L/min'
+operating_pressure_kpa = 350                   # 'Working pressure 0.35Mpa'
+rated_power_w = 60                             # 'Rated power 60W'
+pump_mass_g = 388                              # '388g (Approx without wire 338g)'
+pump_mass_no_wire_g = 338
+input_voltage_v = [44, 60.9]                   # '12-14S (DC44-60.9V)'
+working_current_a_max = 2.5                    # 'Working Current <=2.5A'
+pwm_range_us = [1050, 1950]                    # 'Operating PWM Width'
+size_mm = [123, 76, 52]
+ip_rating = "IP67"
+not_stated = ["tank_capacity_l", "flow vs pressure curve", "pressure at max flow"]

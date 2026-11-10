@@ -51,8 +51,8 @@ DEVICES: dict[str, dict] = {
     "gimbal": dict(
         title="Gimbal (servo)", page="Cameras & Gimbals",
         params={"MNT1_TYPE": 1, "MNT1_PITCH_MIN": -90, "MNT1_PITCH_MAX": 25},
-        servos=[8, 7, 6],
-        notes="Servo gimbal: tilt, roll, pan outputs (mount functions 8, 7, 6); MAVProxy 'gimbal'."),
+        servos=[7, 8, 6],
+        notes="Servo gimbal: tilt, roll, pan outputs (mount functions 7, 8, 6); MAVProxy 'gimbal'."),
     "companion_computer": dict(
         title="Companion computer", page="Companion Computers",
         params={"SERIAL2_PROTOCOL": 2},
@@ -270,6 +270,53 @@ def peripherals(plan: Plan, physics: dict, home: list[float]) -> None:
         plan.params.update({"SIM_PLD_LAT": lat, "SIM_PLD_LON": lon})
 
 
+# Payloads ([payloads.KIND], Systems.Payloads): ArduPilot's parameters and the
+# servo functions of their channels, in the composer's order (payloads.rs
+# KINDS): aux_pwm element k is servo output 9+k.
+PAYLOADS = [
+    ("gripper", [28], {"GRIP_ENABLE": 1, "GRIP_TYPE": 1, "GRIP_GRAB": 2000, "GRIP_RELEASE": 1000,
+                       "GRIP_NEUTRAL": 1500}),
+    ("winch", [88], {"WINCH_TYPE": 1}),
+    ("parachute", [27], {"CHUTE_ENABLED": 1, "CHUTE_TYPE": 10, "CHUTE_SERVO_ON": 1300,
+                         "CHUTE_SERVO_OFF": 1100}),
+    ("sprayer", [22], {"SPRAY_ENABLE": 1}),
+    ("landing_gear", [29], {"LGR_ENABLE": 1}),
+    ("gimbal", [7, 8, 6], {"MNT1_TYPE": 1}),
+    ("tether", [], {}),
+    ("generator", [], {}),
+]
+
+
+def payloads(plan: Plan, physics: dict) -> None:
+    """Parameters and servo outputs for the vehicle's [payloads]."""
+    p = physics.get("payloads", {})
+    deg = 180 / math.pi
+    for name, functions, params in PAYLOADS:
+        if name not in p:
+            continue
+        t = p[name]
+        plan.params.update(params)
+        outputs = [plan.output(f, name) for f in functions]
+        plan.servos[name] = outputs
+        for n in outputs:
+            plan.params.update({f"SERVO{n}_MIN": 1000, f"SERVO{n}_MAX": 2000, f"SERVO{n}_TRIM": 1500})
+        if name == "winch":
+            plan.params["WINCH_RATE_MAX"] = _num(t, "maxRate", 0.5)
+        if name == "sprayer":
+            n = outputs[0]
+            plan.params.update({f"SERVO{n}_MIN": _num(t, "pwmMin", 1000), f"SERVO{n}_MAX": _num(t, "pwmMax", 2000)})
+        if name == "gimbal":
+            lo = t.get("angleMin", [-1.5708, -0.5236, -2.7925])
+            hi = t.get("angleMax", [0.4363, 0.5236, 2.7925])
+            plan.params.update({
+                "MNT1_PITCH_MIN": round(lo[0] * deg), "MNT1_PITCH_MAX": round(hi[0] * deg),
+                "MNT1_ROLL_MIN": round(lo[1] * deg), "MNT1_ROLL_MAX": round(hi[1] * deg),
+                "MNT1_YAW_MIN": round(lo[2] * deg), "MNT1_YAW_MAX": round(hi[2] * deg),
+            })
+        if name in ("tether", "generator"):
+            plan.notes.append(f"{name}: modelled by the vehicle (power to its pack); ArduPilot sees the battery")
+
+
 def _offset(home: list[float], north: float, east: float) -> tuple[float, float]:
     r = 6378137.0
     lat = home[0] + math.degrees(north / r)
@@ -277,9 +324,13 @@ def _offset(home: list[float], north: float, east: float) -> tuple[float, float]
     return round(lat, 9), round(lon, 9)
 
 
-def devices(plan: Plan, names: list[str]) -> None:
+def devices(plan: Plan, names: list[str], physics: dict | None = None) -> None:
     """Parameters and serial devices for the run file's [sitl] devices."""
+    modelled = set((physics or {}).get("payloads", {}))
     for name in names:
+        if name in modelled:
+            plan.notes.append(f"{name}: the vehicle's payload model drives it; [sitl] devices entry ignored")
+            continue
         if name in UNSUPPORTED:
             raise ValueError(f"device {name!r}: {UNSUPPORTED[name]}")
         d = DEVICES.get(name)
@@ -304,7 +355,11 @@ def devices(plan: Plan, names: list[str]) -> None:
 def resolve(physics: dict, names: list[str], home: list[float]) -> Plan:
     plan = Plan()
     peripherals(plan, physics, home)
-    devices(plan, names)
+    payloads(plan, physics)
+    devices(plan, names, physics)
+    if physics.get("peripherals", {}).get("power_module", {}).get("smart"):
+        plan.params.update({"BATT_MONITOR": 16, "BATT_I2C_BUS": 2, "BATT_I2C_ADDR": 11})
+        plan.notes.append("power_module: a smart (SMBus) battery reporting the model's pack")
     return plan
 
 

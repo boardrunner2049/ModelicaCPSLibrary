@@ -1,0 +1,84 @@
+# The quad (configs/quad.toml) with every payload (Systems/Payloads): gripper and
+# winch loads, parachute, sprayer, retractable gear, gimbal, power tether and
+# generator feeding a power module's pack. Servos on SERVO9.. in this order:
+# gripper 9, winch 10, parachute 11, sprayer 12, landing gear 13, gimbal 14-16.
+schema_version = 3
+model_name = "QuadPayloads"
+
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12] # Feet start 2 cm above the ground.
+q_start = [0.7071067811865476, 0.0, 0.0, 0.7071067811865476]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"
+
+# Shared VirtualIO PWM calibration for both P0 and P1.
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0
+
+[peripherals.power_module]
+battery = { cells = 4, capacity = 5.2, resistance = 0.02 }
+
+[payloads.gripper]
+position = [0.0, 0.0, 0.05]
+mass = 0.2
+
+[payloads.winch]
+position = [0.05, 0.0, 0.05]
+mass = 0.2
+maxRate = 0.5
+
+[payloads.parachute]
+position = [0.0, 0.0, -0.08]
+diameter = 1.2
+
+[payloads.sprayer]
+position = [-0.05, 0.0, 0.03]
+tankVolume = 1.0
+volume_start = 0.3
+maxFlow = 1.0
+
+[payloads.landing_gear]
+
+[payloads.gimbal]
+position = [0.1, 0.0, 0.04]
+
+[payloads.tether]
+tension0 = 2.0
+massPerLength = 0.01
+maxPower = 300.0
+
+[payloads.generator]
+ratedPower = 200.0
+tankVolume = 0.2
+fuel_start = 0.2

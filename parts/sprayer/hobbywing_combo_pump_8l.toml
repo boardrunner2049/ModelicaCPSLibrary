@@ -1,0 +1,17 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Hobbywing Combo Pump 8L (brushless water pump)"
+kind = "sprayer"
+manufacturer = "Hobbywing Technology"
+source = "Hobbywing product page 'One-piece Brushless Water Pump 8L for Agri Spray Drones', model Combo-pump 8L Brushless 10A 14S V1 HW: https://www.hobbywing.com/en/products/one-piece-brushless-water-pump-8l106 (accessed 2026-11-09)"
+notes = "Hobbywing's own documents disagree: the user manual 'HW-SMC909-DUL_20210325' lists 626 g and 138x96x69 mm, and an older product page gives 0.8-1.2 MPa and 1100-1940 us. The current product page values are recorded. 120 W is labelled 'Rated output power (Max continuous)'."
+flow_rate_lpm = 8                              # 'Maximum Flow 8L/min'
+operating_pressure_kpa = [800, 1000]           # 'Working Pressure 0.8-1.0Mpa'
+rated_power_w = 120                            # 'Rated output power (Max continuous) 120W'
+pump_mass_g = 698                              # 'Weight 698g'
+input_voltage_v = [44, 60.9]                   # '12-14S (DC44-60.9V)'
+working_current_a_max = 2.5                    # 'Working Current <=2.5A'
+pwm_range_us = [1050, 1950]
+size_mm = [139, 95, 70]
+hose_inner_diameter_mm = 12                    # inlet and outlet
+ip_rating = "IP67"
+not_stated = ["tank_capacity_l", "flow vs pressure curve"]

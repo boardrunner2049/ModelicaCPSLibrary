@@ -3,6 +3,6 @@ model PowerModule "W0: the pack's terminal voltage and the load current, measure
   extends PartialPowerModule;
 equation
   voltage = battery.voltage;
-  current = load;
+  current = packCurrent;
   valid = true;
 end PowerModule;

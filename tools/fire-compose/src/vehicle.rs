@@ -408,6 +408,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
             "gnss",
             "vulnerabilities",
             "peripherals",
+            "payloads",
         ],
         "config",
     )
@@ -443,6 +444,10 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
         barometer: barometer.clone(),
         gnss: gnss.clone(),
         acoustic: crate::acoustic::resolve(&section(root, "vulnerabilities"), &models)?,
+        payloads: crate::payloads::resolve(
+            &section(root, "payloads"),
+            &crate::peripherals::resolve(&section(root, "peripherals"), kind.name)?,
+        )?,
         peripherals: crate::peripherals::resolve(&section(root, "peripherals"), kind.name)?,
         models,
         plant: resolve_plant(&section(root, "plant"), kind)?,
@@ -511,6 +516,24 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         plant.push(sensors);
     }
     crate::peripherals::components(c, &mut components, &mut equalities)?;
+    crate::payloads::components(
+        c,
+        "external_force_frd",
+        "external_moment_frd",
+        &mut components,
+        &mut equalities,
+    )?;
+    if crate::payloads::any(c) {
+        // The payloads' bus, not the host's wrench alone, loads the plant.
+        plant.push(Modifier::Bind(
+            "externalForce_b".into(),
+            crate::composition::Value::Reference("payloadBus.totalForce".into()),
+        ));
+        plant.push(Modifier::Bind(
+            "externalMoment_b".into(),
+            crate::composition::Value::Reference("payloadBus.totalMoment".into()),
+        ));
+    }
     if !plant.is_empty() {
         modifiers.push(Modifier::Nested("plant".into(), plant));
     }

@@ -571,6 +571,37 @@ required = false
 unit = "1"
 meaning = "1 when the target is in view, else 0."
 
+[capabilities.payload_actuation_v1]
+summary = "Pulse-width commands of the payloads' servos (gripper, winch, parachute, sprayer, landing gear, gimbal)."
+[[capabilities.payload_actuation_v1.fields]]
+name = "aux_pwm"
+type = "Float64"
+causality = "input"
+shape = ["n"]
+required = true
+start = "finite"
+unit = "us"
+meaning = "Element k is host servo output 9+k (ArduPilot SERVO9...). Unused elements keep their start value."
+
+[capabilities.fuel_v1]
+summary = "Fuel flow and level of an onboard generator's tank."
+[[capabilities.fuel_v1.fields]]
+name = "fuel_flow_lph"
+type = "Float64"
+causality = "output"
+shape = []
+required = true
+unit = "l/h"
+meaning = "Fuel flow out of the tank."
+[[capabilities.fuel_v1.fields]]
+name = "fuel_level"
+type = "Float64"
+causality = "output"
+shape = []
+required = false
+unit = "1"
+meaning = "Fuel left, fraction of the tank."
+
 # An FMU without the marker is accepted only when the host explicitly selects
 # this profile; the checker then warns. It describes the exports of FastDyn's
 # FastDyn.Copter/Rover/Plane wrappers before migration. Removal is decided

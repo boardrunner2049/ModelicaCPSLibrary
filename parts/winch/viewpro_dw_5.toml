@@ -1,0 +1,15 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Viewpro DW-5 drone winch (30 m rope and hook)"
+kind = "winch"
+manufacturer = "Viewpro (Xiamen Viewpro Technology)"
+source = "Viewpro product page 'Drone Winch DW-5 30m Rope and Hook for Delivery Picking up and Dropping off': https://viewprouav.com/product/drone-winch-with-30m-rope-and-hook-for-delivery-picking-up-and-dropping-off.html (accessed 2026-11-09)"
+notes = "Viewpro gimbals are ArduPilot-supported, but ArduPilot has no driver for this winch; it would run as PWM/servo or relay. The page gives pay-out speed as '10m/ points' (likely 10 m/min, machine-translated); 0.167 m/s is a unit conversion of that reading. The page states no retract speed."
+mass_g = 1050                                 # 'Net Weight: 1.05KG'
+line_length_m = 30                            # 'Rope length: 30M'
+max_load_kg = 5                               # 'Maximum carrying weight: 5KG'
+payout_speed_m_per_min = 10                   # 'Setting out speed: 10m/ points' (assumed m/min)
+payout_speed_mps = 0.167                      # conversion of 10 m/min
+supply_voltage_v = 24                         # 'Operating voltage: 24V'
+motor_power_w = 22                            # 'Motor power: 22w'
+size_mm = [200, 105, 145]                     # 'External size: 200*105*145mm'
+not_stated = ["retract_speed_mps", "tension_n", "current_a", "line mass/diameter"]

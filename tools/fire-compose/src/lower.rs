@@ -151,14 +151,10 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         physical.push(Modifier::Bind("pressure".into(), Value::Real(101325.0)));
         physical.push(Modifier::Bind("temperature".into(), Value::Real(288.15)));
         // Vehicle interface external_wrench_v1: the host's wrench at the CG, body FRD.
-        physical.push(Modifier::Bind(
-            "externalForce_b".into(),
-            reference("external_force_frd"),
-        ));
-        physical.push(Modifier::Bind(
-            "externalMoment_b".into(),
-            reference("external_moment_frd"),
-        ));
+        let (force, moment) =
+            crate::payloads::plant_wrench(c, "external_force_frd", "external_moment_frd");
+        physical.push(Modifier::Bind("externalForce_b".into(), force));
+        physical.push(Modifier::Bind("externalMoment_b".into(), moment));
         components.push(instance(plant_class, "plant", vec![], physical));
         let mut boundary = vec![Modifier::Bind("geometry".into(), geometry(c)?)];
         boundary.extend(fields(&c.interface)?);
@@ -206,7 +202,12 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
                 Value::Array(default.into_iter().map(Value::Real).collect())
             });
             components.push(input);
-            physical.push(Modifier::Bind(name.into(), reference(name)));
+            let value = match name {
+                "externalForce_b" => crate::payloads::plant_wrench(c, name, "").0,
+                "externalMoment_b" => crate::payloads::plant_wrench(c, "", name).1,
+                _ => reference(name),
+            };
+            physical.push(Modifier::Bind(name.into(), value));
         }
         components.push(instance(plant_class, "plant", vec![], physical));
         for (name, class, dimensions) in [
@@ -442,6 +443,12 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
         }
     }
     crate::peripherals::components(c, &mut components, &mut equalities)?;
+    let (host_force, host_moment) = if vio {
+        ("external_force_frd", "external_moment_frd")
+    } else {
+        ("externalForce_b", "externalMoment_b")
+    };
+    crate::payloads::components(c, host_force, host_moment, &mut components, &mut equalities)?;
     if crate::peripherals::supplies_propulsion(c) {
         // The power module's pack is the propulsion supply.
         for (name, value) in equalities.iter_mut() {

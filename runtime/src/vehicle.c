@@ -59,9 +59,11 @@ struct cpv_vehicle {
   fmi3ValueReference marker_vr;
   int marker_value;
 
-  const field_t *pwm, *pwm_min, *pwm_max, *force, *moment;
+  const field_t *pwm, *pwm_min, *pwm_max, *force, *moment, *aux;
   double *pwm_values;
   int pwm_dirty;
+  double *aux_values; /* payload_actuation_v1 */
+  int aux_dirty;
   double wrench[6];
   int wrench_dirty;
 
@@ -377,6 +379,11 @@ static cpv_status_t load_model(cpv_vehicle_t *v, const cpv_model_t *m, const cpv
   v->pwm_max = find_field(v, "pwm_max");
   v->force = find_field(v, "external_force_frd");
   v->moment = find_field(v, "external_moment_frd");
+  v->aux = find_field(v, "aux_pwm");
+  if (has_capability(v, "payload_actuation_v1") && (!v->aux || !v->aux->start)) {
+    set_error(v, "descriptor: payload_actuation_v1 needs aux_pwm with a complete start vector");
+    return CPV_ERR_DESCRIPTOR;
+  }
   if (has_capability(v, "pwm_actuation_v1") && (!v->pwm || !v->pwm->start)) {
     set_error(v, "descriptor: pwm_actuation_v1 needs pwm with a complete start vector");
     return CPV_ERR_DESCRIPTOR;
@@ -420,6 +427,9 @@ static void restore_inputs(cpv_vehicle_t *v) {
   if (v->pwm)
     memcpy(v->pwm_values, v->pwm->start, v->pwm->count * sizeof(double));
   v->pwm_dirty = v->pwm != NULL;
+  if (v->aux)
+    memcpy(v->aux_values, v->aux->start, v->aux->count * sizeof(double));
+  v->aux_dirty = v->aux != NULL;
   if (v->force) {
     memcpy(v->wrench, v->force->start, 3 * sizeof(double));
     memcpy(v->wrench + 3, v->moment->start, 3 * sizeof(double));
@@ -699,6 +709,7 @@ static void destroy(cpv_vehicle_t *v) {
   free(v->overrides);
   free(v->descriptor_values);
   free(v->pwm_values);
+  free(v->aux_values);
   free(v->profile);
   free(v->model_name);
   free(v->instance_name);
@@ -727,6 +738,8 @@ static cpv_vehicle_t *create(const cpv_options_t *o, cpv_status_t *s) {
 /* After the model is loaded and its functions bound: input buffers and the instance. */
 static cpv_status_t instantiate(cpv_vehicle_t *v, const char *token, const char *resource_uri) {
   if (v->pwm && !(v->pwm_values = malloc(v->pwm->count * sizeof(double))))
+    return CPV_ERR_NOMEM;
+  if (v->aux && !(v->aux_values = malloc(v->aux->count * sizeof(double))))
     return CPV_ERR_NOMEM;
   restore_inputs(v);
   v->instance = v->instantiate(v->instance_name, token, resource_uri, fmi3False, fmi3False,
@@ -871,6 +884,15 @@ static cpv_status_t flush_inputs(cpv_vehicle_t *v, const char *phase) {
     worst = s > worst ? s : worst;
     v->pwm_dirty = 0;
   }
+  if (v->aux && v->aux_dirty) {
+    snprintf(what, sizeof(what), "fmi3SetFloat64(aux_pwm) %s", phase);
+    s = fmi_result(v, v->set_float64(v->instance, &v->aux->vr, 1, v->aux_values, v->aux->count),
+                   what);
+    if (s >= CPV_ERR_ARGUMENT)
+      return s;
+    worst = s > worst ? s : worst;
+    v->aux_dirty = 0;
+  }
   if (v->force && v->wrench_dirty) {
     snprintf(what, sizeof(what), "fmi3SetFloat64(external wrench) %s", phase);
     s = fmi_result(v, v->set_float64(v->instance, &v->force->vr, 1, v->wrench, 3), what);
@@ -915,6 +937,7 @@ cpv_status_t cpv_initialize(cpv_vehicle_t *v, double start_time_s) {
     worst = s > worst ? s : worst;
   }
   v->pwm_dirty = v->pwm != NULL;
+  v->aux_dirty = v->aux != NULL;
   v->wrench_dirty = v->force != NULL;
   if ((s = flush_inputs(v, "during initialization")) >= CPV_ERR_ARGUMENT)
     return s;
@@ -1131,6 +1154,26 @@ cpv_status_t cpv_set_pwm_vector(cpv_vehicle_t *v, const double *pulse_us, size_t
   }
   memcpy(v->pwm_values, pulse_us, count * sizeof(double));
   v->pwm_dirty = 1;
+  return CPV_OK;
+}
+
+size_t cpv_aux_count(const cpv_vehicle_t *v) { return v && v->aux ? v->aux->count : 0; }
+
+cpv_status_t cpv_set_aux_pwm(cpv_vehicle_t *v, size_t channel, double pulse_us) {
+  if (!v)
+    return CPV_ERR_ARGUMENT;
+  if (!v->aux) {
+    set_error(v, "model %s does not provide payload_actuation_v1", v->model_name);
+    return CPV_UNSUPPORTED;
+  }
+  if (channel >= v->aux->count || !isfinite(pulse_us)) {
+    set_error(v, "aux channel %zu: outside the model's %zu, or not finite", channel, v->aux->count);
+    return CPV_ERR_ARGUMENT;
+  }
+  if (v->aux_values[channel] != pulse_us) {
+    v->aux_values[channel] = pulse_us;
+    v->aux_dirty = 1;
+  }
   return CPV_OK;
 }
 

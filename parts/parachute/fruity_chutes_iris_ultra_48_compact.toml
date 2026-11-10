@@ -1,0 +1,18 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Fruity Chutes Iris Ultra 48in Compact (IFC-48-S)"
+kind = "parachute"
+manufacturer = "Fruity Chutes Inc"
+source = "Fruity Chutes webstore product page 'Iris Ultra 48\" Compact Parachute - 12.5lb @ 20fps; 7lb @ 15fps' (SKU IFC-48-S-YB), https://shop.fruitychutes.com/products/iris-ultra-48-compact-parachute-12-5lbs-20fps-7lbs-15fps , read via Wayback snapshot 2026-10-22 (live site rate-limited)"
+notes = "Canopy only: no launcher, trigger or harness. ArduPilot's parachute page lists Fruity Chutes as a recommended vendor. Fruity Chutes quotes the effective diameter when deployed, per the Skycat page's note on Fruity Chutes sizing. Metric values are exact unit conversions of the published imperial figures (lb->kg x0.45359, fps->m/s x0.3048, oz->g x28.3495, in->m x0.0254). The '7 lb @ 15 fps' rating is from the product title. A different product, the Iris 48in Ultralight (IFC-48-SUL), is 2.62 oz (74.4 g), 7 lb @ 15 fps, Cd 2.2, packing 1.8in D x 5.7in L."
+canopy_type = "Ultra Compact Toroidal (Annular), 8 gores"   # product page
+canopy_diameter_in = 48                        # product name
+canopy_diameter_m = 1.219                      # conversion of 48 in
+drag_coefficient = 2.2                         # 'Cd of 2.2!' (product page)
+canopy_mass_oz = 4.3                           # 'Weight: 4.3 oz' (product page)
+canopy_mass_g = 121.9                          # conversion of 4.3 oz
+rating = [ { mass_lb = 12.5, mass_kg = 5.67, descent_rate_fps = 20, descent_rate_mps = 6.10 },   # 'Rating: 12.5 lb @ 20 fps'
+           { mass_lb = 7.0,  mass_kg = 3.18, descent_rate_fps = 15, descent_rate_mps = 4.57 } ]  # title '7lb @ 15fps'
+packing_volume_in3 = 26                        # 'Packing Volume: 2.6\" D x 4.9\" L : 26 cu\"' (deployment-bag density 0.18 oz/cu in)
+shroud_lines = "400 lb Spectra"                # product page
+bridle = "1/4 in Kevlar, no swivel"            # product page
+not_stated = ["deployment_time_s", "min_deploy_altitude_m", "max_takeoff_mass_kg (strength limit; Skycat lists 9 kg max for IFC-48-S, see skycat_x55_cf.toml)", "system_mass_g (canopy only)"]

@@ -189,6 +189,13 @@ velocity), `visual_odometry_v1`, `beacon_v1` and `precision_landing_v1`
 (angles and distance to the target). Each has a `*_valid` field, 1 when a
 sample has been delivered and is valid. Units and frames are in the contract.
 
+### `payload_actuation_v1` and `fuel_v1`
+
+`aux_pwm` (input, µs): the payloads' servo pulses (`Systems/Payloads`),
+element k from the host's servo output 9 + k, held between communication
+points (`cpv_set_aux_pwm`). `fuel_v1`: an onboard generator's fuel flow
+(`fuel_flow_lph`) and level (`fuel_level`).
+
 ### Legacy profile `fastdyn_legacy`
 
 An FMU without the marker is refused unless the host **explicitly** selects

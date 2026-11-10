@@ -44,6 +44,7 @@ pub fn catalog() -> Value {
         },
         "parts": parts::catalog(),
         "peripherals": crate::peripherals::catalog(),
+        "payloads": crate::payloads::catalog(),
     })
 }
 

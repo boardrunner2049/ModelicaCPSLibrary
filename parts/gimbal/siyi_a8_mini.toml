@@ -1,0 +1,17 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "SIYI A8 mini"
+kind = "gimbal"
+manufacturer = "SIYI Technology"
+source = "SIYI A8 mini User Manual v1.5 (c) 2023 SIYI, section 1.3 Technical Specification, printed p11 (manualslib viewer p18): https://www.manualslib.com/manual/3251738/Siyi-A8-Mini.html?page=18 ; ArduPilot SIYI page for recommended mount limits: https://ardupilot.org/copter/docs/common-siyi-zr10-gimbal.html"
+notes = "Official PDF (siyi.biz/siyi_file/A8 mini/A8 mini User Manual v1.8.pdf) was not retrievable (served HTML), so figures are from the v1.5 manual as rendered by manualslib; v1.8 (2025) says the spec table was updated, so re-check against v1.8. The manual's range rows are labelled 'controllable' pitch/yaw and 'rotatable' roll; the manual gives no separate mechanical range. The ArduPilot wiki recommends narrower soft limits (MNT1_PITCH -90..25, MNT1_YAW -135..135). manualslib text extraction scrambles the table layout; the +/-0.01 deg angular-vibration pairing is likely but not certain. Mass is gimbal and camera together (the A8 mini is an integrated unit)."
+mass_g = 95                                   # 'Weight 95 g' (spec 1.3, p11)
+pitch_range_deg = [-135, 45]                  # 'Controllable Pitch Angle -135 ~ +45' (spec 1.3, p11)
+yaw_range_deg = [-160, 160]                   # 'Controllable Yaw Angle -160 ~ +160' (spec 1.3, p11)
+roll_range_deg = [-30, 30]                    # 'Rotatable Roll Angle -30 ~ +30' (spec 1.3, p11)
+ardupilot_pitch_limits_deg = [-90, 25]        # ArduPilot wiki recommended MNT1_PITCH_MIN/MAX for A8 (soft limits, not manual)
+ardupilot_yaw_limits_deg = [-135, 135]        # ArduPilot wiki recommended MNT1_YAW_MIN/MAX for A8
+angular_vibration_deg = 0.01                  # 'Angular Vibration Range +/-0.01 deg' (spec 1.3, p11; see notes)
+power_avg_w = 5                               # 'Power consumption: Average 5 W' (spec 1.3, p11)
+power_peak_w = 12                             # 'Summit 12 W' i.e. peak (spec 1.3, p11)
+input_voltage_v = [11, 25.2]                  # 'Working voltage 11 ~ 25.2 V'; early lots may not support 25.2 V (spec 1.3, p11)
+not_stated = ["payload_max_g (integrated camera, not applicable)", "separate mechanical range vs controllable range", "max_rate_dps per axis", "dimensions confirmed only by retailers (55x55x70 mm), not recorded"]

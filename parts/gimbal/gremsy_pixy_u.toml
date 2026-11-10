@@ -1,0 +1,22 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Gremsy Pixy U"
+kind = "gimbal"
+manufacturer = "Gremsy"
+source = "Gremsy Pixy U SPECIFICATION, release July 23 2019 V1.0 (Gremsy spec sheet, hosted at https://www.unmannedsystemstechnology.com/wp-content/uploads/2022/06/Pixy-U-Specs-min.pdf), p1 'Mechanical & Electrical' / 'Working Performance'; cross-checked with Gremsy Pixy U User Manual rev 2019-10-01 p10 (https://www.manualslib.com/manual/3649417/Gremsy-Pixy-U.html)"
+notes = "Pan = yaw, tilt = pitch. Sign convention is Gremsy's own (tilt +135/-45). The sheet's range rows read 'Pan axis control' etc. under both headings. Power is given as current at 12 V; the W figures below are I*V products from the sheet's values, shown for convenience. The user manual gives input UBEC 14-52 V, gimbal 12 V / 5 A."
+mass_g = 465                                  # 'Weight 1 lb (0.465 kg)', gimbal without camera (p1)
+payload_max_g = 465                           # 'Maximum Payload 465g' (p1)
+yaw_range_deg = [-330, 330]                   # Mechanical Endpoint Range, pan +330 to -330; controlled range is the same (p1)
+pitch_range_deg = [-45, 135]                  # Mechanical Endpoint Range, tilt +135 to -45; controlled range is the same (p1)
+roll_range_mech_deg = [-90, 45]               # Mechanical Endpoint Range, roll +45 to -90 (p1)
+roll_range_ctrl_deg = [-45, 45]               # Controlled Rotation Range, roll +/-45 (p1)
+max_rate_dps = { pan = 100, tilt = 100, roll = 100 }   # Maximum Controlled Rotation Speed (p1)
+angular_vibration_deg = 0.02                  # 'Angular Vibration Range +/-0.02 deg' (p1)
+current_static_a_at_12v = 0.4                 # 'Static current: 400mA (@12V)' (p1)
+current_dynamic_a_at_12v = 0.8                # 'Dynamic current: 800mA (@12V)' (p1)
+current_locked_motor_max_a_at_12v = 4.0       # 'Locked motor current: Max 4.0A (@12V)' (p1)
+power_static_w = 4.8                          # derived: 0.4 A x 12 V from the sheet
+power_dynamic_w = 9.6                         # derived: 0.8 A x 12 V from the sheet
+input_voltage_v = [14, 52]                    # 'Input Power 14-52V' (p1)
+dimensions_mm = [112, 145, 200]               # 'Gimbal Dimension 112(W) x 145(D) x 200(H)' (p1)
+not_stated = ["power_w as a direct watt rating (only currents at 12 V)"]

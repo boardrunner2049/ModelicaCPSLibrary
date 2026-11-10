@@ -1,0 +1,18 @@
+# Published figures; a smart (SMBus) pack: [peripherals.power_module] battery = ..., smart = true.
+name = "Tattu Plus 22000mAh 6S 25C smart LiPo (AS150+XT150)"
+kind = "battery"
+smart = true                 # reports over SMBus
+manufacturer = "Grepow (Tattu)"
+source = "Gens Tattu official store product page, part TA-P2-25C-22000-6S1P-AS150, SKU TAA22K6SP25AX: https://genstattu.com/ta-p2-25c-22000-6s1p-as150.html (accessed 2026-11-09)"
+notes = "Onboard BMS (Tattu Plus); the page does not state the bus protocol. Reseller weights range 2640-2650 g, consistent with this page. Grepow's comparison table lists 2063 g, which looks like an error or an old version. Derived: 25C x 22 Ah = 550 A continuous, 50C = 1100 A burst (not stated in amps)."
+cells = 6
+capacity_mah = 22000                           # 'Minimum Capacity: 22000mAh'
+nominal_voltage_v = 22.2                       # '6S1P / 22.2V / 6 Cells'
+max_continuous_discharge_c = 25                # 'Discharge Rate: 25C'
+max_burst_discharge_c = 50                     # 'Max Burst discharge Rate (C): 50'
+mass_g = 2650                                  # 'Net Weight(+/-20g): 2,650g'
+size_mm = [213, 96, 69]
+discharge_plug = "AS150+XT150"
+balance_connector = "MOLEX-436450-9P"
+wire_gauge_awg = 8
+not_stated = ["internal_resistance_mohm", "max charge rate", "communication bus (SMBus/CAN) for ArduPilot"]

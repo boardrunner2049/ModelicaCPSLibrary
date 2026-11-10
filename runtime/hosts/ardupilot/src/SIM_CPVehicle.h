@@ -75,6 +75,7 @@ private:
          has_battery = false, has_temperature = false, has_ahrs = false, has_odometry = false,
          has_beacon = false, has_precland = false;
     size_t rpm_count = 0;
+    size_t aux_count = 0;  // payload_actuation_v1: aux_pwm[k] <- SERVO(9+k)
     uint64_t start_time_us;
     size_t channel_count;
     int8_t channel_source[max_channels];  // SITL servo index per FMU pwm element, -1: none

@@ -1,0 +1,15 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Zubax FluxGrip FG40 (FG401M / FG401MA)"
+kind = "gripper"
+manufacturer = "Zubax Robotics"
+source = "FluxGrip Reference Manual, chapter Hardware > FG40 (last updated 2026-10-16): https://fluxgrip.zubax.com/chapters/hardware/fg40.html ; ArduPilot supports it (common-electro-permanent-magnet.html)"
+notes = "Electro-permanent magnet; it holds with zero power and uses energy only while switching. The FG40 chapter gives family-level values and does not split FG401M (CAN) from FG401MA (RC PWM/analog). Holding force is measured against a 4 mm polished iron sheet in full contact, force perpendicular at the magnet's centre, so real targets will be lower."
+holding_force_n = 250                         # 'Holding force 250 N', 4 mm polished iron sheet, full contact (Magnetic characteristics)
+holding_force_kgf = 25                        # '25 kgf of holding force' (Features)
+mass_g = 72                                   # 'Mass 72 g' (Mechanical characteristics)
+size_mm = [40, 40, 20]                        # '4x4x2 cm' (Features)
+supply_voltage_v = [4.5, 30]                  # 'Supply voltage min 4.5, max 30 V' (Interface and power supply); Features says 4~30 V
+idle_power_w = 0.05                           # 'Idle power consumption 50 mW, magnet not switching'
+switching_current_a = 2                       # 'Switching current consumption 2 A (typical)'
+switching_energy_j = 4                        # 'Magnetization energy consumption 4 J (approximate)'
+not_stated = ["switch_time_s"]

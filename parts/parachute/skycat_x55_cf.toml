@@ -1,0 +1,41 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Skycat X55-CF parachute launcher system"
+kind = "parachute"
+manufacturer = "Skycat (Finland); sold also by Fruity Chutes"
+source = "Skycat product page 'Skycat X55' (sections Launcher, Parachute, Trigger, descent-metrics tables): https://skycat-parachute-launcher.squarespace.com/shop/skycat-x55 (accessed 2026-11-09); tech-specs page https://skycat-parachute-launcher.squarespace.com/tech-specs"
+notes = "ArduPilot names SkyCat as a complete parachute mechanism, triggered by PWM. It is a pneumatic launcher with three parachute options (Fruity Chutes IFC-48-S, IFC-60-SUL, Opale 2.5 m2). Skycat says its descent tables are 'calculated', not measured. The tech-specs page reports measured drop distances (altitude lost before the chute is effective) of 3-10 m. The IFC-48-S ultralight table's 4.0 kg row reads 5.5 m/s on the page, out of sequence with its neighbours (probably 5.1), and is reproduced as published."
+system_mass_g = 320                            # 'Total system weight: Approx. 320g, including X55 launcher, parachute and trigger'
+launcher_mass_g = 157                          # 'Weight 157 grams'
+launcher_diameter_mm = 55                      # Launcher
+launcher_length_mm = 229                       # default; 209 on request
+trigger_mass_g = [26, 66]                      # 'depending on version and cable length'
+trigger_receiver_voltage_v = [4.9, 6.1]        # Trigger
+launch_battery_cells = "3-4S (up to 6S with V3/V4 Pro trigger on X55)"   # Trigger
+drop_distance_m = [3, 10]                      # tech-specs page: measured drop distances 3-10 m (min deploy altitude proxy)
+
+not_stated = ["deployment_time_s", "ejection speed", "drag_coefficient (see Fruity Chutes file: Cd 2.2)"]
+
+[parachute_ifc_48_s]
+mass_g = 126                                   # 'Weight: 126 g'
+canopy_diameter_m = 1.22                       # 'Effective diameter when deployed 48 in / 1,22 m'
+recommended_mass_kg = [3, 5]                   # 'Maximum recommended weight: 3 - 5 kg'
+max_takeoff_mass_kg = 9                        # 'Maximum weight: 9 kg' (strength limit at terminal-speed opening)
+descent_rate_mps_at_mass_kg = [[3.5,4.6],[4.0,5.1],[4.5,5.4],[5.0,5.7],[5.5,5.9],[6.0,6.2],[7.0,6.7],[8.0,7.2],[9.0,7.6],[10.0,8.0],[11.0,8.4],[12.0,8.8]]   # table 'Descent metrics for a 2.5 m2 and IFC-48-S'; [kg, m/s]
+
+[parachute_ifc_60_sul]
+mass_g = 105                                   # 'Weight: 105 g'
+canopy_diameter_m = 1.52                       # 'Effective diameter when deployed 60 in / 1.52 m'
+recommended_mass_kg = [5, 8]
+max_takeoff_mass_kg = 11                       # 'Maximum weight: 11 kg'
+descent_rate_mps_at_mass_kg = [[3.5,3.4],[4.0,4.0],[4.5,4.3],[5.0,4.5],[5.5,4.8],[6.0,5.0],[7.0,5.3],[8.0,5.7],[9.0,6.1],[10.0,6.4],[11.0,6.7],[12.0,7.0]]   # table 'IFC-60-SUL (ultra light)'
+
+[parachute_opale_2_5m2]
+mass_g = 120                                   # 'Weight: 120 g'
+canopy_area_m2 = 2.5                           # 'Canopy area 2,5 m2'
+recommended_mass_kg = [3, 4]
+max_takeoff_mass_kg = 6.5                      # 'Copter max. weight 6,5 kg'
+# descent: shares the '2.5 m2 and IFC-48-S' table above
+
+[parachute_ifc_48_sul]
+descent_rate_mps_at_mass_kg = [[2.5,4.1],[3.0,4.4],[3.5,4.8],[4.0,5.5],[4.5,5.4],[5.0,5.7],[5.5,6.0],[6.0,6.3],[6.5,6.5],[7.0,6.8],[7.5,7.0],[8.0,7.2],[8.5,7.4],[9.0,7.6]]   # table 'IFC-48-S (ultra light)' as published (see notes re 4.0 kg row)
+

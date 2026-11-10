@@ -173,6 +173,11 @@ void CPVehicle::start()
     has_odometry = cpv_has_capability(vehicle, "visual_odometry_v1");
     has_beacon = cpv_has_capability(vehicle, "beacon_v1");
     has_precland = cpv_has_capability(vehicle, "precision_landing_v1");
+    aux_count = cpv_aux_count(vehicle);
+    if (aux_count > 0) {
+        ::printf("cpvehicle: payload servos: aux_pwm[1..%u] <- SERVO9..%u\n", unsigned(aux_count),
+                 unsigned(8 + aux_count));
+    }
     if (has_rpm) {
         double rpm_values[max_channels];
         for (size_t n = 1; n <= max_channels && rpm_count == 0; n++) {
@@ -208,6 +213,16 @@ void CPVehicle::update(const struct sitl_input &input)
             const cpv_status_t status = cpv_set_pwm(vehicle, i, input.servos[servo]);
             if (status != CPV_OK) {
                 fail("set pwm", status);
+            }
+        }
+    }
+
+    // Payload servos: SERVO9.. drive aux_pwm, held while not driven.
+    for (size_t k = 0; k < aux_count && 8 + k < max_channels; k++) {
+        if (input.servos[8 + k] != 0) {
+            const cpv_status_t status = cpv_set_aux_pwm(vehicle, k, input.servos[8 + k]);
+            if (status != CPV_OK) {
+                fail("set aux pwm", status);
             }
         }
     }

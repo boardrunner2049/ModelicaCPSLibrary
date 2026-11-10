@@ -97,6 +97,11 @@ cpv_status_t cpv_set_pwm_vector(cpv_vehicle_t *vehicle, const double *pulse_us, 
 /* The model's pwm_min/pwm_max, when it exports them; CPV_UNSUPPORTED otherwise. */
 cpv_status_t cpv_pwm_range(cpv_vehicle_t *vehicle, double *min_us, double *max_us);
 
+/* payload_actuation_v1: pulse widths of the payloads' servos (gripper, winch,
+ * parachute, ...). Element k is host servo output 9+k. Held like pwm. */
+size_t cpv_aux_count(const cpv_vehicle_t *vehicle);
+cpv_status_t cpv_set_aux_pwm(cpv_vehicle_t *vehicle, size_t channel, double pulse_us);
+
 /* external_wrench_v1: force [N] at the combined CG and moment [N.m] about it, body FRD. */
 cpv_status_t cpv_set_external_wrench(cpv_vehicle_t *vehicle, const double force_frd[3],
                                      const double moment_frd[3]);

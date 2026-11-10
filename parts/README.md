@@ -119,6 +119,15 @@ reads are the ones in the files here.
 | visual_odometry | Intel RealSense T265; ModalAI VOXL 2 VIO; Luxonis OAK-D |
 | beacon | Marvelmind Super-MP-3D; Nooploop LinkTrack P-A |
 | precision_landing | IR-LOCK sensor + MarkOne; OpenMV Cam H7 R2 |
+| gimbal | SIYI A8 mini; Gremsy Pixy U, T3V3 |
+| gripper | NicaDrone OpenGrab EPM v3; Zubax FluxGrip FG40; Tarot TL2962 |
+| winch | Okaya Daiwa winch; Viewpro DW-5 |
+| parachute | Fruity Chutes Iris Ultra 48" compact; Skycat X55 |
+| sprayer | Hobbywing combo pump 5 L, 8 L; TeeJet XR11001 nozzle |
+| landing_gear | Tarot TL65B44, TL8X001 |
+| tether | Elistair Safe-T 2; Hoverfly LiveSky Sentry |
+| generator | Intelligent Energy IE-SOAR 800 W; Loweheiser HYBGEN 32 |
+| battery (smart) | Tattu Plus 16000 mAh 6S, 22000 mAh 6S (`smart = true`: SMBus) |
 
 ## Peripheral parts
 
@@ -134,4 +143,9 @@ datasheet does not state is reported:
 tools/fire-compose/target/debug/fire-compose part rangefinder tfmini
 tools/fire-compose/target/debug/fire-compose part external_ahrs vn_300 --json
 ```
+
+Payloads (`[payloads.KIND] part = ...`, `Systems/Payloads`) are converted by
+`tools/fire-compose/src/payloads.rs`: line speeds and lengths, canopy
+diameters and drag coefficients, pump flows and PWM ranges, gimbal angle
+ranges and rates, tether lengths and powers, generator ratings and fuel use.
 

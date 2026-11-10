@@ -1,0 +1,11 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "TeeJet XR11001 (XR TeeJet extended-range flat spray tip, 110 deg, size 01)"
+kind = "sprayer"
+manufacturer = "TeeJet Technologies (Spraying Systems Co.)"
+source = "TeeJet Broadcast Nozzles catalogue (Polish edition, metric tables), XR TeeJet page, PDF p6: https://www.teejet.com/-/media/dam/agricultural/europe/sales-material/catalog/broadcast_nozzles-pl.pdf ; drop size: TeeJet Data Sheet 37043-1 Rev 1 'XR TeeJet drop size data', https://www.teejet.com/en-in/-/media/dam/agricultural/usa/technical-documentation/product-data-sheet/37043-1_tj.pdf ; US table (gpm @ psi) cross-check: https://crsupply.com/userdocs/documents/XR_Nozzle_Chart.pdf"
+notes = "Flow is per nozzle, water at 21 C (70 F). The recommended XR range is 1-4 bar (15-60 psi). Filter 100 mesh. In the US table: 0.10 gpm @ 40 psi, 0.11 @ 50, 0.12 @ 60. Drop sizes (Dv0.5, um, water, PDPA, VS/VP tips): 274 @10 psi, 213 @20, 189 @30, 174 @40, 165 @50, 157 @60. No tank: none of the sprayer sources give a tank capacity. On ArduPilot drones the tank is part of the airframe."
+spray_angle_deg = 110
+flow_lpm_at_pressure_kpa = [[100, 0.23], [150, 0.28], [200, 0.32], [250, 0.36], [300, 0.39], [400, 0.45]]   # catalogue XR table: 1.0/1.5/2.0/2.5/3.0/4.0 bar -> l/min, one nozzle
+operating_pressure_kpa = [100, 400]            # 'Excellent distribution 1-4 bar (15-60 PSI)'
+drop_dv05_um_at_pressure_psi = [[10, 274], [20, 213], [30, 189], [40, 174], [50, 165], [60, 157]]   # Data Sheet 37043-1
+not_stated = ["tank_capacity_l", "nozzle mass"]

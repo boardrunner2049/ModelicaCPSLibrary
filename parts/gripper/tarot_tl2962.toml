@@ -1,0 +1,13 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Tarot electronic payload release / thrower TL2962"
+kind = "gripper"
+manufacturer = "Tarot"
+source = "Flying Tech (UK reseller) product page 'Drone PWM Electronic Payload Release / Thrower': https://www.flyingtech.co.uk/product/drone-pwm-electronic-payload-release-thrower ; model number TL2962 per reseller listings (e.g. https://rcmumbai.com/products/tarot-thrower-air-thrower-electronic-thrower-quick-press-large-load-20kg-tl2962)"
+notes = "Hook/drop release driven by a servo-style PWM input, usable as an ArduPilot 'Servo Gripper' (GRIP_TYPE=1). No Tarot-hosted datasheet was found, so these are reseller figures. Reseller titles disagree on rating (20 kg vs 40 kg); Flying Tech says 20 kg recommended and that Tarot tested 40 kg. ArduPilot does not name a specific commercial servo gripper."
+max_load_kg = 20                              # 'recommended for up to 20KG' (Flying Tech)
+tested_load_kg = 40                           # 'Tarot have tested it for 40KG' (Flying Tech, vendor claim)
+mass_g = 91.5                                 # 'Weight: 91.5g' (Flying Tech)
+size_mm = [78.5, 48, 18]                      # '78.5mm x 48mm x 18mm' (Flying Tech)
+supply_voltage_v = 5                          # '5V' (Flying Tech)
+pwm_release_threshold_pct = 60                # 60-100 % input triggers the drop, 0-59 % does nothing (Flying Tech)
+not_stated = ["release_time_s", "PWM frequency", "manufacturer datasheet"]

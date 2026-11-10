@@ -22,7 +22,7 @@ protected
     noiseStd={voltageNoiseStd,currentNoiseStd},quantum={voltageQuantum,currentQuantum},
     lower={0,-maxCurrent},upper={maxVoltage,maxCurrent});
 equation
-  sampler.u = {battery.voltage, load};
+  sampler.u = {battery.voltage, packCurrent};
   voltage = sampler.y[1];
   current = sampler.y[2];
   valid = sampler.valid;

@@ -1,0 +1,18 @@
+# Published figures; a smart (SMBus) pack: [peripherals.power_module] battery = ..., smart = true.
+name = "Tattu Plus 16000mAh 6S 15C smart LiPo (XT90-S)"
+kind = "battery"
+smart = true                 # reports over SMBus
+manufacturer = "Grepow (Tattu)"
+source = "Gens Tattu official store product page 'Tattu Plus 16000mAh 6S 15C 22.2V Lipo Battery Pack with XT90S', part TA-P2-15C-16000-6S1P-XT90S, SKU TAA16K6S15XT90S: https://genstattu.com/tattu-plus-16000mah-6s-15c-22-2v-lipo-battery-pack-with-xt90s/ (accessed 2026-11-09)"
+notes = "Tattu Plus packs have an onboard BMS with status and alerts; the page does not say SMBus/CAN or which ArduPilot BATT_MONITOR type applies. Other variants differ: the AS150+XT150 version is listed by resellers at 2063 g, 202x88x69 mm, so check the plug variant. Max continuous current is 15C x 16 Ah = 240 A, burst 30C = 480 A (derived from the rating, not stated in amps). Energy is shown only as 'Over 300wh: Yes'; 22.2 V x 16 Ah = 355 Wh nominal."
+cells = 6
+capacity_mah = 16000                           # 'Minimum Capacity: 16000mAh'
+nominal_voltage_v = 22.2                       # '6S1P / 22.2V'
+max_continuous_discharge_c = 15                # 'Discharge Rate: 15C'
+max_burst_discharge_c = 30                     # 'Max Burst discharge Rate (C): 30'
+mass_g = 1932                                  # 'Net Weight(+/-20g): 1932g'
+size_mm = [203, 82, 70]
+discharge_plug = "XT90-S"
+balance_connector = "MOLEX-436450-9P"
+wire_gauge_awg = 8
+not_stated = ["internal_resistance_mohm", "max charge rate", "communication bus (SMBus/CAN) for ArduPilot"]

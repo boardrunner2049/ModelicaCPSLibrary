@@ -525,7 +525,7 @@ impl Kind {
             keys.extend(["position", "orientation"]);
         }
         if self.name == "power_module" {
-            keys.extend(["battery", "supply"]);
+            keys.extend(["battery", "supply", "smart"]);
         }
         if self.name == "precision_landing" {
             keys.push("target");
@@ -640,7 +640,7 @@ pub fn resolve(raw: &Toml, vehicle: &str) -> Result<Table> {
                     }
                     other => crate::config::rotation(other, &label)?,
                 },
-                "supply" => {
+                "supply" | "smart" => {
                     v.as_bool()
                         .ok_or_else(|| format!("{label}: expected true or false"))?;
                 }
@@ -727,7 +727,7 @@ pub fn components(
         let mut shaft_count = 0;
         for (k, v) in sel {
             match k.as_str() {
-                "model" | "supply" => {}
+                "model" | "supply" | "smart" => {}
                 "position" => modifiers.push(Modifier::Bind("position_b".into(), literal(v)?)),
                 "target" => {
                     modifiers.push(Modifier::Bind("targetPosition_w".into(), literal(v)?))
@@ -1300,7 +1300,7 @@ fn battery_pack(part: &Table) -> (Table, Vec<String>) {
     let f = |k: &str| part.get(k).and_then(|v| v.as_float().or(v.as_integer().map(|n| n as f64)));
     let mut t = Table::new();
     let mut notes = Vec::new();
-    let cells = f("cells_series").unwrap_or(4.0);
+    let cells = f("cells_series").or(f("cells")).unwrap_or(4.0);
     t.insert("cells".into(), Toml::Integer(cells as i64));
     if let Some(mah) = f("capacity_mah") {
         t.insert("capacity".into(), Toml::Float(mah / 1000.0));

@@ -228,6 +228,11 @@ lands. The models start facing north, so use home heading 0.
   parameters (`build/vehicle-interface/NAME.devices.parm`) and SITL's serial
   devices (SERIAL5 and up; SERIAL3/4 are SITL's GPS). SITL prints which
   peripherals are the model's at start.
+- **Payloads.** The vehicle's `[payloads]` (`Systems/Payloads`) are driven by
+  `SERVO9..16` (`payload_actuation_v1`, `cpv_set_aux_pwm`), in the
+  composer's order; `devices.py` sets the gripper, winch, parachute, sprayer,
+  landing-gear and mount parameters on those outputs. A `[sitl] devices`
+  entry for a modelled payload is ignored.
 - **Devices SITL simulates.** A run file's `[sitl] devices = [...]` switches
   on the rest of ArduPilot's optional hardware that SITL simulates itself or
   that needs no simulation (ADS-B, gripper, parachute, winch, sprayer,

@@ -1,0 +1,13 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Tarot TL65B44 carbon retractable landing gear (pair)"
+kind = "landing_gear"
+manufacturer = "Tarot"
+source = "Flying Tech (UK reseller) product page 'Tarot Carbon Fibre Retractable Landing Gear for Tarot 680 PRO - TL65B44', Specification section: https://www.flyingtech.co.uk/electronics/tarot-carbon-fibre-retractable-landing-gear-tl65b44"
+notes = "No Tarot-hosted datasheet was found, so these are reseller figures. The page's structured data says 0.25 kg, which conflicts with the 143 g spec line. It is driven directly from a spare 5 V receiver/servo channel (ArduPilot SERVOx_FUNCTION=29). The ArduPilot landing gear page names 'Tarot retractable landing gear legs' and says they may need SERVOx_REVERSED without the Tarot control box. It suits Tarot FY650/FY680-Pro/FY690S and frames under 700 mm wheelbase. The matching retract motor TL65B43 is listed elsewhere at 5 V and 25 g (75 deg, 16 mm)."
+mass_g = 143                                   # 'Weight: 143g' (set of 2 legs)
+max_load_kg = 5                                # 'Maximum load: 5kg'
+supply = "5V/0.2A from spare receiver channel" # 'Power Input: 5V/0.2A'
+supply_voltage_v = 5
+supply_current_a = 0.2
+legs = 2
+not_stated = ["retract_time_s", "retract angle (TL65B43 motor listing says 75 deg)", "per-leg load"]

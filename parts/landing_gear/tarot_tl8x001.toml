@@ -1,0 +1,16 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "Tarot TL8X001 retractable landing gear leg (X4/X6/X8) with TL8X002 controller"
+kind = "landing_gear"
+manufacturer = "Tarot"
+source = "Flying Tech (UK reseller) product pages: TL8X001 https://www.flyingtech.co.uk/electronics/tarot-retractable-landing-gear-tarot-x4-x6-x8-tl8x001 ; TL8X002 controller https://www.flyingtech.co.uk/electronics/tarot-retractable-landing-gear-controller-tl8x002"
+notes = "A full gear is a pair of TL8X001 legs plus one TL8X002 controller, and the leg must be used with the TL8X002. The pages give no load rating ('high load bearing' only) and no retract time. Controller PWM: <1520 us deploys, >1520 us retracts, which matches ArduPilot SERVOx_FUNCTION=29 low=deploy."
+leg_mass_g = 190                               # 'Weight:190g' (per leg)
+controller_mass_g = 14                         # TL8X002 'Weight: 14g'
+retract_angle_deg = 75                         # '75-degree retract angle'
+leg_tube_mm = [25, 23, 349]                    # 'Leg: Phi25x23x349mm' (OD x ID x length)
+skid_tube_mm = [16, 14, 445]                   # 'Landing Skid: Phi16x14x445mm'
+controller_voltage_v = [12.6, 25.2]            # '3S-6S (12.6V-25.2V)'; min 10 V, max 26 V
+controller_voltage_abs_v = [10, 26]
+pwm_threshold_us = 1520                        # '<1520us will deploy, >1520us will retract'
+controller_size_mm = [47, 32, 9.5]
+not_stated = ["retract_time_s", "max_load_kg", "motor current"]

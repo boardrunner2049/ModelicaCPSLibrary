@@ -1,0 +1,12 @@
+# Published figures; tools/fire-compose/src/payloads.rs converts them.
+name = "OpenGrab EPM v3"
+kind = "gripper"
+manufacturer = "NicaDrone / Zubax Robotics (discontinued)"
+source = "ArduPilot wiki 'Electro Permanent Magnet Gripper (OpenGrab EPM v3) (discontinued)': https://ardupilot.org/copter/docs/common-electro-permanent-magnet-V3.html"
+notes = "Discontinued. ArduPilot and Zubax name the Zubax FluxGrip FG40 as the drop-in replacement (see zubax_fluxgrip_fg40.toml). The Zubax wiki page and the NicaDrone product page could not be read. Retailers list about 94-97 g, which is not recorded because it is not a manufacturer figure. Grip/release is a short electromagnet pulse; the page says significant power is drawn for about 1 s while switching, but it is not a timing spec."
+holding_force_n = 200                         # 'capable of 200N of force' (ArduPilot page, overview)
+holding_mass_kg = 15                          # 'can hold about 15kg of cargo securely' (ArduPilot page)
+supply_voltage_v = 5                          # 'requires a 5V power supply'; <5 V low-power mode, <4.5 V error (ArduPilot page)
+size_mm_max = [40, 40, 20]                    # 'less than 4cm x 4cm x 2cm' (ArduPilot page)
+compass_interference_note = "minimal at 10 cm"  # ArduPilot page
+not_stated = ["mass_g", "switch_time_s", "switching current / energy", "idle power"]
