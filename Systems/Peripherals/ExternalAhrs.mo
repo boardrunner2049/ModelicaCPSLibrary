@@ -1,7 +1,7 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model ExternalAhrs "E0: an external AHRS/INS reporting the vehicle's attitude (roll, pitch, yaw and quaternion, body FRD to NED), body rates and specific force at the mount, and the mount's NED position and velocity; truth, continuous"
   extends PartialPeripheral;
-  parameter Real gravity(unit="m/s2") = 9.80665;
+  parameter Real gravity(unit="m/s2") = 9.80665 "[physics]";
   output Real attitude[3](each unit="rad") "Roll, pitch, yaw";
   output Real quaternion[4] "Scalar-first, body FRD to NED";
   output Real rate[3](each unit="rad/s") "Body FRD";

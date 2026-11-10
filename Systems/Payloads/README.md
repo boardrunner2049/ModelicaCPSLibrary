@@ -47,3 +47,12 @@ comes down under its canopy.
 - The parachute's canopy is attached at its mount (no riser length); the
   retracted gear's ground contact is unchanged (the plant's legs stay).
 - The gimbal's reaction torques and the camera's view are not modelled.
+
+## Provenance
+
+The parameters are tagged as the peripherals' are (`Systems/Peripherals`,
+Provenance): `[datasheet]` for what a device's specification states (line
+length and speed, canopy, pump flow, angle ranges, power ratings),
+`[assumed]` for what none does (line and ground stiffness and damping,
+inflation time, the gear's drag area, the gimbal's time constant, the
+tether's tension). The composed vehicle's manifest lists each value's origin.

@@ -1,11 +1,11 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Tether "A power tether to a ground station: its winch keeps a constant tension toward the anchor, the vehicle carries half the hanging tether's weight, and it supplies power up to its limit"
   extends PartialPayload;
-  parameter Real anchor_w[3](each unit="m") = zeros(3) "Ground station, NED";
-  parameter Real tension0(unit="N") = 5 "Winch tension";
-  parameter Real massPerLength(unit="kg/m") = 0.02 "Tether";
-  parameter Real maxLength(unit="m") = 100;
-  parameter Real maxPower(unit="W") = 2000 "Power through the tether";
+  parameter Real anchor_w[3](each unit="m") = zeros(3) "Ground station, NED [configuration]";
+  parameter Real tension0(unit="N") = 5 "Winch tension [assumed]";
+  parameter Real massPerLength(unit="kg/m") = 0.02 "Tether [datasheet]";
+  parameter Real maxLength(unit="m") = 100 "[datasheet]";
+  parameter Real maxPower(unit="W") = 2000 "Power through the tether [datasheet]";
   input Real utilization = 0 "Fraction of its capacity the vehicle draws (the power module's)";
   output Real length(unit="m");
   output Real capacity(unit="W") "Power it can deliver";

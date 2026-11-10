@@ -1,13 +1,13 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 partial model PartialSlungLoad "A point-mass load on a line from the attachment: tension only (spring-damper stretch), gravity, ground contact and friction for the load"
   extends PartialPayload;
-  parameter Real mass(unit="kg") = 1 "Load";
-  parameter Real stiffness(unit="N/m") = 1000 "Line";
-  parameter Real damping(unit="N.s/m") = 30 "Line";
-  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down";
-  parameter Real groundStiffness(unit="N/m") = 3000;
-  parameter Real groundDamping(unit="N.s/m") = 150;
-  parameter Real groundFriction(unit="N.s/m") = 50 "Horizontal damping of the load on the ground";
+  parameter Real mass(unit="kg") = 1 "Load [configuration]";
+  parameter Real stiffness(unit="N/m") = 1000 "Line [assumed]";
+  parameter Real damping(unit="N.s/m") = 30 "Line [assumed]";
+  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down [environment]";
+  parameter Real groundStiffness(unit="N/m") = 3000 "[assumed]";
+  parameter Real groundDamping(unit="N.s/m") = 150 "[assumed]";
+  parameter Real groundFriction(unit="N.s/m") = 50 "Horizontal damping of the load on the ground [assumed]";
   output Real load_w[3](each unit="m") "Load position, NED";
   output Real tension(unit="N");
   output Real lineLength(unit="m") "Distance from the attachment to the load";

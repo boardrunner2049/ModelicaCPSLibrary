@@ -1,11 +1,11 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Generator "An onboard generator (engine or fuel cell) delivering the share of the vehicle's electrical demand the power module draws from it, up to its rating, burning fuel in proportion; the fuel's weight loads the vehicle"
   extends PartialPayload;
-  parameter Real ratedPower(unit="W") = 2000;
-  parameter Real fuelRate(unit="l/h") = 1.5 "At rated power";
-  parameter Real tankVolume(unit="l") = 3;
-  parameter Real fuel_start(unit="l") = 3;
-  parameter Real fuelDensity(unit="kg/l") = 0.74;
+  parameter Real ratedPower(unit="W") = 2000 "[datasheet]";
+  parameter Real fuelRate(unit="l/h") = 1.5 "At rated power [datasheet]";
+  parameter Real tankVolume(unit="l") = 3 "[datasheet]";
+  parameter Real fuel_start(unit="l") = 3 "[configuration]";
+  parameter Real fuelDensity(unit="kg/l") = 0.74 "[physics]";
   input Real utilization = 0 "Fraction of its capacity the vehicle draws (the power module's)";
   output Real capacity(unit="W") "Power it can deliver";
   output Real supply(unit="W") "Power delivered";

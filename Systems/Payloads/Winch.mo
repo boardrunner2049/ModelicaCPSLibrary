@@ -1,10 +1,10 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Winch "A load on a winch line paid out and wound in at a rate set by a servo (ArduPilot WINCH_TYPE 1: rate = maxRate (pulse - 1500)/500, positive out)"
   extends PartialSlungLoad;
-  parameter Real maxRate(unit="m/s") = 0.5 "Line speed at full command";
-  parameter Real maxLength(unit="m") = 10 "Line on the drum";
-  parameter Real length_start(unit="m") = 0.2;
-  parameter Real deadband(unit="us") = 25 "Around 1500 us";
+  parameter Real maxRate(unit="m/s") = 0.5 "Line speed at full command [datasheet]";
+  parameter Real maxLength(unit="m") = 10 "Line on the drum [datasheet]";
+  parameter Real length_start(unit="m") = 0.2 "[configuration]";
+  parameter Real deadband(unit="us") = 25 "Around 1500 us [assumed]";
   input Real pulse(unit="us") = 1500 "Servo command";
   output Real paidOut(unit="m") "Line paid out";
 protected

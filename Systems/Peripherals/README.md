@@ -60,3 +60,25 @@ landing finding the model's target.
 - Visual odometry's drift is a random walk in a slowly varying direction
   scaled by the distance travelled; a datasheet's "1 % drift" is its bound.
 - Airspeed has no wind (the vehicle interface has no wind input yet).
+
+## Provenance
+
+Every parameter here, in `Systems/Payloads` and in `Power.Battery` ends its
+description with where its value should come from:
+
+| Tag | Meaning |
+|---|---|
+| `[datasheet]` | a figure a device's datasheet states (a part fills it) |
+| `[physics]` | a physical constant |
+| `[environment]` | the world: atmosphere at the origin, the ground plane |
+| `[configuration]` | the vehicle's: mount, load, initial state, counts, random streams |
+| `[ArduPilot]` | the autopilot's conventions (servo pulses) |
+| `[assumed]` | a chosen value no datasheet gives (correlation times, line stiffness, efficiencies, ...) |
+
+A composed vehicle records, for every parameter of every fitted device, the
+value used and its origin: `datasheet` (the part, the figures and the
+conversion), `configuration`, `library default`, or `assumed` (a conversion
+had to assume it, e.g. a pack resistance a datasheet does not state). It is
+in the manifest (`provenance`) and in the composed model's documentation
+(`tools/fire-compose/src/provenance.rs`). A `[datasheet]` parameter at its
+library default is a placeholder: no device's figure set it.

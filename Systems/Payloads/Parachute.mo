@@ -1,13 +1,13 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Parachute "A canopy released by a servo (ArduPilot CHUTE_TYPE 10: released above releasePulse), deploying after a delay and inflating, then drag 1/2 rho Cd A |v| v at the attachment"
   extends PartialPayload;
-  parameter Real diameter(unit="m") = 1.2 "Canopy, inflated";
-  parameter Real dragCoefficient = 1.5;
-  parameter Real deployDelay(unit="s") = 0.3 "Release to canopy out";
-  parameter Real inflationTime(unit="s") = 1.0;
-  parameter Real releasePulse(unit="us") = 1200 "Above it: released (CHUTE_SERVO_ON 1300, OFF 1100)";
-  parameter Real pressure0(unit="Pa") = 101325;
-  parameter Real temperature0(unit="K") = 288.15;
+  parameter Real diameter(unit="m") = 1.2 "Canopy, inflated [datasheet]";
+  parameter Real dragCoefficient = 1.5 "[datasheet]";
+  parameter Real deployDelay(unit="s") = 0.3 "Release to canopy out [datasheet]";
+  parameter Real inflationTime(unit="s") = 1.0 "[assumed]";
+  parameter Real releasePulse(unit="us") = 1200 "Above it: released (CHUTE_SERVO_ON 1300, OFF 1100) [ArduPilot]";
+  parameter Real pressure0(unit="Pa") = 101325 "[environment]";
+  parameter Real temperature0(unit="K") = 288.15 "[environment]";
   input Real pulse(unit="us") = 1100 "Servo command";
   output Boolean released;
   output Real inflation "Canopy area fraction, 0..1";

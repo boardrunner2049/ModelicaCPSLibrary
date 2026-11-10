@@ -1,8 +1,8 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model Airspeed "A0: pitot-static differential pressure 1/2 rho u|u| of the air velocity u along the device x axis, and the static air temperature at the mount (ISA troposphere); continuous"
   extends PartialPeripheral;
-  parameter Real pressure0(unit="Pa") = 101325 "Ambient pressure at the origin";
-  parameter Real temperature0(unit="K") = 288.15 "Ambient temperature at the origin";
+  parameter Real pressure0(unit="Pa") = 101325 "Ambient pressure at the origin [environment]";
+  parameter Real temperature0(unit="K") = 288.15 "Ambient temperature at the origin [environment]";
   input Real wind_w[3](each unit="m/s") = zeros(3) "Air velocity over ground, NED";
   output Real differentialPressure(unit="Pa") "Total minus static pressure";
   output Real temperature(unit="K") "Static air temperature";

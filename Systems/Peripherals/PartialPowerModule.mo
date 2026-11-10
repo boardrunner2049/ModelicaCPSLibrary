@@ -1,11 +1,11 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 partial model PartialPowerModule "A battery pack (Power.Battery) feeding the vehicle, and the module measuring its voltage and current"
-  parameter Real avionicsCurrent(unit="A") = 0.5 "Constant load besides propulsion";
-  parameter Integer nCurrents(min=1) = 1 "Electrical propulsion currents";
-  parameter Integer nShafts(min=1) = 1 "Shafts without an electrical model";
-  parameter Real efficiency = 0.8 "Electrical to shaft power (motor and ESC), for shaft power";
-  parameter Real propellerDiskArea(unit="m2") = 0.05 "Propeller disk, for a thrust-only propulsion model";
-  parameter Real figureOfMerit = 0.7 "Ideal (momentum) power over shaft power, for a thrust-only propulsion model";
+  parameter Real avionicsCurrent(unit="A") = 0.5 "Constant load besides propulsion [assumed]";
+  parameter Integer nCurrents(min=1) = 1 "Electrical propulsion currents [configuration]";
+  parameter Integer nShafts(min=1) = 1 "Shafts without an electrical model [configuration]";
+  parameter Real efficiency = 0.8 "Electrical to shaft power (motor and ESC), for shaft power [assumed]";
+  parameter Real propellerDiskArea(unit="m2") = 0.05 "Propeller disk, for a thrust-only propulsion model [assumed]";
+  parameter Real figureOfMerit = 0.7 "Ideal (momentum) power over shaft power, for a thrust-only propulsion model [assumed]";
   Power.Battery battery;
   input Real propulsionCurrent[nCurrents](each unit="A") = zeros(nCurrents)
     "Electrical propulsion currents (magnitudes are summed)";
@@ -13,7 +13,7 @@ partial model PartialPowerModule "A battery pack (Power.Battery) feeding the veh
   input Real shaftSpeed[nShafts](each unit="rad/s") = zeros(nShafts);
   input Real thrust(unit="N") = 0 "Thrust of a propulsion model with neither current nor shaft torque";
   input Real airspeed(unit="m/s") = 0 "Axial inflow of that propeller";
-  parameter Integer nSupplies(min=1) = 1 "Power sources besides the pack";
+  parameter Integer nSupplies(min=1) = 1 "Power sources besides the pack [configuration]";
   input Real supplyPower[nSupplies](each unit="W") = zeros(nSupplies) "What a generator or a power tether can deliver";
   output Real voltage(unit="V") "Measured";
   output Real current(unit="A") "Measured";

@@ -1,15 +1,15 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model SampledRpm "R1: R0 counted over a gate: resolution of one pulse per gate, noise, latency"
-  parameter Integer n(min=1) = 1;
-  parameter Real samplePeriod(unit="s") = 0.1 "Gate time";
-  parameter Real startTime(unit="s") = 0;
-  parameter Integer latencySamples(min=0) = 0;
-  parameter Integer seed = 1;
-  parameter Integer streamId = 341;
-  parameter Real pulsesPerRevolution = 1;
-  parameter Real noiseStd = 0 "rpm";
-  parameter Real scale = 0 "Scale-factor error";
-  parameter Real maxRpm = 1e30 "Clipped";
+  parameter Integer n(min=1) = 1 "[configuration]";
+  parameter Real samplePeriod(unit="s") = 0.1 "Gate time [datasheet]";
+  parameter Real startTime(unit="s") = 0 "[configuration]";
+  parameter Integer latencySamples(min=0) = 0 "[datasheet]";
+  parameter Integer seed = 1 "[configuration]";
+  parameter Integer streamId = 341 "[configuration]";
+  parameter Real pulsesPerRevolution = 1 "[datasheet]";
+  parameter Real noiseStd = 0 "rpm [datasheet]";
+  parameter Real scale = 0 "Scale-factor error [datasheet]";
+  parameter Real maxRpm = 1e30 "Clipped [datasheet]";
   input Real speed[n](each unit="rad/s");
   output Real rpm[n];
   output Boolean valid;

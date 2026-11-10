@@ -1,17 +1,17 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model SampledTemperature "T1: T0 through a first-order thermal lag, sampled with offset, noise and resolution"
   extends PartialPeripheral;
-  parameter Real temperature0(unit="K") = 288.15;
-  parameter Real selfHeating(unit="K") = 0;
-  parameter Real timeConstant(unit="s") = 1 "Thermal response";
-  parameter Real samplePeriod(unit="s") = 0.1;
-  parameter Real startTime(unit="s") = 0;
-  parameter Integer latencySamples(min=0) = 0;
-  parameter Integer seed = 1;
-  parameter Integer streamId = 361;
-  parameter Real bias(unit="K") = 0;
-  parameter Real noiseStd(unit="K") = 0;
-  parameter Real quantum(unit="K") = 0;
+  parameter Real temperature0(unit="K") = 288.15 "[environment]";
+  parameter Real selfHeating(unit="K") = 0 "[datasheet]";
+  parameter Real timeConstant(unit="s") = 1 "Thermal response [datasheet]";
+  parameter Real samplePeriod(unit="s") = 0.1 "[datasheet]";
+  parameter Real startTime(unit="s") = 0 "[configuration]";
+  parameter Integer latencySamples(min=0) = 0 "[datasheet]";
+  parameter Integer seed = 1 "[configuration]";
+  parameter Integer streamId = 361 "[configuration]";
+  parameter Real bias(unit="K") = 0 "[datasheet]";
+  parameter Real noiseStd(unit="K") = 0 "[datasheet]";
+  parameter Real quantum(unit="K") = 0 "[datasheet]";
   output Real temperature(unit="K");
   output Boolean valid;
   output Real validity = if valid then 1 else 0 "1 if valid, else 0";

@@ -1,6 +1,6 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model Rpm "R0: shaft speeds in revolutions per minute, continuous"
-  parameter Integer n(min=1) = 1;
+  parameter Integer n(min=1) = 1 "[configuration]";
   input Real speed[n](each unit="rad/s");
   output Real rpm[n];
   output Boolean valid = true;

@@ -1,17 +1,17 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model SampledVisualOdometry "V1: V0 at the output rate; position drift growing with the distance travelled (driftFraction of each step, in a slowly varying direction), heading random walk, noise, latency"
   extends PartialPeripheral;
-  parameter Real samplePeriod(unit="s") = 0.033;
-  parameter Real startTime(unit="s") = 0;
-  parameter Integer latencySamples(min=0) = 0;
-  parameter Integer seed = 1;
-  parameter Integer streamId = 381;
-  parameter Real driftFraction = 0 "Position drift per metre travelled (0.01: 1 %)";
-  parameter Real driftTau(unit="s") = 60 "Correlation time of the drift direction";
-  parameter Real headingWalk = 0 "Heading random walk [rad/sqrt(s)]";
-  parameter Real positionNoiseStd(unit="m") = 0;
-  parameter Real velocityNoiseStd(unit="m/s") = 0;
-  parameter Real attitudeNoiseStd(unit="rad") = 0;
+  parameter Real samplePeriod(unit="s") = 0.033 "[datasheet]";
+  parameter Real startTime(unit="s") = 0 "[configuration]";
+  parameter Integer latencySamples(min=0) = 0 "[datasheet]";
+  parameter Integer seed = 1 "[configuration]";
+  parameter Integer streamId = 381 "[configuration]";
+  parameter Real driftFraction = 0 "Position drift per metre travelled (0.01: 1 %) [datasheet]";
+  parameter Real driftTau(unit="s") = 60 "Correlation time of the drift direction [assumed]";
+  parameter Real headingWalk = 0 "Heading random walk [rad/sqrt(s)] [assumed]";
+  parameter Real positionNoiseStd(unit="m") = 0 "[datasheet]";
+  parameter Real velocityNoiseStd(unit="m/s") = 0 "[datasheet]";
+  parameter Real attitudeNoiseStd(unit="rad") = 0 "[datasheet]";
   output Real position[3](each unit="m");
   output Real velocity[3](each unit="m/s");
   output Real attitude[3](each unit="rad");

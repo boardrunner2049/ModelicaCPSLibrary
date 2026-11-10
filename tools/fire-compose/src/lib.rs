@@ -10,6 +10,7 @@ pub mod parts;
 pub mod payloads;
 pub mod peripherals;
 pub mod powertrain;
+pub mod provenance;
 pub mod sensors;
 pub mod vehicle;
 

@@ -1,9 +1,9 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model OpticalFlow "F0: image flow rates about the device x and y axes (ArduPilot's convention: x = -v_y/r + p, y = v_x/r + q, r the slant range along the boresight, device +z) and the device's x and y body rates; valid within the range band; continuous"
   extends PartialPeripheral;
-  parameter Real minRange(unit="m") = 0.08 "Closest resolvable surface";
-  parameter Real maxRange(unit="m") = 30 "Farthest resolvable surface";
-  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down coordinate";
+  parameter Real minRange(unit="m") = 0.08 "Closest resolvable surface [datasheet]";
+  parameter Real maxRange(unit="m") = 30 "Farthest resolvable surface [datasheet]";
+  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down coordinate [environment]";
   output Real flowRate[2](each unit="rad/s");
   output Real bodyRate[2](each unit="rad/s");
   output Boolean valid "A surface is in range";

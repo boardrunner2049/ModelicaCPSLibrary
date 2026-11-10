@@ -1,9 +1,9 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model Rangefinder "L0: slant range along the boresight (device +z) to the ground plane, continuous"
   extends PartialPeripheral;
-  parameter Real minRange(unit="m") = 0.1;
-  parameter Real maxRange(unit="m") = 12;
-  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down coordinate";
+  parameter Real minRange(unit="m") = 0.1 "[datasheet]";
+  parameter Real maxRange(unit="m") = 12 "[datasheet]";
+  parameter Real groundDown(unit="m") = 0 "Ground plane, NED down coordinate [environment]";
   output Real distance(unit="m") "Zero when invalid";
   output Boolean valid;
   output Real reported(unit="m") "As a device reports it: the distance; 0 below the minimum range, maxRange + 1 beyond the maximum, -1 for no return or a device error";

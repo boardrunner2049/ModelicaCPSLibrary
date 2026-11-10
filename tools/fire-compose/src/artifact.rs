@@ -107,7 +107,16 @@ pub fn emit(
     output: &Path,
 ) -> Result<(PathBuf, PathBuf)> {
     let profile = crate::canonical_profile(profile)?;
-    let source = format!("{HEADER}{}", lower::compose(config, profile)?.emit()?);
+    let mut source = format!("{HEADER}{}", lower::compose(config, profile)?.emit()?);
+    // Where every fitted device's parameter values came from (crate::provenance).
+    let provenance = crate::provenance::table(config);
+    if !provenance.is_empty() {
+        let end = format!("end {};", config.model_name);
+        if let Some(at) = source.rfind(&end) {
+            let info = crate::provenance::html(&provenance).replace('\\', "\\\\").replace('"', "\\\"");
+            source.insert_str(at, &format!("  annotation(Documentation(info=\"{info}\"));\n"));
+        }
+    }
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let output = resolved(output)?;
     if output.starts_with(&root) && !output.starts_with(root.join("build")) {
@@ -149,6 +158,9 @@ pub fn emit(
     } else {
         vehicle_manifest(config, raw, profile, &root, &source)?
     };
+    if !provenance.is_empty() {
+        manifest_value["provenance"] = Value::Array(provenance);
+    }
     if let Some(prior) = previous {
         if ["config_sha256", "generated_model_sha256", "profile"]
             .iter()

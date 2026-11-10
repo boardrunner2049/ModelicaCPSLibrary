@@ -1,8 +1,8 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model Temperature "T0: air temperature at the mount (ISA troposphere from the origin), plus a fixed self-heating offset; continuous"
   extends PartialPeripheral;
-  parameter Real temperature0(unit="K") = 288.15 "Ambient temperature at the origin";
-  parameter Real selfHeating(unit="K") = 0;
+  parameter Real temperature0(unit="K") = 288.15 "Ambient temperature at the origin [environment]";
+  parameter Real selfHeating(unit="K") = 0 "[datasheet]";
   output Real temperature(unit="K");
   output Boolean valid = true;
   output Real validity = 1 "1 if valid, else 0";

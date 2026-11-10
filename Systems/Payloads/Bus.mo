@@ -1,6 +1,6 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Bus "The payloads' forces and moments summed with the host's external wrench, for the plant"
-  parameter Integer n(min=1) = 1;
+  parameter Integer n(min=1) = 1 "[configuration]";
   input Real hostForce[3](each unit="N") = zeros(3);
   input Real hostMoment[3](each unit="N.m") = zeros(3);
   input Real force[n, 3](each unit="N");

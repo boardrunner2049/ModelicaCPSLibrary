@@ -1,10 +1,10 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model LandingGear "Retractable gear moved by a servo (ArduPilot LGR_ENABLE: deployed at the maximum pulse, retracted at the minimum) at a finite speed; its drag area while deployed"
   extends PartialPayload;
-  parameter Real retractTime(unit="s") = 2 "Full travel";
-  parameter Real dragArea(unit="m2") = 0.01 "Cd A of the deployed gear";
-  parameter Real pwmMin(unit="us") = 1000;
-  parameter Real pwmMax(unit="us") = 2000;
+  parameter Real retractTime(unit="s") = 2 "Full travel [datasheet]";
+  parameter Real dragArea(unit="m2") = 0.01 "Cd A of the deployed gear [assumed]";
+  parameter Real pwmMin(unit="us") = 1000 "[ArduPilot]";
+  parameter Real pwmMax(unit="us") = 2000 "[ArduPilot]";
   input Real pulse(unit="us") = 2000 "Servo command";
   output Real deployed "1 deployed, 0 retracted";
 protected

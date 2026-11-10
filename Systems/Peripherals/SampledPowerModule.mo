@@ -1,21 +1,21 @@
 within ModelicaCPSLibrary.Systems.Peripherals;
 model SampledPowerModule "W1: voltage and current sampled through the module's sensing: gain error, offset, noise, resolution, range"
   extends PartialPowerModule;
-  parameter Real samplePeriod(unit="s") = 0.1;
-  parameter Real startTime(unit="s") = 0;
-  parameter Integer latencySamples(min=0) = 0;
-  parameter Integer seed = 1;
-  parameter Integer streamId = 351;
-  parameter Real voltageScale = 0 "Gain error";
-  parameter Real voltageBias(unit="V") = 0;
-  parameter Real voltageNoiseStd(unit="V") = 0;
-  parameter Real voltageQuantum(unit="V") = 0;
-  parameter Real maxVoltage(unit="V") = 1e30;
-  parameter Real currentScale = 0 "Gain error";
-  parameter Real currentBias(unit="A") = 0;
-  parameter Real currentNoiseStd(unit="A") = 0;
-  parameter Real currentQuantum(unit="A") = 0;
-  parameter Real maxCurrent(unit="A") = 1e30;
+  parameter Real samplePeriod(unit="s") = 0.1 "[datasheet]";
+  parameter Real startTime(unit="s") = 0 "[configuration]";
+  parameter Integer latencySamples(min=0) = 0 "[datasheet]";
+  parameter Integer seed = 1 "[configuration]";
+  parameter Integer streamId = 351 "[configuration]";
+  parameter Real voltageScale = 0 "Gain error [datasheet]";
+  parameter Real voltageBias(unit="V") = 0 "[datasheet]";
+  parameter Real voltageNoiseStd(unit="V") = 0 "[datasheet]";
+  parameter Real voltageQuantum(unit="V") = 0 "[datasheet]";
+  parameter Real maxVoltage(unit="V") = 1e30 "[datasheet]";
+  parameter Real currentScale = 0 "Gain error [datasheet]";
+  parameter Real currentBias(unit="A") = 0 "[datasheet]";
+  parameter Real currentNoiseStd(unit="A") = 0 "[datasheet]";
+  parameter Real currentQuantum(unit="A") = 0 "[datasheet]";
+  parameter Real maxCurrent(unit="A") = 1e30 "[datasheet]";
 protected
   Sampler sampler(n=2,samplePeriod=samplePeriod,startTime=startTime,latencySamples=latencySamples,
     seed=seed,streamId=streamId,scale={voltageScale,currentScale},bias={voltageBias,currentBias},

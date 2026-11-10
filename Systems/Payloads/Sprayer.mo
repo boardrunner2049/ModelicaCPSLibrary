@@ -1,12 +1,12 @@
 within ModelicaCPSLibrary.Systems.Payloads;
 model Sprayer "A liquid tank emptied by a pump whose flow follows its servo (ArduPilot SPRAY_ENABLE: pump function 22); the liquid's weight loads the vehicle at the tank"
   extends PartialPayload;
-  parameter Real tankVolume(unit="l") = 5 "Capacity";
-  parameter Real volume_start(unit="l") = 5 "Liquid at the start";
-  parameter Real maxFlow(unit="l/min") = 5 "Pump at full command";
-  parameter Real density(unit="kg/l") = 1.0;
-  parameter Real pwmMin(unit="us") = 1000 "Pump off";
-  parameter Real pwmMax(unit="us") = 2000 "Pump full";
+  parameter Real tankVolume(unit="l") = 5 "Capacity [datasheet]";
+  parameter Real volume_start(unit="l") = 5 "Liquid at the start [configuration]";
+  parameter Real maxFlow(unit="l/min") = 5 "Pump at full command [datasheet]";
+  parameter Real density(unit="kg/l") = 1.0 "[physics]";
+  parameter Real pwmMin(unit="us") = 1000 "Pump off [datasheet]";
+  parameter Real pwmMax(unit="us") = 2000 "Pump full [datasheet]";
   input Real pulse(unit="us") = 1000 "Pump servo command";
   output Real volume(unit="l");
   output Real flowRate(unit="l/min");
