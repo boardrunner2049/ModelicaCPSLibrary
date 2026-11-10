@@ -1,0 +1,63 @@
+# The IMU reuse case (milestone 6): the noise workflow on a public static
+# recording, and the fitted values driving the existing COMPOSE IMU model.
+# MILUV's chips are not identified: this exercises the workflow; it validates
+# no part.
+
+[experiment]
+kind = "imu"
+name = "imu_miluv_static"
+description = "MILUV ifo001 static IMU recordings (Pixhawk 4 via PX4, RealSense D435i): white noise and Gauss-Markov bias per channel, held-out Allan check, COMPOSE I1 configured with the fit"
+thresholds = "imu_miluv_static.thresholds.toml"
+seed = 7
+# Declared before the data was analysed: drop the first hour (warm-up), train
+# on the next 7.5 h, hold out the last 7.5 h.
+split_note = "1 h to 8.5 h, held out 8.5 h to 16 h; the first hour is excluded as warm-up"
+
+[split]
+train_s = [3600, 30600]
+holdout_s = [30600, 57600]
+
+[source]
+citation = "Shalaby, Ahmed, Dahdah, Cossette, Le Ny, Forbes, MILUV: A Multi-UAV Indoor Localization dataset with UWB and Vision (2025), doi:10.25452/figshare.plus.28386041.v1."
+license = "CC BY 4.0"
+url = "https://ndownloader.figshare.com/files/52251866"
+member = "imu_calib.zip: imu_calib/ifo001/ifo001_imu_2024-02-12-13-22-50.bag"
+local_dir = "build/calibration/datasets/miluv/imu_calib/ifo001"
+bag = "ifo001_imu_2024-02-12-13-22-50.bag"
+rate_hz = 200
+note = "Uvify IFO-S, static on foam, external power, 16 h (dataset paper, Section 6.1). The dataset's configs say 200 Hz; the recorded PX4 stream averages 213 Hz with mixed 4 and 8 ms intervals, so the analysis bins by time, not by sample count."
+[source.topics]
+px4 = "/mavros/imu/data_raw"
+camera = "/camera/imu"
+
+[fit]                     # search ranges, not priors
+sigma_w = [1e-7, 1.0]
+sigma_d = [1e-7, 1.0]
+tau = [2.0, 1e5]
+
+[model]
+duration_s = 1800
+
+# The dataset's own Allan-variance results (imu_calib/ifo001/*_imu.yaml), for comparison.
+[miluv_reference.px4]
+gyroscope_noise_density = 0.0005456081828071378
+accelerometer_noise_density = 0.002397367389767996
+[miluv_reference.camera]
+gyroscope_noise_density = 0.00012105637703041613
+accelerometer_noise_density = 0.0018172297482387074
+
+# The same bag's barometer (the Pixhawk 4's), over the same static hours:
+# noise and relative behaviour only, since nothing measured the room's pressure.
+[barometer]
+topic = "/mavros/imu/static_pressure"
+part = "te_ms5611"
+basis = "Holybro's Pixhawk 4 specification lists the barometer as MS5611 (https://holybro.com/products/pixhawk-4); the dataset does not state it"
+# Screen for the barometer topic: a static indoor reading near sea level, and
+# a per-sample spread no more than 3x the datasheet's noisiest mode. Written
+# after a first look at the topic had shown a level near 198 kPa, so it is a
+# documented rejection criterion, not a predeclared one.
+screen = { level_pa = [85000, 110000], max_noise_over_datasheet = 3.0 }
+[barometer.fit]
+sigma_w = [1e-4, 100.0]
+sigma_d = [1e-4, 1000.0]
+tau = [2.0, 1e5]

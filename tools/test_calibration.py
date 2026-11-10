@@ -70,6 +70,31 @@ class Stochastic(unittest.TestCase):
         self.assertAlmostEqual(slope, -0.5, delta=0.05)
 
 
+class ImuWorkflow(unittest.TestCase):
+    def test_time_bins_of_an_irregular_stream(self):
+        from cp_calibration import imu
+        rng = np.random.default_rng(1)
+        t = np.cumsum(rng.choice([0.004, 0.008], 50000))
+        m, empty = imu.bin_means(t, np.full(len(t), 2.5), 1.0, 0.0, 100.0)
+        self.assertEqual(empty, 0)
+        self.assertTrue(np.allclose(m, 2.5))
+
+    def test_gauss_markov_window_variance(self):
+        from cp_calibration import imu
+        rng = np.random.default_rng(2)
+        T, tau, s = 600.0, 200.0, 1.0
+        v = [np.var(imu.simulate_model(int(T), 1.0, 0.0, s, tau, rng)) for _ in range(400)]
+        expect = s ** 2 * (1 - 2 * tau / T + 2 * (tau / T) ** 2 * (1 - math.exp(-T / tau)))
+        self.assertAlmostEqual(np.mean(v) / expect, 1.0, delta=0.05)
+
+    def test_noise_density_from_one_second_means(self):
+        rng = np.random.default_rng(3)
+        rate, N = 200, 1e-4
+        x = N * math.sqrt(rate) * rng.standard_normal(rate * 4000)
+        est = stochastic.fit(x.reshape(-1, rate).mean(axis=1), 1.0, stochastic.Bounds((1e-7, 1.0), (1e-7, 1.0), (2.0, 1e5)), drift=False)
+        self.assertAlmostEqual(est["sigma_w"] / N, 1.0, delta=0.03)
+
+
 class Datasets(unittest.TestCase):
     def test_changed_dataset_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -269,6 +294,18 @@ class Pilot(unittest.TestCase):
         static = next(ev for ev in r["holdout"] if ev["dataset"] == "holdout_static")
         self.assertTrue(static["calibrated"]["pass"], static)
         self.assertEqual(r["profile_in_composer"]["evidence"], "synthetic-calibrated (not a device)")
+
+
+@unittest.skipUnless(os.environ.get("FIRE_TEST_MILUV") == "1" and _fmpy(),
+                     "FIRE_TEST_MILUV=1 with the MILUV bag in build/calibration/datasets/miluv")
+class Miluv(unittest.TestCase):
+    def test_reuse(self):
+        from cp_calibration import imu
+        r = imu.run(ROOT / "tools/calibration/experiments/imu_miluv_static.toml")
+        for rec in r["recordings"].values():
+            for c, ch in rec["compose_model"]["channels"].items():
+                self.assertLess(abs(ch["ratio"][0] - 1), 0.2, c)    # the configured model reproduces the fitted noise
+        self.assertFalse(r["barometer"]["accepted"])
 
 
 if __name__ == "__main__":

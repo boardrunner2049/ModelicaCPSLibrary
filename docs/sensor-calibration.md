@@ -2,9 +2,19 @@
 
 This is how a COMPOSE sensor model goes from a real part's datasheet to a
 calibration fitted to measurements of one unit, with the evidence for every
-value recorded. The pilot is the Infineon DPS310 barometer at level B1
-(`Systems.Sensing.Barometer.SampledSensor`). The same workflow is meant to
-cover the analog power module, the RPM sensor and the existing IMU next.
+value recorded. It covers four cases:
+
+| sensor | models | experiment | data |
+|---|---|---|---|
+| Infineon DPS310 barometer (the pilot) | B1 `Systems.Sensing.Barometer.SampledSensor` | `dps310_synthetic.toml` | synthetic |
+| Analog power module, Holybro PM02 V3 as the reference configuration | A1–A3 `Systems.Sensing.PowerModule.*`; vehicle level W2 | `power_pm02_synthetic.toml` | synthetic bench |
+| Pulse RPM sensor, Melexis US5881 on a 12-magnet ring | E1 `Systems.Sensing.Rpm.PulseSensor`; vehicle level R2 | `rpm_us5881_synthetic.toml` | synthetic edges |
+| Existing IMU, reuse case | I1 `Systems.Sensing.IMU.StatisticalSensor` | `imu_miluv_static.toml` | public MILUV static recordings (CC BY 4.0) |
+
+The power module and RPM references are named configurations, not the lab's
+hardware, which is still to be identified. Only the IMU case uses real
+measurements, and its chips are not identified, so it tests the workflow and
+validates no part.
 
 COMPOSE owns the sensor's behaviour and its timing. It exposes them through
 the model and FMU interfaces. FastDyn decides how those outputs reach
@@ -213,29 +223,191 @@ not test a DPS310.
 
 ## Toolchain findings (Rumoca 0.10.1, FMPy 0.3.32)
 
-- **Frozen seeds (fixed for the barometer).** Rumoca evaluates start values at
+- **Frozen seeds (fixed everywhere).** Rumoca evaluates start values at
   compile time, so a noise stream seeded through
-  `rngState(start = initialState(streamId, seed))` ignores `seed` and
-  `streamId` set in the FMU. They are declared tunable, but they are inert.
-  - The barometer now seeds at its first acquisition through
-    `Systems.Sensing.seededNormalDraw`, written with whole-array assignments
-    and scalar conditionals because Rumoca generates no code for array
-    slices or branch-local definitions.
-  - Its draws are bit-identical to the old seeding (checked against the
-    previous FMU).
-  - **The other sensors that seed the same way still have frozen seeds in
-    exported FMUs.** A seed set by the composer in the Modelica source works.
+  `rngState(start = initialState(streamId, seed))` ignored `seed` and
+  `streamId` set in the FMU. They were declared tunable, but they were inert.
+  - Every sensor now seeds at its first draw through
+    `Systems.Sensing.seededState` (the barometer through `seededNormalDraw`).
+    That function uses whole-array assignments and scalar conditionals,
+    because Rumoca generates no code for array slices or branch-local
+    definitions.
+  - On the exported FMUs, every model's default-seed output is bit-identical
+    to before, and a different seed now changes it.
+- **Buffer shifts in state events.** In a state-event `when`, Rumoca rejects a
+  for-loop shift `b[j] = pre(b[j-1])` ("invalid array subscript"), although it
+  accepts the same loop under a time event. `b = cat(1, {x}, pre(b[1:n-1]))`
+  works.
+- **The integrator is adaptive.** A first-order model with τ = 1 ms stays
+  within 2 µV of the analytic step response at communication steps up to
+  20 ms.
 - **Structural parameters are fixed in the FMU.** `latencySamples` is exported
   as a fixed calculated parameter. The harness refuses to set it and exports
   one variant per value instead.
 - **No event mode.** The FMU has no Co-Simulation event mode
-  (`hasEventMode = false`). Sample events inside a step are handled
-  internally. A consumer sees the latest delivery per communication point;
-  `sequence` makes missed readings countable. Edge-level event exposure for
-  the RPM sensor must be designed against this.
+  (`hasEventMode = false`). Sample and state events inside a step are located
+  internally. A consumer sees the values at its communication points:
+  - for sampled sensors, `sequence` makes missed readings countable;
+  - for the RPM sensor, the count plus the edge buffer carry every edge (see
+    below).
 - **Rumoca reads every `.mo` file under the library root.** Keep generated
   Modelica out of the tree. The harness writes its wrappers to a temporary
   directory.
+
+## Analog power module (milestone 4)
+
+The sensor ends at its two analog outputs. The autopilot's ADC and scaling
+(ArduPilot BATT_VOLT_MULT, BATT_AMP_PERVLT, BATT_AMP_OFFSET) are the
+consumer's.
+
+**Models** (`Systems.Sensing.PowerModule`). Inputs are the true voltage and
+current, plus the module temperature; outputs are `voltageSense` and
+`currentSense` in volts, clipped at the rails.
+
+| level | class | what it represents |
+|---|---|---|
+| A1 | `AnalogSensor` | gain and offset per channel; optional current-gain temperature coefficient |
+| A2 | `FirstOrderAnalogSensor` | A1 plus a first-order output response per channel |
+| A3 | `ShuntAnalogSensor` | component level: divider, shunt (temperature coefficient, self-heating through a thermal resistance and capacitance), amplifier |
+
+From terminal measurements only the product amplifier gain × shunt
+resistance is identifiable, not the two factors.
+
+**In a vehicle:** `[peripherals.power_module] level = "W2"` (`AnalogPowerModule`).
+- **Input:** the pack's true voltage and current, from the plant.
+- **Chain:** A1, then an ADC (`adcReference`, `adcBits`), then the autopilot's
+  scaling (`voltageMultiplier`, `ampsPerVolt`, `ampsOffset`). The result is
+  `battery_v1`.
+- **Exports:** the analog outputs, as `power_module_analog_v1`
+  (`battery_voltage_sense_v`, `battery_current_sense_v`).
+- **Default level:** a power-module part without a level still selects W1.
+
+**PM02 V3 conversion (W2):**
+- gains are *derived* (1/18.182 V/V, 1/36.364 V/A);
+- the autopilot's scales and the 3.3 V range are *specified* (from the setup
+  documentation);
+- the 12-bit ADC and the zero offsets are *assumed*, because no figure states
+  them.
+
+**Pipeline** (`cp_calibration.power`). Bench data is the true V/I as a
+reference plus a logger's samples of the two outputs, taken off the stimulus
+clock. The logger is simulated: 1 mV rms noise, 16 bits.
+- Static gains and offsets are fitted through the A1 FMU.
+- The output time constant is fitted from a 20 kHz current step (A2), then
+  refined jointly with the gain and offset.
+- **Identifiability:** A3's amplifier gain and shunt resistance must be
+  flagged structural.
+- **Mismatch:** a self-heating copper-trace shunt (A3), fitted with A1. The
+  residual must trend within constant-current dwells, and a sustained 60 A
+  hold must fail.
+- **Held-out:** a flight-like current profile with pack sag, and a voltage
+  staircase at 35 °C.
+
+## Pulse RPM sensor (milestone 5)
+
+**Model** (`Systems.Sensing.Rpm.PulseSensor`, E1). Shaft speed is integrated
+into a pulse phase (`cycles`), so edges stay phase-continuous as speed
+changes.
+- **Edges:** rising edge k is the state event `cycles = k`.
+- **Outputs:**
+  - `count`: exact;
+  - `level`: high for `dutyCycle` of each period;
+  - `lastEdgeTime` and `edgeTimes[bufferSize]`: newest first, including
+    `edgeDelay` and seeded `edgeJitterStd`;
+  - `rpm`: from the latest two edges, 0 after `timeout`.
+- **Not modelled:** missed pulses and the device's switching limit.
+
+**Event contract.** A consumer reading every h seconds recovers every edge
+since its previous read.
+- **New edges:** `count - previous`, timed by the first that many entries of
+  `edgeTimes`.
+- **Overflow:** more than `bufferSize` edges in a step keeps the count exact
+  but loses the older times, and the consumer detects it.
+- **Demonstrated on the exported FMU** at 6000 rpm × 12 pulses/rev (1200
+  edges/s), and accelerating from 1000 to 11000 rpm, at consumer steps of 0.5
+  to 50 ms:
+  - counts are exact;
+  - recovered edge times are within 1e-13 s of the analytic ones;
+  - overflow is detected exactly when a step spans more than 32 edges.
+- **Edge cases:** coincident edges cannot occur (one per pulse period). A
+  reset restarts the phase.
+
+**In a vehicle:** `[peripherals.rpm] level = "R2"` (`PulseRpm`), per shaft.
+It exports `rpm_pulses_v1`:
+- `rpm_pulse_count[n]`;
+- `rpm_last_edge_time_s[n]`;
+- `rpm_edge_times_s[n·bufferSize]`, flattened shaft-major, because the
+  contract is one-dimensional.
+
+**Pipeline** (`cp_calibration.rpm`). Reported edge times, as the consumer
+recovers them, are compared with a reference encoder's true edges.
+- Edge delay is the mean of reported minus reference; jitter is its spread.
+- **Identifiability:** delay and an unknown clock offset between sensor and
+  encoder must be flagged structural.
+- **Mismatch:** a constant *angular* lag fitted as a time delay. The delay
+  must scale with the pulse period across training speeds and fail at 12000
+  rpm.
+- **Requires edge-level references:** sampled rpm cannot establish jitter or
+  latency.
+
+## IMU reuse (milestone 6)
+
+`cp_calibration.imu` runs the same stochastic workflow on MILUV's 16 h static
+recordings: Uvify IFO-S ifo001, Pixhawk 4 IMU through PX4 and RealSense D435i
+IMU, both at 200 Hz.
+- **Getting the data:** the harness reads the one vehicle's bag out of
+  `imu_calib.zip` with HTTP range requests (1.7 GB of 5 GB) into
+  `build/calibration/datasets/miluv/`. It records the hashes and the CC BY 4.0
+  attribution.
+- **Split, declared before analysis:** the first hour is dropped as warm-up,
+  1–8.5 h is training, 8.5–16 h is held out.
+- **Per channel, it reports:**
+  - the white noise density and a Gauss-Markov bias, from 1 s means;
+  - a profile interval for the bias time;
+  - the per-sample spread and lag-1 correlation, which show the PX4 filtering;
+  - the held-out Allan deviation against the fitted model's 5–95 % band;
+  - a refit on the held-out window (stationarity);
+  - MILUV's own `allan_variance_ros` noise density beside it.
+- **Reuse:** the fitted values then configure the existing I1 IMU
+  (`StatisticalSensor`), whose static output's Allan deviation is compared
+  with the fitted model's.
+- **No part validated:** no COMPOSE part is established for these chips, so
+  the result is an explicit `[imu]` configuration snippet, not a part
+  overlay.
+
+**What the MILUV run found** (`build/calibration/imu_miluv_static/report.md`):
+- **The streams are not what the configs say.** MILUV's configs give 200 Hz;
+  the PX4 stream averages 213 Hz with mixed 4 and 8 ms intervals (2 million
+  gaps over 1.5 periods), and the camera stream has 194 non-increasing
+  stamps. The analysis therefore bins by time, not by sample count.
+- **The PX4 stream is filtered.** Its lag-1 correlation is 0.2–0.6, and its
+  per-sample spread is below the white-noise equivalent. Its gyro z reads a
+  0.355 rad/s offset while static (not bias-compensated). The camera stream
+  looks white.
+- **Noise densities agree with MILUV's own `allan_variance_ros`:**
+  - camera, per axis: within 1–10 % (gyro) and 4–20 % (accelerometer);
+  - PX4: ours are 15–60 % lower, consistent with the filtering.
+- **The held-out check fails on every channel**, with only 6–39 % of cluster
+  times in the fitted model's band, against the predeclared 80 %:
+  - the values drift between the two 7.5 h halves (see the refit column);
+  - short-τ ratios are 0.87–1.02, but the band there is a few percent wide;
+  - the slow component differs by up to ×3;
+  - most PX4 bias times are longer than the window, so their intervals are
+    unbounded.
+
+  One white-noise-plus-Gauss-Markov fit from one window therefore does not
+  predict another window of the same unit. The workflow reports this rather
+  than hiding it. The fix is repeated recordings, with the variation between
+  them reported (as in Bakalli et al.).
+- **Reuse works.** The fitted values in the existing I1 model
+  (`StatisticalSensor`) reproduce the fitted model's Allan deviation within
+  ±20 % from 1 to 180 s, except where a 30-minute run gives about ten
+  clusters.
+- **The bag's barometer topic is rejected.** `/mavros/imu/static_pressure`
+  sits at about 198 kPa, twice atmospheric, and its consecutive samples
+  spread 16 Pa, against the MS5611's 1.2–6.5 Pa. It cannot be attributed to
+  the Pixhawk 4's MS5611, so no barometer noise is reported from it. The
+  screen was written after a first look at the level.
 
 ## Data a real calibration needs
 

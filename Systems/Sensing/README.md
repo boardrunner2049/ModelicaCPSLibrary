@@ -14,6 +14,12 @@ archived under `deprecated/legacy_enu_flu/ModelicaCPSLibrary`; they are not acti
 - Barometer: ambient Pa/K and geometric Up-positive altitude/climb rate; no pressure-height inversion.
   Every level outputs `sampleTime`, `deliveryTime`, `sequence` and `valid` (the timing contract in
   `Barometer.PartialSensor`, docs/sensor-calibration.md); the suite passes them on as `barometer*`.
+- `PowerModule`: analog power-module sensing (A1 static, A2 first-order, A3 shunt and divider
+  components): true voltage and current in, the two sense voltages out (docs/sensor-calibration.md).
+- `Rpm.PulseSensor`: phase-continuous pulses from shaft speed, an exact edge count and a buffer of
+  edge times so a coarse consumer recovers every edge.
+- Every sampled sensor seeds its noise at the first draw (`seededState`), so `seed` and `streamId`
+  stay settable in an exported FMU.
 
 `R_ab` converts components by `v_a=R_ab*v_b`. Standalone `R_bs=identity(3)`
 aligns the sensor with body FRD. Vehicle geometry defaults to

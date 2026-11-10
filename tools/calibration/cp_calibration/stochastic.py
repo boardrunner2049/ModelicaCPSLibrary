@@ -70,6 +70,33 @@ def _unpack(z, fixed):
 
 def fit(y: np.ndarray, T: float, bounds: Bounds, quantum: float = 0.0, fixed: dict | None = None,
         start: dict | None = None, drift: bool = True) -> dict:
+    """Maximum-likelihood b, sigma_w, sigma_d, tau (those not in `fixed`),
+    computed on standardized data (the optimizer is badly conditioned when the
+    values are far from 1, e.g. an IMU's 1e-4 rad/s) and converted back."""
+    y = np.asarray(y, float)
+    m0 = float(np.mean(y))
+    s0 = float(np.std(y)) or 1.0
+    def to(d):
+        out = {}
+        for k, v in (d or {}).items():
+            if k == "b":
+                out[k] = (v - m0) / s0
+            elif k in ("sigma_w", "sigma_d"):
+                out[k] = v / s0
+            else:
+                out[k] = v
+        return out
+    b2 = Bounds((bounds.sigma_w[0] / s0, bounds.sigma_w[1] / s0), (bounds.sigma_d[0] / s0, bounds.sigma_d[1] / s0), bounds.tau)
+    r = _fit((y - m0) / s0, T, b2, quantum / s0, to(fixed), to(start), drift)
+    r["b"] = r["b"] * s0 + m0
+    r["sigma_w"] *= s0
+    r["sigma_d"] *= s0
+    r["loglik"] = r["loglik"] - len(y) * math.log(s0)
+    return r
+
+
+def _fit(y: np.ndarray, T: float, bounds: Bounds, quantum: float = 0.0, fixed: dict | None = None,
+         start: dict | None = None, drift: bool = True) -> dict:
     """Maximum-likelihood b, sigma_w, sigma_d, tau (those not in `fixed`).
     With drift=False the model is white noise only (sigma_d = 0)."""
     fixed = dict(fixed or {})
@@ -136,7 +163,14 @@ def profile(y: np.ndarray, T: float, bounds: Bounds, name: str, grid: np.ndarray
         return 2 * (top - fit(y, T, bounds, quantum, fixed={name: float(g)}, start={**mle, "_warm": True})["loglik"]) - CHI2_95
 
     def cross(i, j):                          # dev[i] > 0 >= dev[j]: the end by root finding
-        v = optimize.brentq(deviance, x[i], x[j], xtol=1e-6 * max(1.0, abs(x[j])), maxiter=60)
+        # Refitting at a bracket end can land on a slightly better optimum than
+        # the grid pass did; then the bracket no longer changes sign, and the
+        # grid's own crossing (interpolated) is used.
+        fi, fj = deviance(x[i]), deviance(x[j])
+        if fi * fj < 0:
+            v = optimize.brentq(deviance, x[i], x[j], xtol=1e-6 * max(1.0, abs(x[j])), maxiter=60)
+        else:
+            v = x[i] + dev[i] / (dev[i] - dev[j]) * (x[j] - x[i])
         return float(math.exp(v) if log else v)
 
     lower_bounded = lo_i > 0

@@ -1,0 +1,9 @@
+# Fixed before the held-out window was analysed.
+[holdout]
+# The held-out window's Allan deviation (at 18 cluster times from 1 s to a
+# tenth of the window) must lie inside the 5-95 % band of the fitted model's
+# Allan deviation, from 40 realizations of the same length, at no fewer than
+# 80 % of the cluster times. A one-bias model is expected to miss some long
+# cluster times if the sensor also has a rate random walk.
+realizations = 40
+fraction_inside_min = 0.8
