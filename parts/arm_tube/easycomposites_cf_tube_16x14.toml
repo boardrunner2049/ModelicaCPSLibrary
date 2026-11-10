@@ -1,0 +1,26 @@
+# Published figures; tools/fire-compose/src/config.rs converts them (frame: armLength; arm_tube: mass.arm).
+name = "Easy Composites 16mm (14mm) Woven Finish Roll Wrapped Carbon Fibre Tube"
+kind = "arm_tube"
+manufacturer = "Easy Composites Ltd"
+notes = """
+Roll-wrapped carbon fibre tube with a woven finish (2x2 twill, glossy), epoxy matrix, 1 m and 2 m lengths.
+All figures are from the product page's Specification table. The page's FAQ gives a +/-0.3 mm tolerance,
+which conflicts with the table.
+"""
+
+source = { title = "16mm (14mm) Woven Finish Roll Wrapped Carbon Fibre Tube (Easy Composites product page)", revision = "not stated on page; accessed 2026-11-09", url = "https://www.easycomposites.co.uk/16mm-woven-finish-carbon-fibre-tube" }
+
+od_mm = 16                        # Specification table: "Outside Diameter (OD)"
+id_mm = 14                        # Specification table: "Inside Diameter (ID)"
+wall_mm = 1                       # Specification table: "Wall Thickness 1 mm"
+mass_per_length_g_per_m = 74.2      # Specification table: "Weight per metre"
+tensile_modulus_gpa = 64          # Specification table: "Tensile Modulus (lengthways) 64 GPa"
+tensile_strength_mpa = 650        # Specification table: "Tensile Strength (Lengthways) 650 MPa"
+fibre_orientation = "0, 90"       # Specification table: "Fibre Orientation"
+construction = "Woven Finish Roll Wrapped"  # Specification table: "Construction"
+resin_matrix = "Epoxy"            # Specification table: "Resin Matrix"
+tg_onset_c = 120                  # Specification table: "Tg Onset (DMA) 120 C"
+id_tolerance_mm = 0.2             # Specification table: "ID Tolerance (mm)"
+od_tolerance_mm = 0.15              # Specification table: "OD Tolerance (mm)"
+
+not_stated = ["density_g_cm3", "flexural_modulus", "Young's modulus other than the lengthwise tensile modulus"]

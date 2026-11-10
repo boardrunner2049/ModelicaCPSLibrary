@@ -285,6 +285,50 @@ fn part(v: &Value, label: &str, position: [f64; 3]) -> Result<Value> {
     Ok(Value::Table(p))
 }
 
+/// Frame parts: `[geometry] frame = PART` sets armLength to half the
+/// wheelbase (the motor-to-motor diagonal); `[mass.arm] part = PART` (an arm
+/// tube) sets massPerLength and tubeDiameter. Explicit keys win.
+fn expand_frame(root: &mut Table, reports: &mut Vec<serde_json::Value>) -> Result<()> {
+    use serde_json::json;
+    let num = |t: &Table, k: &str| t.get(k).and_then(|v| v.as_float().or(v.as_integer().map(|n| n as f64)));
+    if let Some(Value::String(name)) = root.get("geometry").and_then(|g| g.get("frame")).cloned() {
+        let (id, part) = crate::parts::find("frame", &name)?;
+        let wheelbase = num(&part, "wheelbase_mm").ok_or(format!("frame {id}: no wheelbase_mm"))?;
+        let g = root.get_mut("geometry").unwrap().as_table_mut().unwrap();
+        g.remove("frame");
+        let explicit = g.contains_key("armLength");
+        g.entry("armLength").or_insert(Value::Float(wheelbase / 2000.0));
+        reports.push(json!({
+            "kind": "frame", "part": id, "name": part.get("name").and_then(Value::as_str).unwrap_or(&id),
+            "source": part.get("source").and_then(Value::as_str).unwrap_or(""), "level": "geometry", "model": "Geometry",
+            "parameters": {"armLength": {"value": if explicit { json!("explicit in the configuration") } else { json!(wheelbase / 2000.0) },
+                                         "how": format!("half the {wheelbase} mm wheelbase"), "from": ["wheelbase_mm"]}},
+            "assumed": [], "not_stated": {},
+            "not_represented": {"frame_mass_g": "the frame's mass is in [mass] (its split between arms and plates is not stated)"},
+        }));
+    }
+    let arm_part = root.get("mass").and_then(|m| m.get("arm")).and_then(|a| a.get("part")).cloned();
+    if let Some(Value::String(name)) = arm_part {
+        let (id, part) = crate::parts::find("arm_tube", &name)?;
+        let lambda = num(&part, "mass_per_length_g_per_m").ok_or(format!("arm_tube {id}: no mass_per_length_g_per_m"))? / 1000.0;
+        let od = num(&part, "od_mm").ok_or(format!("arm_tube {id}: no od_mm"))? / 1000.0;
+        let arm = root.get_mut("mass").unwrap().get_mut("arm").unwrap().as_table_mut().unwrap();
+        arm.remove("part");
+        arm.entry("massPerLength").or_insert(Value::Float(lambda));
+        arm.entry("tubeDiameter").or_insert(Value::Float(od));
+        reports.push(json!({
+            "kind": "arm_tube", "part": id, "name": part.get("name").and_then(Value::as_str).unwrap_or(&id),
+            "source": part.get("source").and_then(Value::as_str).unwrap_or(""), "level": "assembled", "model": "arm",
+            "parameters": {
+                "massPerLength": {"value": lambda, "how": "weight per metre", "from": ["mass_per_length_g_per_m"]},
+                "tubeDiameter": {"value": od, "how": "outside diameter", "from": ["od_mm"]}},
+            "assumed": ["the arm is the bare tube from the reference to the rotor (no connectors, clamps or wiring)"],
+            "not_stated": {}, "not_represented": {},
+        }));
+    }
+    Ok(())
+}
+
 /// `[mass.placements.NAME] mass, position, from`: an item of the aggregate
 /// (its mass included in it, at `from`, default the chassis reference) placed
 /// at `position` instead, as a point mass: the aggregate's CG and its inertia
@@ -364,6 +408,8 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
             "R_br",
             "spinSign",
             "armLength",
+            "frame",
+            "propellerDiameter",
             "imuPosition_C",
             "gnssPosition_C",
             "barometerPosition_C",
@@ -490,6 +536,37 @@ fn geometry(raw: &Value) -> Result<(String, Table)> {
         rotation(r, "geometry.R_br")?;
     }
     array(&positions, &[nr, 3], "geometry.rotorPosition_C")?;
+    // Propellers must not overlap: discs in one plane (coaxial pairs, one
+    // above the other, are allowed) closer than a diameter collide.
+    if let Some(d) = g.get("propellerDiameter") {
+        let d = number(d, "geometry.propellerDiameter", true, false)?;
+        let p: Vec<[f64; 3]> = positions
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| {
+                let r = r.as_array().unwrap();
+                [0, 1, 2].map(|k| r[k].as_float().or(r[k].as_integer().map(|n| n as f64)).unwrap())
+            })
+            .collect();
+        for i in 0..p.len() {
+            for j in i + 1..p.len() {
+                let h = (p[i][0] - p[j][0]).hypot(p[i][1] - p[j][1]);
+                let coaxial = h < 1e-6 && (p[i][2] - p[j][2]).abs() > 1e-6;
+                if !coaxial && h < d {
+                    return Err(format!(
+                        "geometry: the propellers of rotors {} and {} overlap: their hubs are {:.3} m apart, \
+                         the propeller is {:.3} m across (make the arms at least {:.3} m)",
+                        i + 1,
+                        j + 1,
+                        h,
+                        d,
+                        d / (2.0 * (std::f64::consts::PI / p.len() as f64).sin())
+                    ));
+                }
+            }
+        }
+    }
     let t = [
         ("nArms", int(na)),
         ("nRotors", int(nr)),
@@ -572,10 +649,27 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
         out.insert("core".into(), part(&m["core"], "mass.core", [0.; 3])?);
         let mut arm = table(
             &m["arm"],
-            &["mass", "inertia", "R_Cj", "componentIds"],
+            &["mass", "inertia", "R_Cj", "componentIds", "massPerLength", "tubeDiameter"],
             "mass.arm",
         )?
         .clone();
+        // massPerLength [kg/m]: each arm a slender rod from the reference to
+        // its rotor, mass = massPerLength x its length, inertia m L^2/12
+        // across it (physics), so the frame's size moves its mass.
+        let per_length = arm
+            .remove("massPerLength")
+            .map(|v| number(&v, "mass.arm.massPerLength", true, false))
+            .transpose()?;
+        if per_length.is_some() && (arm.contains_key("mass") || arm.contains_key("inertia")) {
+            return Err("mass.arm: massPerLength, or mass and inertia; not both".into());
+        }
+        let tube = arm
+            .remove("tubeDiameter")
+            .map(|v| number(&v, "mass.arm.tubeDiameter", true, false))
+            .transpose()?;
+        if per_length.is_some() != tube.is_some() {
+            return Err("mass.arm: massPerLength goes with tubeDiameter (the arm tube's outside diameter)".into());
+        }
         let na = g["nArms"].as_integer().unwrap() as usize;
         let ids = arm.remove("componentIds").unwrap_or_else(|| {
             Value::Array(
@@ -594,6 +688,24 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
             let mut p = [0.; 3];
             for (j, x) in p.iter_mut().enumerate() {
                 *x = number(&g["armMount"][i][j], "mount", false, false)? / 2.;
+            }
+            if let Some(lambda) = per_length {
+                let tip = [2. * p[0], 2. * p[1], 2. * p[2]];
+                let length = (tip[0] * tip[0] + tip[1] * tip[1] + tip[2] * tip[2]).sqrt();
+                let u = tip.map(|x| x / length.max(1e-12));
+                let m = lambda * length;
+                // A thin-walled tube of radius a: m a^2 about its axis, m (a^2/2 + L^2/12) across.
+                let a2 = (tube.unwrap() / 2.).powi(2);
+                let mut inertia = [[0.; 3]; 3];
+                for r in 0..3 {
+                    for k in 0..3 {
+                        let e = if r == k { 1. } else { 0. };
+                        inertia[r][k] = m * (a2 / 2. + length * length / 12.) * (e - u[r] * u[k])
+                            + m * a2 * u[r] * u[k];
+                    }
+                }
+                arm.insert("mass".into(), Value::Float(m));
+                arm.insert("inertia".into(), mat(inertia));
             }
             arms.push(part(&Value::Table(arm.clone()), "mass.arm", p)?);
         }
@@ -668,6 +780,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
         let (mut expanded, mut parts) = (expanded, parts);
         crate::peripherals::expand(&mut expanded, &mut parts)?;
         crate::payloads::expand(&mut expanded, &mut parts)?;
+        expand_frame(&mut expanded, &mut parts)?;
         (expanded, parts)
     };
     let mut c = resolve_root(Value::Table(expanded))?;
@@ -1315,5 +1428,65 @@ mod placement_tests {
         let r = (m[0].as_float().unwrap().powi(2) + m[1].as_float().unwrap().powi(2)).sqrt();
         assert!((r - 0.3).abs() < 1e-12, "arm {r}");
         assert_eq!(c.geometry["imuPosition_C"][0].as_float(), Some(0.02));
+    }
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+
+    fn quad(geometry: &str, mass: &str) -> Result<ResolvedFireConfig> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(root).unwrap();
+        let start = raw.find("[mass]").unwrap();
+        let end = raw.find("[motor]").unwrap();
+        let raw = format!("{}{mass}\n{}", &raw[..start], &raw[end..])
+            .replace("preset = \"QuadX\"", &format!("preset = \"QuadX\"\n{geometry}"));
+        parse_at(&raw, None)
+    }
+    const ASSEMBLED: &str = "[mass]\nmode = \"assembled\"\n[mass.core]\nmass = 1.0\ninertia = [[0.01,0,0],[0,0.01,0],[0,0,0.02]]\n[mass.arm]\nmassPerLength = 0.1\ntubeDiameter = 0.016\n";
+
+    #[test]
+    fn overlapping_propellers_are_refused() {
+        // 10 in props (0.254 m) on a quad: adjacent hubs are armLength x sqrt(2) apart.
+        assert!(quad("armLength = 0.25\npropellerDiameter = 0.254", ASSEMBLED).is_ok());
+        let e = quad("armLength = 0.15\npropellerDiameter = 0.254", ASSEMBLED).unwrap_err();
+        assert!(e.contains("overlap"), "{e}");
+    }
+
+    #[test]
+    fn longer_arms_weigh_more_and_turn_slower() {
+        let i = |l: f64| {
+            let c = quad(&format!("armLength = {l}"), ASSEMBLED).unwrap();
+            let arm = &c.mass["arms"][0];
+            (arm["mass"].as_float().unwrap(), arm["inertia"][2][2].as_float().unwrap())
+        };
+        let (m1, _) = i(0.25);
+        let (m2, _) = i(1.0);
+        assert!((m1 - 0.025).abs() < 1e-12 && (m2 - 0.1).abs() < 1e-12, "{m1} {m2}");
+        assert!(quad("armLength = 0.25", "[mass]\nmode = \"assembled\"\n[mass.core]\nmass = 1.0\ninertia = [[0.01,0,0],[0,0.01,0],[0,0,0.02]]\n[mass.arm]\nmassPerLength = 0.1\n").is_err(), "tube needed");
+    }
+}
+
+#[cfg(test)]
+mod frame_part_tests {
+    #[test]
+    fn a_frame_and_an_arm_tube_size_and_weigh_the_arms() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(root).unwrap();
+        let (a, b) = (raw.find("[mass]").unwrap(), raw.find("[motor]").unwrap());
+        let raw = format!(
+            "{}[mass]\nmode = \"assembled\"\n[mass.core]\nmass = 1.2\ninertia = [[0.01,0,0],[0,0.01,0],[0,0,0.02]]\n\
+             [mass.arm]\npart = \"easycomposites_cf_tube_16x14\"\n{}",
+            &raw[..a], &raw[b..]
+        )
+        .replace("preset = \"QuadX\"", "preset = \"QuadX\"\nframe = \"holybro_x500_v2\"");
+        let c = super::parse_at(&raw, None).unwrap();
+        let m = &c.geometry["armMount"][0];
+        let r = (m[0].as_float().unwrap().powi(2) + m[1].as_float().unwrap().powi(2)).sqrt();
+        assert!((r - 0.25).abs() < 1e-12, "half the 500 mm wheelbase: {r}");
+        let arm = c.mass["arms"][0]["mass"].as_float().unwrap();
+        assert!((arm - 0.0742 * 0.25).abs() < 1e-12, "74.2 g/m x 0.25 m: {arm}");
+        assert!(c.parts.iter().any(|p| p["kind"] == "frame") && c.parts.iter().any(|p| p["kind"] == "arm_tube"));
     }
 }

@@ -1,0 +1,32 @@
+# Published figures; tools/fire-compose/src/config.rs converts them (frame: armLength; arm_tube: mass.arm).
+name = "Holybro X500 V2 frame"
+kind = "frame"
+manufacturer = "Holybro"
+notes = """
+Figures are from Holybro's own docs page for the PX4 Development Kit - X500 V2 (frame kit SKU30120).
+The page does not say what the 610 g "Weight" covers (frame only, or the kit with the motors, ESCs
+and props listed under "Included items"). Use it as frame mass with care.
+"""
+
+source = { title = "PX4 Development Kit - X500 V2 (Holybro Docs)", revision = "not stated on page; accessed 2026-11-09", url = "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2" }
+
+wheelbase_mm = 500                # "Mechanical Specification": "Wheelbase: 500mm"
+frame_mass_g = 610                # "Mechanical Specification": "Weight: 610g" (scope not stated; see notes)
+arm_tube_od_mm = 16               # "X500 V2 Frame Kit Details (SKU30120)": "16mm carbon fiber tubes" (arms)
+arm_material = "carbon fiber tube with fiber-reinforced nylon connectors"  # "Frame Kit Details": "High-strength & ultra-lightweight 16mm carbon fiber tubes with newly designed fiber-reinforced nylon connectors"
+motor_mount_spacing = "16x16mm"   # "Mechanical Specification": "Motor mount pattern: 16x16mm"
+center_plate_size = "144x144mm, 2mm thick"  # "Mechanical Specification": "Frame Body: 144x144mm, 2mm thick"; Frame Kit Details: "Full Carbon Fiber Top & Bottom plate"
+plate_spacing_mm = 28             # "Mechanical Specification": "Space between top and bottom plates: 28mm"
+landing_gear_height_mm = 215      # "Mechanical Specification": "Landing gear height: 215mm"
+included_propeller = "1045"       # "Included items": "1045 Propellers (6 pcs)" (the kit's prop, not a stated maximum)
+max_payload_g = 1000              # "Mechanical Specification": "Max payload: ~1kg (w/ 4S 5000 mAh battery @70% Throttle)" (converted kg -> g; stated as approximate)
+
+not_stated = [
+  "arm_count (quad; kit lists 4 motors, but the arm count is not given explicitly)",
+  "arm_mass_g",
+  "arm_tube_id_mm / wall thickness",
+  "arm_length_mm",
+  "propeller_max_in",
+  "center_plate_mass_g",
+  "what frame weight includes",
+]

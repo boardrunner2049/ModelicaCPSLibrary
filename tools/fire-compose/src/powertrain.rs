@@ -1617,6 +1617,18 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
                 ));
             }
         }
+        // The propeller's diameter (its datasheet's) sizes the discs whose
+        // overlap the geometry checks.
+        if let Some(Value::String(name)) = sel.get("propeller") {
+            let (_, part) = crate::parts::find("propeller", name)?;
+            let num = |k: &str| part.get(k).and_then(|v| v.as_float().or(v.as_integer().map(|n| n as f64)));
+            if let Some(d) = num("diameter_mm").map(|mm| mm / 1000.0).or(num("diameter_in").map(|i| i * 0.0254)) {
+                let g = root.entry("geometry").or_insert_with(|| Value::Table(Table::new()));
+                if let Some(g) = g.as_table_mut() {
+                    g.entry("propellerDiameter").or_insert(Value::Float(d));
+                }
+            }
+        }
         let (m, sections, report) = propulsion(root, sel)?;
         for (section, params) in sections {
             merge(root, &section, params);

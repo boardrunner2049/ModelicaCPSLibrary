@@ -99,6 +99,18 @@ position = [0.03, 0.0, 0.02]       #   (parallel-axis theorem, the item as a poi
 from = [0.0, 0.0, 0.0]             #   where the aggregate has it (default the reference)
 ```
 
+`[geometry] frame = "holybro_x500_v2"` (parts/frame/) sets `armLength` to half
+the wheelbase. With a propeller part (`[models.propulsion] propeller`), its
+datasheet diameter is `geometry.propellerDiameter`, and propellers whose
+discs overlap are refused. In assembled mode, `[mass.arm] part =
+"easycomposites_cf_tube_16x14"` (parts/arm_tube/), or `massPerLength` with
+`tubeDiameter`, makes each arm a thin-walled tube from the reference to its
+rotor: its mass and inertia follow the frame's size.
+
+Sanity: `python3 -m unittest tools/test_sanity.py` (static), and with
+`FIRE_TEST_SITL=1` the flights: the baseline flies, a CG outside the rotors
+tips over and never flies, thrust below weight never leaves the ground.
+
 ## Real parts
 
 Motors, propellers, batteries, ESCs, servos and gearmotors too: `[models.propulsion]`, `[models.servos]`/`[models.steering]`, `[models.drive]` (src/powertrain.rs); see parts/README.md.

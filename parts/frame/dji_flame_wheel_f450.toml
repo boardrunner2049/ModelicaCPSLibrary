@@ -1,0 +1,34 @@
+# Published figures; tools/fire-compose/src/config.rs converts them (frame: armLength; arm_tube: mass.arm).
+name = "DJI Flame Wheel F450"
+kind = "frame"
+manufacturer = "DJI (Dajiang Innovation Technology Co. Ltd.)"
+notes = """
+Figures are from the DJI FlameWheel450 User Manual V1.6 (Specifications, p.7 per the contents page).
+The manual's Specifications table gives no arm dimensions or materials.
+Retrieved from a third-party mirror (buzzflyer.co.uk) of the DJI PDF.
+"""
+
+source = { title = "FlameWheel450 User Manual", revision = "V 1.6 (copyright 2010-2011)", url = "https://www.buzzflyer.co.uk/manuals/dji-hobby-f450-manual.pdf" }
+
+wheelbase_mm = 450                # Specifications (p.7) > Frame: "Diagonal Wheelbase 450mm"
+frame_mass_g = 282                # Specifications (p.7) > Frame: "Frame Weight 282g" (manual does not say what is included)
+takeoff_mass_g_min = 800          # Specifications (p.7) > Frame: "Takeoff Weight 800g ~ 1600g"
+takeoff_mass_g_max = 1600         # Specifications (p.7) > Frame: "Takeoff Weight 800g ~ 1600g"
+arm_count = 4                     # "In Box" (p.4): "Frame Arms 450FAC x2" + "Frame Arms 450FAW x2"
+propeller_recommended = "10 x 4.5in (@3S); 8 x 4.5in (@4S)"  # Specifications (p.7) > Motor: "Propeller"
+motor_stator_size = "22x12mm"     # Specifications (p.7) > Motor: "Stator size 22x12mm"
+motor_kv_rpm_per_v = 920          # Specifications (p.7) > Motor: "KV 920rpm/V"
+esc_current = "30A OPTO"          # Specifications (p.7) > ESC: "Current 30A OPTO"
+battery = "3S ~ 4S LiPo"          # Specifications (p.7) > ESC: "Battery 3S ~ 4S LiPo"
+
+not_stated = [
+  "arm_mass_g",
+  "arm_tube_od_mm (arms are not tubes; the manual gives no arm cross-section)",
+  "arm_tube_id_mm / wall thickness",
+  "arm_length_mm",
+  "arm_material",
+  "propeller_max_in (only the recommended props are given)",
+  "center_plate_mass_g",
+  "motor_mount_spacing",
+  "what frame weight includes",
+]

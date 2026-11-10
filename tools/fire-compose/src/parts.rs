@@ -862,6 +862,7 @@ pub fn all() -> Vec<(String, String, Table)> {
         .chain(crate::powertrain::KINDS)
         .chain(crate::peripherals::KINDS.iter().map(|k| k.name))
         .chain(crate::payloads::KINDS.iter().map(|k| k.name))
+        .chain(["frame", "arm_tube"])
     {
         let Ok(dir) = std::fs::read_dir(directory().join(kind)) else {
             continue;

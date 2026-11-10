@@ -127,6 +127,8 @@ reads are the ones in the files here.
 | landing_gear | Tarot TL65B44, TL8X001 |
 | tether | Elistair Safe-T 2; Hoverfly LiveSky Sentry |
 | generator | Intelligent Energy IE-SOAR 800 W; Loweheiser HYBGEN 32 |
+| frame | Holybro X500 V2, S500 V2; DJI Flame Wheel F450 (wheelbase: armLength) |
+| arm_tube | Easy Composites carbon tube 16x14, 20x18, 25x23 mm (mass per metre, OD) |
 | battery (smart) | Tattu Plus 16000 mAh 6S, 22000 mAh 6S (`smart = true`: SMBus) |
 
 ## Peripheral parts
