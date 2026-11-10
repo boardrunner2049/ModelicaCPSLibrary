@@ -127,7 +127,11 @@ device from `parts/` instead of a model: the composer selects the level and
 fills `[KIND]` from the device's datasheet figures, explicit keys winning, and
 records what it derived, assumed and could not represent in `config.parts`.
 `fire-compose part KIND [ID]` lists the devices or shows one's conversion. See
-`parts/README.md`.
+`parts/README.md`. Barometer parts classify each value (specified, derived,
+measured, assumed, configuration) and list unknowns; `drift = "none"` and
+`calibration = "PROFILE.toml"` (`--drift`, `--calibration`) select a no-drift
+scenario or overlay a fitted calibration profile without touching the part
+file (docs/sensor-calibration.md).
 
 ## IMU fidelity v2 and independent acoustics
 

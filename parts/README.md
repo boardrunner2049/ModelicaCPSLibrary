@@ -12,6 +12,10 @@ level = "G1"             # optional; default the highest level a datasheet fills
 mode = "sbas"            # optional: gnss standalone | sbas | rtk; barometer low_noise | fast
 tolerances = "draw"      # optional: draw offsets, scale and cross-axis errors within the
                          #   datasheet's ± tolerances, deterministically from [KIND].seed
+[models.barometer]
+part = "infineon_dps310"
+drift = "none"           # optional, barometer: relative_accuracy (default, assumed) | none
+calibration = "unit.profile.toml"   # optional: a fitted profile overlaid on the part (docs/sensor-calibration.md)
 [models.imu]
 part = "tdk_icm42688p"
 range = { accel_g = 8, gyro_dps = 1000 }   # optional: one of the part's ranges
@@ -41,7 +45,7 @@ just a new file.
 |---|---|---|
 | GNSS (G1) | CEP 50 % (per mode), vertical median, 50 % velocity accuracy, max navigation rate | position σ = CEP / 1.1774, split into a Gauss-Markov bias (90 %, τ 60 s; RTK 10 s) and white noise; vertical σ = median / 0.6745 (1.5 × horizontal when not stated); velocity σ = 50 % / 0.6745, white. The sample rate is checked against the maximum. |
 | IMU (I1, I2, I3) | range, ADC bits, noise densities, bias instability, ODR | `fullScale`; `quantum` = 2 × range / 2^bits; `noiseStd` per ADC tick = density × √(f_tick / 2); gyro `biasStd` = bias instability. The ADC rate is checked against the ODR. |
-| Barometer (B1) | RMS noise per mode, resolution, relative accuracy, conversion time | `pressureNoiseStd`, `pressureQuantum`, drift σ = relative accuracy / 2 (τ 300 s), `temperatureQuantum`; the sample period is at least the conversion time. |
+| Barometer (B1) | RMS noise per mode, resolution, relative accuracy, pressure and temperature measurement times | `pressureNoiseStd` and `pressureQuantum` (specified), `temperatureQuantum` (specified); the sample period is at least the pressure plus temperature measurement time (derived; DPS310 64x: 0.108 s); drift σ = relative accuracy / 2, τ 300 s, both *assumed* (relative accuracy bounds a pressure step, not a drift; `drift = "none"` drops it). Each value carries its evidence class; unknowns are listed. |
 | Magnetometer (M1) | range, resolution, RMS noise, ODR at that noise | `fullScale`, `quantum`, `noiseStd`. |
 | Tolerances (`tolerances = "draw"`) | zero-g / zero-rate offsets, sensitivity tolerance, cross-axis, offset tempcos, g-sensitivity; absolute pressure and temperature accuracy; magnetometer offset | `accelBias`, `gyroBias`, `scale`, misalignment, `temperatureCoefficient`, `gyroGSensitivity`; `pressureBias`, `temperatureBias`; `bias`, `softIron`: each drawn uniformly within ±. |
 

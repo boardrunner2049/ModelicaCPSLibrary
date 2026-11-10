@@ -63,6 +63,7 @@ ul.devices small { color: var(--muted); }
         font-weight: 600; border: 1px solid currentColor; vertical-align: 1px; }
 .prov-datasheet { color: #2e8b57; } .prov-configuration { color: #3b6fd8; }
 .prov-assumed { color: #c27c0e; } .prov-placeholder { color: #c0392b; }
+.prov-calibration { color: #7b4fc9; }
 .prov-default { color: var(--muted); }
 p.prov-sum { font-size: 12px; }
 button[aria-pressed="true"] .tag { color: inherit; opacity: .8; }
@@ -445,7 +446,8 @@ function showReports() {
 const KEY_OF = { position_b: "position", R_bs: "orientation", targetPosition_w: "target" };
 const PROV = { "datasheet": ["datasheet", "from the device's datasheet"],
   "configuration": ["set here", "set in this configuration"],
-  "assumed": ["assumed", "a conversion had to assume it: the datasheet does not state it"] };
+  "assumed": ["assumed", "a conversion had to assume it: the datasheet does not state it"],
+  "calibration": ["calibrated", "fitted to measurements of this unit (a calibration profile)"] };
 function showProvenance(prov) {
   for (const d of prov) {
     const part = frame().parts.find((p) => p.id === d.kind && p.table);
@@ -464,10 +466,11 @@ function showProvenance(prov) {
       const cell = card.querySelector(`tr[data-key^="${CSS.escape(key.toLowerCase())} "] td.key`);
       if (!cell) continue;
       cell.querySelector(".prov")?.remove();
-      cell.append(el("span", { class: `prov prov-${cls}`, title: `${about}${r.source ? ": " + r.source : ""}` }, label));
+      const evidence = r.evidence ? ` [evidence: ${r.evidence}]` : "";
+      cell.append(el("span", { class: `prov prov-${cls}`, title: `${about}${r.source ? ": " + r.source : ""}${evidence}` }, label));
     }
     card.querySelector("p.prov-sum")?.remove();
-    const order = [["datasheet", "from the datasheet"], ["configuration", "set here"], ["assumed", "assumed"],
+    const order = [["datasheet", "from the datasheet"], ["calibration", "calibrated"], ["configuration", "set here"], ["assumed", "assumed"],
                    ["placeholder", "datasheet values at the library default"], ["default", "library defaults"]];
     const parts = order.filter(([k]) => count[k]).map(([k, t]) => `${count[k]} ${t}`);
     const sum = el("p", { class: "prov-sum about" }, `Provenance: ${parts.join(" · ")}. Hover a mark for its source.`);

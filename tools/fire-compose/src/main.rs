@@ -41,6 +41,12 @@ enum Action {
         /// none or draw
         #[arg(long)]
         tolerances: Option<String>,
+        /// Barometer drift scenario: relative_accuracy (default) or none
+        #[arg(long)]
+        drift: Option<String>,
+        /// A calibration profile to overlay (docs/sensor-calibration.md)
+        #[arg(long)]
+        calibration: Option<String>,
         /// Explicit [KIND] values, as TOML (e.g. 'samplePeriod = 0.1')
         #[arg(long)]
         set: Option<String>,
@@ -142,6 +148,8 @@ fn run() -> Result<()> {
             level,
             mode,
             tolerances,
+            drift,
+            calibration,
             set,
             json,
             with,
@@ -217,7 +225,13 @@ fn run() -> Result<()> {
             }
             let mut sel = toml::map::Map::new();
             sel.insert("part".into(), toml::Value::String(part));
-            for (k, v) in [("level", level), ("mode", mode), ("tolerances", tolerances)] {
+            for (k, v) in [
+                ("level", level),
+                ("mode", mode),
+                ("tolerances", tolerances),
+                ("drift", drift),
+                ("calibration", calibration),
+            ] {
                 if let Some(v) = v {
                     sel.insert(k.into(), toml::Value::String(v));
                 }

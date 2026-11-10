@@ -1,20 +1,31 @@
 # Datasheet figures as published; tools/fire-compose/src/parts.rs converts them.
+# Audited 2026-11-10 against V1.2 (sha256 c856826f913193c53a83fe73bc853b7517d36a2c5a75d1de19e701c1a88e0d00).
+# Unless noted, Table 7 figures are in its "Typ." column, measured at
+# VDD = VDDIO = 1.8 V, 1000 hPa and 25 °C: typical values, not guaranteed
+# min/max bounds, and the datasheet gives no distribution for them.
 name = "Infineon DPS310"
 kind = "barometer"
 manufacturer = "Infineon Technologies"
 source = "DPS310 Data Sheet V1.2 (marked preliminary), 2020-10-15, https://community.infineon.com/gfawx74859/attachments/gfawx74859/KnowledgeBaseArticles/10104/3/Infineon-DPS310-DataSheet.pdf"
-notes = "Long-term stability is ±1 hPa with no period given."
-pressure_range_pa = [30000, 120000]           # Table 3, p6
-pressure_rms_noise_pa = 0.2                   # 64x oversampling, High Precision (Table 7, p9)
+notes = "Long-term stability is ±1 hPa 'depending on environmental conditions' (Table 3), with no period given. Relative accuracy is the error of any 1 hPa pressure change at a constant temperature, not a drift over time; no figure states a drift process."
+pressure_range_pa = [30000, 120000]           # Table 3, p6 (operating range)
+pressure_rms_noise_pa = 0.2                   # Table 7, p9 and Table 16, p30: 64x, "average standard deviation", typ.
 pressure_rms_noise_mode = "64x oversampling (High Precision); 104.4 ms"
-pressure_rms_noise_fast_pa = 2.5              # single oversampling (Table 16, p30)
+pressure_rms_noise_fast_pa = 2.5              # Table 16, p30: single oversampling
 pressure_rms_noise_fast_mode = "single oversampling (Low Precision); 3.6 ms"
-pressure_resolution_pa = 0.06                 # Table 7, p9 (max)
-relative_accuracy_pa = 6                      # ±, any 1 hPa step in 800..1200 hPa, 20..60 C
-absolute_accuracy_pa = 100                    # ±, 300..1200 hPa, 0..65 C
-temperature_coefficient_offset_pa_per_k = 0.5 # Table 7, p9
-solder_drift_pa = 80                          # Table 3, p6
-temperature_accuracy_c = 0.5                  # ±
-temperature_resolution_c = 0.01
-odr_max_hz = 128                              # low oversampling only
-conversion_time_lowest_noise_ms = 104.4       # 64x
+pressure_resolution_pa = 0.06                 # Table 7, p9: data resolution, max column ("PaRMS")
+relative_accuracy_pa = 6                      # Table 7, p9: ±, typ., any Δ1 hPa in 800..1200 hPa, any constant temperature in 20..60 °C
+absolute_accuracy_pa = 100                    # Table 7, p9: ±, typ., 300..1200 hPa, 0..65 °C, excluding solder effects
+temperature_coefficient_offset_pa_per_k = 0.5 # Table 7, p9: typ., 1000 hPa, 25..65 °C, calibrated measurements
+power_supply_rejection_pa = 0.063             # Table 7, p9: max, PaRMS, 217 Hz square wave and broadband noise, 100 mVpp
+solder_drift_pa = 80                          # Table 3, p6: typ., minimum solder height 50 µm; removable by one-point calibration
+temperature_accuracy_c = 0.5                  # Table 6, p8: ±, typ.
+temperature_resolution_c = 0.01               # Table 6, p8
+odr_max_hz = 128                              # Tables 6/7: measurement rate 1..128 Hz
+conversion_time_lowest_noise_ms = 104.4       # Table 16, p30: 64x (Table 7 rounds it to 105 ms)
+conversion_time_fast_ms = 3.6                 # Table 16, p30: single oversampling
+temperature_measurement_time_ms = 3.6         # TMP_CFG register, p31 (TMP_PRC 0000, single, the default); Table 17 note: rate_T*time_T + rate_P*time_P < 1 s
+# Table 16, p30, every pressure oversampling rate (the converter uses the two modes above).
+pressure_oversampling = [1, 2, 4, 8, 16, 32, 64, 128]
+pressure_measurement_time_ms = [3.6, 5.2, 8.4, 14.8, 27.6, 53.2, 104.4, 206.8]
+pressure_precision_pa = [2.5, 1.0, 0.5, 0.4, 0.35, 0.3, 0.2]   # 128x: no figure printed

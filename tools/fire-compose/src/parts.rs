@@ -59,7 +59,21 @@ const DEFAULT_LEVEL: [(&str, &str); 4] = [
     ("magnetometer", "sampled"),
 ];
 const METADATA: [&str; 6] = ["name", "kind", "manufacturer", "source", "notes", "url"];
-const OPTIONS: [&str; 6] = ["part", "level", "model", "mode", "tolerances", "range"];
+const OPTIONS: [&str; 8] = [
+    "part",
+    "level",
+    "model",
+    "mode",
+    "tolerances",
+    "range",
+    "drift",
+    "calibration",
+];
+/// Evidence classes of a parameter value (docs/sensor-calibration.md):
+/// stated by the datasheet under its conditions, calculated from stated
+/// figures, estimated from a named dataset, or chosen without sufficient
+/// information. `configuration` is a modelling choice of the user.
+pub const EVIDENCE: [&str; 5] = ["specified", "derived", "measured", "assumed", "configuration"];
 
 /// One parameter the conversion produced.
 struct Entry {
@@ -67,6 +81,8 @@ struct Entry {
     value: Value,
     from: Vec<&'static str>,
     how: String,
+    /// One of EVIDENCE, when the converter classifies its values.
+    class: Option<&'static str>,
 }
 
 #[derive(Default)]
@@ -82,6 +98,9 @@ struct Conversion {
     missing: Vec<(&'static str, &'static str)>,
     /// Figures used to check the configuration (rates), not converted.
     checked: Vec<&'static str>,
+    /// Properties the model needs that no figure determines (kept unknown in
+    /// the report even when a runnable value had to be assumed).
+    unknown: Vec<String>,
 }
 
 impl Conversion {
@@ -104,7 +123,20 @@ impl Conversion {
             value,
             from: from.to_vec(),
             how: how.into(),
+            class: None,
         });
+    }
+    /// `put` with an evidence class.
+    fn put_as(
+        &mut self,
+        class: &'static str,
+        key: &'static str,
+        value: Value,
+        from: &[&'static str],
+        how: impl Into<String>,
+    ) {
+        self.put(key, value, from, how);
+        self.entries.last_mut().unwrap().class = Some(class);
     }
 }
 
@@ -116,6 +148,8 @@ struct Inputs<'a> {
     mode: String,
     draw: Option<Rng>,
     range: Option<&'a Table>,
+    /// Barometer: "relative_accuracy" (default) or "none".
+    drift: String,
 }
 
 impl Inputs<'_> {
@@ -574,77 +608,154 @@ fn gnss(x: &mut Inputs) -> Result<Conversion> {
 
 fn barometer(x: &mut Inputs) -> Result<Conversion> {
     let mut c = Conversion::default();
-    let (noise_key, mode_key) = match x.mode.as_str() {
-        "" | "low_noise" => ("pressure_rms_noise_pa", "pressure_rms_noise_mode"),
-        "fast" => ("pressure_rms_noise_fast_pa", "pressure_rms_noise_fast_mode"),
+    let (noise_key, mode_key, time_key) = match x.mode.as_str() {
+        "" | "low_noise" => (
+            "pressure_rms_noise_pa",
+            "pressure_rms_noise_mode",
+            "conversion_time_lowest_noise_ms",
+        ),
+        "fast" => (
+            "pressure_rms_noise_fast_pa",
+            "pressure_rms_noise_fast_mode",
+            "conversion_time_fast_ms",
+        ),
         m => return Err(format!("models.barometer.mode = {m:?}: low_noise or fast")),
     };
-    let min_period = x
-        .f("conversion_time_lowest_noise_ms")
-        .filter(|_| noise_key == "pressure_rms_noise_pa")
-        .map(|ms| ms * 1e-3)
-        .or(x.f("odr_max_hz").map(|r| 1.0 / r));
+    // One reading is a pressure and a temperature measurement: when the part
+    // states both measurement times, they share the period (DPS310: rate_T *
+    // time_T + rate_P * time_P < 1 s).
+    let pressure_time = x.f(time_key).map(|ms| ms * 1e-3);
+    let temperature_time = x.f("temperature_measurement_time_ms").map(|ms| ms * 1e-3);
+    let odr = x.f("odr_max_hz").map(|r| 1.0 / r);
+    let measured = match (pressure_time, temperature_time) {
+        (Some(p), Some(t)) => Some(p + t),
+        (Some(p), None) => Some(p),
+        _ => None,
+    };
+    let min_period = match (measured, odr) {
+        (Some(m), Some(o)) => Some(m.max(o)),
+        (m, o) => m.or(o),
+    };
     let period = match x.explicit_f("samplePeriod") {
         Some(p) => p,
         None => {
             let p = min_period.map_or(0.02, |m| m.max(0.02));
-            c.put(
+            let mut from = Vec::new();
+            if pressure_time.is_some() {
+                from.push(time_key);
+            }
+            if temperature_time.is_some() && pressure_time.is_some() {
+                from.push("temperature_measurement_time_ms");
+            }
+            if odr.is_some() && min_period == odr {
+                from.push("odr_max_hz");
+            }
+            let derived = min_period.is_some_and(|m| m >= 0.02);
+            c.put_as(
+                if derived { "derived" } else { "configuration" },
                 "samplePeriod",
                 num(p),
-                &[],
-                "50 Hz, or the part's conversion time in this mode if longer",
+                if derived { &from } else { &[] },
+                if derived {
+                    "the shortest period the part allows in this mode: pressure plus temperature measurement time, at most the maximum rate"
+                } else {
+                    "50 Hz (a modelling choice), slower than any limit the part states"
+                },
             );
             p
         }
     };
     if let Some(m) = min_period {
-        c.checked.push(
-            if noise_key == "pressure_rms_noise_pa"
-                && x.f("conversion_time_lowest_noise_ms").is_some()
-            {
-                "conversion_time_lowest_noise_ms"
-            } else {
-                "odr_max_hz"
-            },
-        );
+        if pressure_time.is_some() {
+            c.checked.push(time_key);
+        }
+        if temperature_time.is_some() {
+            c.checked.push("temperature_measurement_time_ms");
+        }
+        if odr.is_some() {
+            c.checked.push("odr_max_hz");
+        }
         if period < m * 0.9999 {
             return Err(format!(
-                "barometer: {:.1} Hz is faster than the part allows in this mode ({:.1} Hz)",
+                "barometer: {:.1} Hz is faster than the part allows in this mode ({:.1} Hz: a reading needs {:.1} ms of pressure{} measurement)",
                 1.0 / period,
-                1.0 / m
+                1.0 / m,
+                m * 1e3,
+                if temperature_time.is_some() { " and temperature" } else { "" }
             ));
         }
     }
     if let Some(n) = c.need(x, noise_key, "pressureNoiseStd") {
         let mode = x.part.get(mode_key).and_then(Value::as_str).unwrap_or("");
-        c.put(
+        c.put_as(
+            "specified",
             "pressureNoiseStd",
             num(n),
             &[noise_key],
-            format!("RMS noise per sample ({mode})"),
+            format!("RMS noise per reading ({mode})"),
         );
     }
     if let Some(q) = c.need(x, "pressure_resolution_pa", "pressureQuantum") {
-        c.put(
+        c.put_as(
+            "specified",
             "pressureQuantum",
             num(q),
             &["pressure_resolution_pa"],
             "output LSB",
         );
     }
-    if let Some(r) = c.need(x, "relative_accuracy_pa", "pressureDriftStd") {
-        c.put(
-            "pressureDriftStd",
-            num(r / 2.0),
-            &["relative_accuracy_pa"],
-            "± relative accuracy taken as 2σ of a slow drift",
-        );
-        c.put("pressureDriftTau", num(300.0), &[], "assumed");
-        c.assumed
-            .push("pressure drift: σ = relative accuracy / 2, τ 300 s".into());
+    match x.drift.as_str() {
+        "" | "relative_accuracy" => {
+            if let Some(r) = c.need(x, "relative_accuracy_pa", "pressureDriftStd") {
+                c.put_as(
+                    "assumed",
+                    "pressureDriftStd",
+                    num(r / 2.0),
+                    &["relative_accuracy_pa"],
+                    "assumed: half the ± relative accuracy as the σ of a slow drift (the figure bounds the error of a pressure step, not a drift over time)",
+                );
+                c.put_as(
+                    "assumed",
+                    "pressureDriftTau",
+                    num(300.0),
+                    &[],
+                    "assumed: no figure states a correlation time",
+                );
+                c.assumed
+                    .push("pressure drift: σ = relative accuracy / 2, τ 300 s".into());
+            }
+        }
+        "none" => {
+            c.put_as(
+                "assumed",
+                "pressureDriftStd",
+                num(0.0),
+                &[],
+                "no-drift scenario (drift = \"none\")",
+            );
+            c.assumed.push("pressure drift: none (drift = \"none\")".into());
+        }
+        d => {
+            return Err(format!(
+                "models.barometer.drift = {d:?}: relative_accuracy or none"
+            ))
+        }
+    }
+    c.unknown.push(
+        "pressure drift over time: no figure states a drift process or its correlation time"
+            .into(),
+    );
+    if x.part.get("latency_ms").is_none() {
+        c.unknown
+            .push("delivery latency: not stated (latencySamples stays 0)".into());
+    }
+    if x.part.get("temperature_rms_noise_c").is_none() {
+        c.unknown
+            .push("temperature noise: not stated (temperatureNoiseStd stays 0)".into());
     }
     if let Some(q) = c.need(x, "temperature_resolution_c", "temperatureQuantum") {
-        c.put(
+        c.put_as(
+            "specified",
             "temperatureQuantum",
             num(q),
             &["temperature_resolution_c"],
@@ -652,7 +763,8 @@ fn barometer(x: &mut Inputs) -> Result<Conversion> {
         );
     }
     for key in ["seed", "streamId"] {
-        c.put(
+        c.put_as(
+            "configuration",
             key,
             Value::Integer(if key == "seed" { 1 } else { 301 }),
             &[],
@@ -663,25 +775,31 @@ fn barometer(x: &mut Inputs) -> Result<Conversion> {
     match draw.as_mut() {
         Some(r) => {
             if let Some(a) = x.f("absolute_accuracy_pa") {
-                c.put(
+                c.put_as(
+                    "assumed",
                     "pressureBias",
                     num(r.signed() * a),
                     &["absolute_accuracy_pa"],
-                    "drawn within ± the absolute accuracy",
+                    "drawn uniformly within ± the absolute accuracy (the uniform distribution is assumed)",
                 );
             }
             if let Some(t) = x.f("temperature_accuracy_c") {
-                c.put(
+                c.put_as(
+                    "assumed",
                     "temperatureBias",
                     num(r.signed() * t),
                     &["temperature_accuracy_c"],
-                    "drawn within ± the temperature accuracy",
+                    "drawn uniformly within ± the temperature accuracy (the uniform distribution is assumed)",
                 );
             }
         }
-        None => c
-            .tolerances
-            .extend(["absolute_accuracy_pa", "temperature_accuracy_c"]),
+        None => {
+            c.tolerances
+                .extend(["absolute_accuracy_pa", "temperature_accuracy_c"]);
+            c.unknown.push(
+                "this unit's pressure and temperature offsets: the accuracy figures bound them, a calibration measures them".into(),
+            );
+        }
     }
     c.unused = vec![
         (
@@ -693,17 +811,19 @@ fn barometer(x: &mut Inputs) -> Result<Conversion> {
             "no temperature-dependent offset in B1",
         ),
         ("long_term_stability_pa_per_year", "beyond a flight"),
+        ("long_term_stability_pa", "beyond a flight"),
         (
             "solder_drift_pa",
             "an offset after assembly: part of the absolute accuracy",
         ),
-        ("odr_max_hz", "the sample period is checked against it"),
-        (
-            "conversion_time_lowest_noise_ms",
-            "the sample period is checked against it",
-        ),
         ("pressure_rms_noise_fast_pa", "another mode is selected"),
         ("pressure_rms_noise_pa", "another mode is selected"),
+        ("conversion_time_fast_ms", "another mode is selected"),
+        ("conversion_time_lowest_noise_ms", "another mode is selected"),
+        ("pressure_oversampling", "the mode's figures are used"),
+        ("pressure_measurement_time_ms", "the mode's figures are used"),
+        ("pressure_precision_pa", "the mode's figures are used"),
+        ("power_supply_rejection_pa", "no supply input in B1"),
     ];
     Ok(c)
 }
@@ -968,6 +1088,117 @@ fn accepted(kind: &str, model: &str) -> Vec<&'static str> {
     }
 }
 
+/// Overlay a calibration profile on a part's conversion. A profile
+/// (docs/sensor-calibration.md) names the part and level it was fitted for and
+/// gives parameter values with an evidence class; the part file stays as
+/// published. Returns the report's `calibration` entry.
+fn apply_calibration(
+    label: &str,
+    kind: &str,
+    part: &str,
+    level: &str,
+    path: &str,
+    keys: &[&'static str],
+    conv: &mut Conversion,
+) -> Result<Json> {
+    let full = {
+        let p = PathBuf::from(path);
+        if p.is_absolute() || p.exists() {
+            p
+        } else {
+            crate::artifact::library_root().join(p)
+        }
+    };
+    let text = std::fs::read_to_string(&full)
+        .map_err(|e| format!("{label}.calibration = {path:?}: {e}"))?;
+    let profile: Table = toml::from_str(&text)
+        .map_err(|e| format!("{label}.calibration = {path:?}: {e}"))?;
+    let head = profile
+        .get("profile")
+        .and_then(Value::as_table)
+        .ok_or(format!("{label}.calibration: [profile] missing in {path}"))?;
+    let field = |k: &str| head.get(k).and_then(Value::as_str).unwrap_or("");
+    if field("kind") != kind {
+        return Err(format!("{label}.calibration: the profile is for a {:?}, not a {kind}", field("kind")));
+    }
+    if field("part") != part {
+        return Err(format!(
+            "{label}.calibration: the profile was fitted for part {:?}, not {part:?}",
+            field("part")
+        ));
+    }
+    if !field("level").is_empty() && field("level") != level {
+        return Err(format!(
+            "{label}.calibration: the profile was fitted at level {:?}, not {level}",
+            field("level")
+        ));
+    }
+    let params = profile
+        .get("parameters")
+        .and_then(Value::as_table)
+        .ok_or(format!("{label}.calibration: [parameters] missing in {path}"))?;
+    let mut measured = Vec::new();
+    let mut applied = serde_json::Map::new();
+    for (name, entry) in params {
+        let key = keys
+            .iter()
+            .copied()
+            .find(|k| k == name)
+            .ok_or(format!("{label}.calibration: {name} is not a parameter of {level}"))?;
+        let t = entry
+            .as_table()
+            .ok_or(format!("{label}.calibration: parameters.{name} must be a table"))?;
+        let value = t
+            .get("value")
+            .cloned()
+            .ok_or(format!("{label}.calibration: parameters.{name}.value missing"))?;
+        let class = t.get("class").and_then(Value::as_str).unwrap_or("measured");
+        let class = EVIDENCE
+            .iter()
+            .copied()
+            .find(|c| *c == class)
+            .ok_or(format!("{label}.calibration: parameters.{name}.class = {class:?}: one of {}", EVIDENCE.join(", ")))?;
+        let dataset = t.get("dataset").and_then(Value::as_str).unwrap_or("");
+        if class == "measured" {
+            if dataset.is_empty() {
+                return Err(format!(
+                    "{label}.calibration: parameters.{name} is measured but names no dataset"
+                ));
+            }
+            measured.push(name.clone());
+        }
+        let how = t.get("how").and_then(Value::as_str).unwrap_or(match class {
+            "measured" => "fitted to measurements",
+            _ => "set by the calibration profile",
+        });
+        let note = if dataset.is_empty() {
+            format!("calibration profile: {how}")
+        } else {
+            format!("calibration profile: {how} (dataset {dataset})")
+        };
+        conv.entries.retain(|e| e.key != key);
+        conv.put_as(class, key, value, &[], note);
+        let mut a = serde_json::to_value(t).unwrap_or(Json::Null);
+        a["class"] = json!(class);
+        applied.insert(name.clone(), a);
+    }
+    if !measured.is_empty() {
+        conv.assumed.retain(|a| {
+            !(a.starts_with("pressure drift") && measured.iter().any(|m| m.starts_with("pressureDrift")))
+        });
+    }
+    Ok(json!({
+        "path": path,
+        "synthetic": head.get("synthetic").and_then(Value::as_bool).unwrap_or(false),
+        "label": field("label"),
+        "unit": field("unit"),
+        "created": field("created"),
+        "measured": measured,
+        "parameters": applied,
+        "datasets": profile.get("datasets").map(|d| serde_json::to_value(d).unwrap_or(Json::Null)).unwrap_or(Json::Null),
+    }))
+}
+
 /// Resolve one part use: the level, the parameters it fills (explicit keys
 /// excluded) and the report.
 pub fn resolve(
@@ -1019,7 +1250,15 @@ pub fn resolve(
             .into(),
         draw: (tolerances == "draw").then(|| Rng::new(seed, kind)),
         range: selection.get("range").and_then(Value::as_table),
+        drift: selection
+            .get("drift")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .into(),
     };
+    if !inputs.drift.is_empty() && kind != "barometer" {
+        return Err(format!("{label}.drift: only barometer parts choose a drift scenario"));
+    }
     if !inputs.mode.is_empty() && !["gnss", "barometer"].contains(&kind) {
         return Err(format!(
             "{label}.mode: only gnss and barometer parts have modes"
@@ -1028,13 +1267,22 @@ pub fn resolve(
     if inputs.range.is_some() && kind != "imu" {
         return Err(format!("{label}.range: only IMU parts pick a range"));
     }
-    let conv = match kind {
+    let mut conv = match kind {
         "imu" => imu(&mut inputs)?,
         "gnss" => gnss(&mut inputs)?,
         "barometer" => barometer(&mut inputs)?,
         _ => magnetometer(&mut inputs)?,
     };
     let keys = accepted(kind, model);
+    let calibration = match selection.get("calibration") {
+        None => None,
+        Some(v) => {
+            let path = v
+                .as_str()
+                .ok_or(format!("{label}.calibration: expected a path"))?;
+            Some(apply_calibration(&label, kind, &id, level, path, &keys, &mut conv)?)
+        }
+    };
     let mut params = Table::new();
     let mut derived = serde_json::Map::new();
     let mut used: BTreeSet<&str> = BTreeSet::new();
@@ -1052,10 +1300,11 @@ pub fn resolve(
             );
             continue;
         }
-        derived.insert(
-            e.key.into(),
-            json!({"value": e.value, "from": e.from, "how": e.how}),
-        );
+        let mut entry = json!({"value": e.value, "from": e.from, "how": e.how});
+        if let Some(class) = e.class {
+            entry["class"] = json!(class);
+        }
+        derived.insert(e.key.into(), entry);
         params.insert(e.key.into(), e.value.clone());
     }
     used.extend(conv.checked.iter().copied());
@@ -1109,6 +1358,24 @@ pub fn resolve(
         "tolerances": tolerances,
         "parameters": derived, "assumed": conv.assumed, "not_represented": not_represented, "not_stated": not_stated,
     });
+    let mut report = report;
+    if !conv.unknown.is_empty() {
+        report["unknown"] = json!(conv.unknown);
+    }
+    if kind == "barometer" {
+        report["drift"] = json!(if inputs.drift.is_empty() { "relative_accuracy" } else { inputs.drift.as_str() });
+    }
+    // A profile fitted to synthetic data demonstrates the pipeline; it is not a
+    // measurement of a device and is never labelled as one.
+    report["evidence"] = json!(match &calibration {
+        Some(c) if c["measured"].as_array().is_some_and(|m| !m.is_empty()) => {
+            if c["synthetic"] == true { "synthetic-calibrated (not a device)" } else { "measurement-calibrated" }
+        }
+        _ => "datasheet-derived",
+    });
+    if let Some(c) = calibration {
+        report["calibration"] = c;
+    }
     Ok((model, params, report))
 }
 
@@ -1194,7 +1461,8 @@ pub fn summary(report: &Json) -> String {
                 })
                 .unwrap_or_default();
             out.push_str(&format!(
-                "    {k} = {value}\n      {}{}\n",
+                "    {k} = {value}{}\n      {}{}\n",
+                v["class"].as_str().map(|c| format!("  ({c})")).unwrap_or_default(),
                 v["how"].as_str().unwrap_or(""),
                 if from.is_empty() {
                     String::new()
@@ -1209,6 +1477,15 @@ pub fn summary(report: &Json) -> String {
         for x in a {
             out.push_str(&format!("    {}\n", x.as_str().unwrap_or("")));
         }
+    }
+    if let Some(a) = report["unknown"].as_array().filter(|a| !a.is_empty()) {
+        out.push_str("  unknown:\n");
+        for x in a {
+            out.push_str(&format!("    {}\n", x.as_str().unwrap_or("")));
+        }
+    }
+    if let Some(e) = report["evidence"].as_str() {
+        out.push_str(&format!("  evidence: {e}\n"));
     }
     if let Some(a) = report["checks"].as_array().filter(|a| !a.is_empty()) {
         out.push_str("  checks:\n");
@@ -1265,6 +1542,7 @@ mod tests {
             mode: String::new(),
             draw: None,
             range: None,
+            drift: String::new(),
         }
     }
 

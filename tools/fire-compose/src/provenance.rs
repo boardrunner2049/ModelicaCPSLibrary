@@ -154,10 +154,27 @@ fn device(
             Some(v) => (text(v), "configuration", String::new()),
             None => (d.default.clone(), "library default", String::new()),
         };
-        rows.push(json!({
+        let mut row = json!({
             "parameter": d.name, "value": value, "origin": origin, "tag": d.tag,
             "source": source,
-        }));
+        });
+        // The converter's evidence class (specified, derived, measured,
+        // assumed, configuration), where it classifies its values.
+        let class = match origin {
+            "datasheet" => filled.and_then(|p| p["class"].as_str()).map(str::to_string),
+            "configuration" => Some("configuration".into()),
+            _ => None,
+        };
+        if let Some(class) = class {
+            row["evidence"] = json!(class);
+            match class.as_str() {
+                "measured" => row["origin"] = json!("calibration"),
+                "assumed" => row["origin"] = json!("assumed"),
+                "configuration" => row["origin"] = json!("configuration"),
+                _ => {}
+            }
+        }
+        rows.push(row);
     }
     json!({"kind": kind, "component": component, "class": format!("ModelicaCPSLibrary.{package}.{class}"),
            "part": report.map(|r| r["name"].clone()).unwrap_or(Json::Null),
@@ -165,10 +182,20 @@ fn device(
            "parameters": rows})
 }
 
-/// Every fitted peripheral and payload, and a power module's pack.
+/// Every fitted peripheral and payload, and a power module's pack; a
+/// barometer named by its part.
 pub fn table(c: &ResolvedFireConfig) -> Vec<Json> {
     let report = |kind: &str| c.parts.iter().rev().find(|r| r["kind"] == kind);
     let mut out = Vec::new();
+    if let Some(r) = report("barometer") {
+        if let Some(level) = r["model"].as_str().and_then(|m| crate::sensors::BAROMETER.level(m)) {
+            let class = level.class.rsplit('.').next().unwrap();
+            let mut d = device("barometer", "sensors.barometer", "Systems.Sensing.Barometer", class, &c.barometer, Some(r));
+            d["evidence"] = r["evidence"].clone();
+            d["unknown"] = r["unknown"].clone();
+            out.push(d);
+        }
+    }
     for kind in crate::peripherals::KINDS {
         let Some(sel) = c.peripherals.get(kind.name).and_then(Toml::as_table) else {
             continue;
@@ -217,23 +244,25 @@ pub fn table(c: &ResolvedFireConfig) -> Vec<Json> {
 pub fn html(rows: &[Json]) -> String {
     let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;");
     let mut h = String::from(
-        "<html><h3>Provenance of the peripherals and payloads</h3><p>Origin: datasheet (the part's \
-         figures), configuration, or library default; tag: where the parameter's value should come \
-         from (datasheet, physics, environment, configuration, ArduPilot, assumed).</p>",
+        "<html><h3>Provenance of the peripherals, payloads and sensor parts</h3><p>Origin: datasheet (the part's \
+         figures), calibration (a measured profile), assumed, configuration, or library default; evidence, \
+         where classified: specified, derived, measured, assumed or configuration; tag: where the parameter's \
+         value should come from (datasheet, physics, environment, configuration, ArduPilot, assumed).</p>",
     );
     for d in rows {
         h += &format!(
-            "<h4>{} ({}){}</h4><table border=\"1\"><tr><th>parameter</th><th>value</th><th>origin</th><th>tag</th><th>from</th></tr>",
+            "<h4>{} ({}){}</h4><table border=\"1\"><tr><th>parameter</th><th>value</th><th>origin</th><th>evidence</th><th>tag</th><th>from</th></tr>",
             esc(d["component"].as_str().unwrap_or("")),
             esc(d["class"].as_str().unwrap_or("")),
             d["part"].as_str().map(|p| format!(": {}", esc(p))).unwrap_or_default()
         );
         for r in d["parameters"].as_array().into_iter().flatten() {
             h += &format!(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                 esc(r["parameter"].as_str().unwrap_or("")),
                 esc(r["value"].as_str().unwrap_or("")),
                 esc(r["origin"].as_str().unwrap_or("")),
+                esc(r["evidence"].as_str().unwrap_or("")),
                 esc(r["tag"].as_str().unwrap_or("")),
                 esc(r["source"].as_str().unwrap_or(""))
             );
@@ -253,6 +282,7 @@ mod tests {
             ("Systems.Peripherals", crate::peripherals::KINDS.iter().flat_map(|k| k.levels.iter().map(|l| l.class)).collect::<Vec<_>>()),
             ("Systems.Payloads", crate::payloads::KINDS.iter().map(|k| k.class).collect()),
             ("Systems.Power", vec!["Battery"]),
+            ("Systems.Sensing.Barometer", vec!["Sensor", "SampledSensor"]),
         ] {
             for class in classes {
                 let d = declared(package, class);
@@ -265,6 +295,27 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_barometer_part_s_values_carry_their_evidence() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(&root).unwrap()
+            + "\n[models.barometer]\npart = \"infineon_dps310\"\n";
+        let c = crate::config::parse_at(&raw, None).unwrap();
+        let t = table(&c);
+        let baro = t.iter().find(|d| d["kind"] == "barometer").unwrap();
+        assert_eq!(baro["evidence"], "datasheet-derived");
+        let rows = baro["parameters"].as_array().unwrap();
+        let row = |n: &str| rows.iter().find(|r| r["parameter"] == n).unwrap().clone();
+        assert_eq!(row("pressureNoiseStd")["evidence"], "specified");
+        assert_eq!(row("samplePeriod")["evidence"], "derived");
+        assert_eq!(row("samplePeriod")["value"], "0.108");
+        assert_eq!(row("pressureDriftStd")["evidence"], "assumed");
+        assert_eq!(row("pressureDriftStd")["origin"], "assumed");
+        assert_eq!(row("pressureDriftTau")["evidence"], "assumed");
+        assert_eq!(row("latencySamples")["origin"], "library default");
+        assert!(baro["unknown"].as_array().unwrap().iter().any(|u| u.as_str().unwrap().starts_with("pressure drift over time")));
     }
 
     #[test]
