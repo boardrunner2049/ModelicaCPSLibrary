@@ -52,6 +52,13 @@ section.card { background: var(--panel); border: 1px solid var(--line); border-r
   padding: 14px 16px; margin-bottom: 14px; }
 h2 { font-size: 15px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
 .tag { font-size: 12px; font-weight: 500; color: var(--muted); }
+h3.group { margin: 18px 2px 4px; font-size: 15px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+section.card.off { opacity: .8; }
+section.card.off h2 { margin-bottom: 4px; }
+ul.devices { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+ul.devices li { display: flex; gap: 8px; align-items: flex-start; }
+ul.devices li.muted { opacity: .55; }
+ul.devices small { color: var(--muted); }
 button[aria-pressed="true"] .tag { color: inherit; opacity: .8; }
 .airframes { display: flex; gap: 8px; flex-wrap: wrap; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
@@ -194,6 +201,8 @@ body.docked .side { max-height: calc(100vh - var(--t-shown, 42vh) - 24px); overf
 .g-strap { fill: var(--g-dark); opacity: .7; }
 .g-board { fill: var(--g-board); stroke: var(--g-dark); stroke-width: 1; }
 .g-chip { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: .8; }
+.g-payload { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: .8; stroke-dasharray: 3 2; }
+.g-tiny.g-in { fill: var(--g-ink, #e8eef6); font-size: 9px; font-weight: 600; letter-spacing: .04em; }
 .g-servo { fill: var(--g-servo); stroke: var(--g-dark); stroke-width: 1; }
 .g-link, .g-line { stroke: var(--g-edge); stroke-width: 2; }
 .g-puck { fill: var(--g-dark); stroke: var(--g-edge); stroke-width: 1.5; }
@@ -294,7 +303,8 @@ section.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--a
 "use strict";
 const $ = (id) => document.getElementById(id);
 let catalog = null;
-const state = { airframe: "quad", model_name: "", levels: {}, devices: {}, slots: {}, values: {} };
+const state = { airframe: "quad", model_name: "", levels: {}, devices: {}, slots: {}, values: {},
+                sitlDevices: new Set() };
 let reports = [];        // the composer's part reports of the last check
 let initial = {};        // dotted path -> starting value text of the current fields
 let run = null, pollTimer = null, checkTimer = null;
@@ -332,6 +342,7 @@ function pickAirframe(name) {
     for (const f of fieldsOf(part)) initial[dotted(f)] = state.values[dotted(f)] = f.value;
   }
   state.model_name = "";
+  state.sitlDevices = new Set();
   $("sitl-name").value = "my_" + name;
   render();
 }
@@ -451,7 +462,8 @@ function fieldTable(part) {
   const rows = fields.map((f) => {
     const key = dotted(f);
     const dev = fromDevice(part), name = f.path[f.path.length - 1];
-    const fromSheet = dev && f.path.length === 2 && f.path[0] === part.id ? dev.values[name] : undefined;
+    const owner = (part.table || [part.id]).join(".");
+    const fromSheet = dev && f.path.slice(0, -1).join(".") === owner ? dev.values[name] : undefined;
     const input = el("input", { type: "text", value: state.values[key] ?? "",
       placeholder: fromSheet !== undefined ? `from the part: ${fromSheet}` :
         !f.default || f.default === "library default" ? "library default" : `default: ${f.default}`,
@@ -487,9 +499,26 @@ function render() {
       el("input", { type: "text", id: "model-name", value: state.model_name,
         placeholder: "from the SITL name, e.g. my_quad -> MyQuad",
         oninput: (e) => { state.model_name = e.target.value; scheduleCheck(); } })))];
+  let group = "";
   for (const part of fr.parts) {
     const lv = level(part);
     const slow = /0\.0\d|hours|not practical/.test(lv.description);
+    if ((part.group || "") !== group && part.group) {
+      group = part.group;
+      cards.push(el("h3", { class: "group" }, group, el("span", { class: "tag" },
+        group === "Peripherals" ? "sensors the autopilot reads: ArduPilot's optional hardware"
+                                : "loads and accessories on the airframe, on SERVO9 and up")));
+    }
+    if (part.table && lv.id === "off") {
+      cards.push(el("section", { class: "card off", "data-part": part.id },
+        el("h2", {}, part.title, el("span", { class: "tag" }, "not fitted")),
+        el("div", { class: "seg", role: "group", "aria-label": part.title },
+          part.levels.map((l) => el("button", { "aria-pressed": String(l.id === lv.id),
+            onclick: () => pickLevel(part, l.id) }, l.label))),
+        el("p", { class: "about" }, lv.description),
+        deviceBlock(part)));
+      continue;
+    }
     cards.push(el("section", { class: "card", "data-part": part.id },
       el("h2", {}, part.title, el("span", { class: "tag" },
         part.levels.length > 1 ? `${part.levels.length} levels` : "")),
@@ -500,10 +529,35 @@ function render() {
       deviceBlock(part),
       fieldTable(part)));
   }
+  cards.push(sitlDevicesCard());
   $("parts").replaceChildren(...cards);
   Garage.update(garageInfo());
   markCard();
   scheduleCheck(0);
+}
+
+// ArduPilot's optional hardware that SITL simulates itself: switched on in the
+// run file ([sitl] devices), not modelled by the vehicle.
+function sitlDevicesCard() {
+  const all = catalog.sitl_devices || { devices: {}, unsupported: {} };
+  const fitted = new Set(frame().parts.filter((p) => p.table && level(p).id !== "off").map((p) => p.id));
+  const rows = Object.entries(all.devices).map(([id, d]) => {
+    const modelled = fitted.has(id);
+    const box = el("input", { type: "checkbox", id: `dev-${id}`, checked: state.sitlDevices.has(id) && !modelled,
+      disabled: modelled, onchange: (e) => { e.target.checked ? state.sitlDevices.add(id) : state.sitlDevices.delete(id);
+                                             scheduleCheck(); } });
+    return el("li", { class: modelled ? "muted" : "" }, box,
+      el("label", { for: `dev-${id}` }, el("strong", {}, d.title), " ",
+        el("small", {}, modelled ? "modelled by the vehicle (its payload card)" :
+          d.notes + (d.build ? ` Needs ${d.build}.` : ""))));
+  });
+  return el("section", { class: "card", "data-part": "sitl_devices" },
+    el("h2", {}, "SITL devices", el("span", { class: "tag" }, `${Object.keys(all.devices).length} on offer`)),
+    el("p", { class: "about" }, "The rest of ArduPilot's optional hardware: devices ArduPilot SITL simulates itself " +
+      "(from the vehicle's truth) or that need no simulation. Each sets its parameters and serial ports in the run."),
+    el("ul", { class: "devices" }, rows),
+    el("details", {}, el("summary", {}, `Not simulated (${Object.keys(all.unsupported).length})`),
+      el("ul", { class: "gaps" }, Object.values(all.unsupported).map((t) => el("li", {}, t)))));
 }
 
 // What the garage draws and says: the parts, their levels and picks.
@@ -552,6 +606,9 @@ function choice() {
   const home = $("sitl-home").value.split(",").map((s) => parseFloat(s.trim()));
   const sitl = { name: $("sitl-name").value.trim(), speedup: parseFloat($("sitl-speedup").value) || 1 };
   if (home.length === 4 && home.every(Number.isFinite)) sitl.home = home;
+  const fitted = new Set(frame().parts.filter((p) => p.table && level(p).id !== "off").map((p) => p.id));
+  const devs = [...state.sitlDevices].filter((d) => !fitted.has(d));
+  if (devs.length) sitl.devices = devs;
   const values = {};
   for (const [k, v] of Object.entries(state.values)) if (v !== "") values[k] = v;
   return { airframe: state.airframe, model_name: state.model_name, levels: state.levels,

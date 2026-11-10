@@ -105,6 +105,9 @@ def parse_value(text: str, label: str):
     try:
         return tomllib.loads(f"v = {text}")["v"]
     except tomllib.TOMLDecodeError as e:
+        # A bare word is a string: an orientation (down) or a part id.
+        if re.fullmatch(r"[A-Za-z_][\w.-]*", text.strip()):
+            return text.strip()
         raise ValueError(f"{label}: not a TOML value ({e})") from None
 
 
@@ -163,11 +166,17 @@ def devices(cc: dict, kind: str, levels: list[str]) -> list[dict]:
     """Real parts of one sensor kind (parts/KIND/*.toml) and, per level, the
     parameters the composer derives from each datasheet (`fire-compose part`)."""
     out = []
-    for p in cc.get("parts", {}).get(kind, []):
+    found = cc.get("parts", {}).get(kind, [])
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(16) as pool:
+        runs = {(p["id"], level): pool.submit(
+                    subprocess.run, [str(compose_binary()), "part", kind, p["id"], "--level", level, "--json"],
+                    capture_output=True, text=True)
+                for p in found for level in levels}
+    for p in found:
         per_level = {}
         for level in levels:
-            r = subprocess.run([str(compose_binary()), "part", kind, p["id"], "--level", level, "--json"],
-                               capture_output=True, text=True)
+            r = runs[(p["id"], level)].result()
             if r.returncode:
                 continue
             rep = json.loads(r.stdout)
@@ -234,9 +243,12 @@ def catalog() -> dict:
         parts.append(imu_part(cc, mounts.get("imu", [])))
         parts += [sensor_part(cc, sensor, mounts.get(sensor, []))
                   for sensor in ("magnetometer", "barometer", "gnss")]
+        parts += [peripheral_part(cc, spec) for spec in cc.get("peripherals", [])
+                  if not (kind == "fixed_wing" and spec["name"] == "rpm")]
+        parts += [payload_part(cc, spec) for spec in cc.get("payloads", [])]
         airframes[name] = {"vehicle": kind, "model_name": doc.get("model_name", ""),
                            "parts": parts}
-    return {"airframes": airframes}
+    return {"airframes": airframes, "sitl_devices": sitl_devices()}
 
 
 # Headline figures of a real part, for the builder's part cards: (label,
@@ -264,6 +276,31 @@ STATS = {
                   ("Relative", "±{} Pa", "relative_accuracy_pa"), ("Rate", "{} Hz", "odr_max_hz")],
     "gnss": [("Position", "{} m CEP", "horizontal_cep_m"), ("Velocity", "{} m/s", "velocity_accuracy_mps"),
              ("Rate", "{} Hz", "nav_rate_max_hz"), ("Cold start", "{} s", "cold_start_s")],
+    "rangefinder": [("Range", "{}-{} m", "range_min_m range_max_m"), ("Range", "up to {} m", "range_max_m"),
+                    ("Rate", "{} Hz", "update_rate_hz"), ("Mass", "{} g", "mass_g")],
+    "airspeed": [("Resolution", "{} bit", "resolution_bits"), ("Error band", "±{} % span", "total_error_band_percent_span"),
+                 ("Zero point", "±{} Pa", "zero_point_accuracy_pa")],
+    "optical_flow": [("Field of view", "{}°", "fov_deg"), ("Max rate", "{} rad/s", "max_speed_rad_s"),
+                     ("From", "{} m", "min_height_m"), ("Mass", "{} g", "mass_g")],
+    "rpm": [("Max", "{} Hz", "max_frequency_hz"), ("Supply", "{}-{} V", "supply_voltage_v")],
+    "power_module": [("Current", "{} A ({} A burst)", "max_current_a burst_current_a"), ("Mass", "{} g", "mass_g")],
+    "temperature": [("Accuracy", "±{} °C", "accuracy_c"), ("Resolution", "{} °C", "resolution_c")],
+    "external_ahrs": [("Pitch/roll", "{}°", "pitch_roll_accuracy_dynamic_deg"), ("Heading", "{}°", "heading_accuracy_deg"),
+                      ("Rate", "{} Hz", "output_rate_hz_max"), ("Mass", "{} g", "mass_g")],
+    "visual_odometry": [("Drift", "{} %", "drift_percent"), ("Rate", "{} Hz", "output_rate_hz"), ("Mass", "{} g", "mass_g")],
+    "beacon": [("Accuracy", "±{} m", "position_accuracy_m"), ("Accuracy", "±{} m (2-D)", "position_accuracy_2d_m"),
+               ("Range", "{} m", "max_range_m"), ("Mass", "{} g", "mass_g")],
+    "precision_landing": [("View", "{}° x {}°", "fov_h_deg fov_v_deg"), ("Range", "{} m", "detection_range_max_m"),
+                          ("Rate", "{} Hz", "frame_rate_hz")],
+    "gimbal": [("Mass", "{} g", "mass_g"), ("Payload", "{} g", "payload_max_g")],
+    "gripper": [("Holds", "{} N", "holding_force_n"), ("Load", "{} kg", "max_load_kg"), ("Mass", "{} g", "mass_g")],
+    "winch": [("Load", "{} kg", "max_load_kg"), ("Line", "{} m", "line_length_m"), ("Mass", "{} g", "mass_g")],
+    "parachute": [("Canopy", "{} m", "canopy_diameter_m"), ("Cd", "{}", "drag_coefficient"),
+                  ("System", "{} g", "system_mass_g")],
+    "sprayer": [("Flow", "{} l/min", "flow_rate_lpm"), ("Mass", "{} g", "pump_mass_g")],
+    "landing_gear": [("Load", "{} kg", "max_load_kg"), ("Mass", "{} g", "mass_g")],
+    "tether": [("Length", "{} m", "max_tether_length_m"), ("Power", "{} W", "max_power_w")],
+    "generator": [("Power", "{} W", "rated_power_w"), ("Mass", "{} g", "mass_g")],
 }
 
 
@@ -277,7 +314,10 @@ def stats(kind: str, part_id: str) -> list[list[str]]:
     out = []
     for label, fmt, keys in STATS.get(kind, []):
         values = [sheet.get(k) for k in keys.split()]
-        if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+        if len(values) == 1 and isinstance(values[0], list) and fmt.count("{}") == 2:
+            values = values[0]
+        if (all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values)
+                and not any(o[0] == label for o in out)):
             out.append([label, fmt.format(*(f"{v:g}" for v in values))])
     return out
 
@@ -328,6 +368,63 @@ def sensor_part(cc: dict, sensor: str, mounts: list[dict]) -> dict:
                        "select": {f"models.{sensor}.model": spec["model"]}, "fields": fields})
     return {"id": sensor, "title": SENSOR_TITLE[sensor], "levels": levels, "fields": mounts,
             "devices": devices(cc, sensor, [lv["id"] for lv in levels])}
+
+
+# --- peripherals, payloads and SITL devices ------------------------------------
+
+# Field notes, for the keys a frontend shows.
+KEY_ABOUT = {
+    "position": "mount from the combined CG, body FRD [m], e.g. [0, 0, 0.05]",
+    "orientation": "boresight: down, forward, back, left, right, up",
+    "battery": "the pack: a battery part (tattu_4s_5200_35c) or { cells = 4, capacity = 5.2 }",
+    "supply": "the pack feeds the propulsion (multirotor P1-P4): true or false",
+    "smart": "a smart (SMBus) pack: true or false",
+    "target": "landing target, NED from home [m]",
+    "mass": "the load [kg]",
+}
+OFF = {"id": "off", "label": "Off", "select": {}, "fields": []}
+
+
+def _field(table: list[str], key: str) -> dict:
+    return {"path": [*table, key], "value": "", "default": "library default",
+            "description": KEY_ABOUT.get(key, "")}
+
+
+def peripheral_part(cc: dict, spec: dict) -> dict:
+    """A peripheral ([peripherals.KIND]): off, or one of its levels, with its devices."""
+    name, table = spec["name"], ["peripherals", spec["name"]]
+    levels = [{**OFF, "description": f"Not fitted. ArduPilot: {spec['ardupilot']}."}]
+    for lv in spec["levels"]:
+        levels.append({"id": lv["level"], "label": f"{lv['level']} {lv['model']}",
+                       "description": lv["description"] + ".",
+                       "select": {f"peripherals.{name}.model": lv["model"]},
+                       "fields": [_field(table, k) for k in lv["keys"] if k not in ("model", "level")]})
+    return {"id": name, "title": spec["title"], "group": "Peripherals", "table": table,
+            "levels": levels, "devices": devices(cc, name, [lv["level"] for lv in spec["levels"]])}
+
+
+def payload_part(cc: dict, spec: dict) -> dict:
+    """A payload ([payloads.KIND]): off or fitted, with its devices."""
+    name, table = spec["name"], ["payloads", spec["name"]]
+    servos = spec["servo_functions"]
+    about = (f"{spec['description'][0].upper()}{spec['description'][1:]}. ArduPilot: {spec['ardupilot']}"
+             + (f"; servo function{'s' if len(servos) > 1 else ''} {', '.join(map(str, servos))} on SERVO9 and up."
+                if servos else "; a power source for the power module's pack."))
+    levels = [{**OFF, "description": f"Not fitted. ArduPilot: {spec['ardupilot']}."},
+              {"id": "on", "label": "Fitted", "description": about, "select": {},
+               "fields": [_field(table, k) for k in ["position", *spec["keys"]]]}]
+    return {"id": name, "title": spec["title"], "group": "Payloads", "table": table,
+            "levels": levels, "devices": devices(cc, name, ["on"])}
+
+
+def sitl_devices() -> dict:
+    """ArduPilot's optional hardware SITL simulates ([sitl] devices; runtime/hosts/ardupilot/devices.py)."""
+    import importlib.util
+    path = ROOT / "runtime" / "hosts" / "ardupilot" / "devices.py"
+    spec = importlib.util.spec_from_file_location("ardupilot_devices", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.catalog()
 
 
 def imu_part(cc: dict, mounts: list[dict]) -> dict:
@@ -392,6 +489,22 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
         level = next((lv for lv in part["levels"]
                       if lv["id"] == choice.get("levels", {}).get(part["id"])), part["levels"][0])
         device = choice.get("devices", {}).get(part["id"])
+        if part.get("table"):
+            # A peripheral or payload: off, or its table with a level and device.
+            if level["id"] == "off":
+                continue
+            doc = physics
+            for key in part["table"]:
+                doc = doc.setdefault(key, {})
+            if device and any(d["id"] == device for d in part.get("devices", [])):
+                doc["part"] = device
+                if level["id"] != "on":
+                    doc["level"] = level["id"]
+            else:
+                for dotted, value in level["select"].items():
+                    put(physics, dotted.split("."), value)
+            allowed |= {".".join(f["path"]) for f in level["fields"]}
+            continue
         picked = {s["key"]: choice["slots"][part["id"]][s["key"]] for s in part.get("slots", [])
                   if any(o["id"] == choice.get("slots", {}).get(part["id"], {}).get(s["key"])
                          for o in s["options"])}

@@ -115,6 +115,40 @@ const Garage = (() => {
 
   const DRAW = { quad, rover, plane };
 
+  // --- peripherals and payloads ------------------------------------------------------
+  // Drawn when fitted: a labelled module each, sensors in one bay and payloads
+  // in another, in the catalog's order, clear of the airframe.
+  const LABEL = { rangefinder: "RANGE", airspeed: "PITOT", optical_flow: "FLOW", rpm: "RPM",
+    power_module: "POWER", temperature: "TEMP", external_ahrs: "AHRS", visual_odometry: "VIO",
+    beacon: "UWB", precision_landing: "IR-LOCK", gripper: "GRIPPER", winch: "WINCH",
+    parachute: "CHUTE", sprayer: "SPRAYER", landing_gear: "GEAR", gimbal: "GIMBAL",
+    tether: "TETHER", generator: "GENSET" };
+  const grid = (x0, y0, cols, rows, dx, dy) => {
+    const out = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push([x0 + c * dx, y0 + r * dy]);
+    return out;
+  };
+  const BAYS = {   // [sensor slots, payload slots]
+    quad: [grid(150, 160, 2, 5, 58, 24), grid(594, 160, 2, 4, 58, 24)],
+    rover: [grid(250, 18, 5, 2, 62, 26), grid(250, 336, 5, 2, 62, 26)],
+    plane: [grid(450, 118, 4, 3, 62, 22), grid(450, 252, 4, 2, 62, 22)],
+  };
+  function modules(airframe, parts, levels) {
+    const [sensors, payloads] = BAYS[airframe];
+    let s = "", i = 0, j = 0;
+    for (const p of parts) {
+      if (!p.table || !levels[p.id] || levels[p.id].id === "off") continue;
+      const bay = p.group === "Payloads" ? payloads : sensors;
+      const slot = bay[p.group === "Payloads" ? j++ : i++];
+      if (!slot) continue;
+      const [x, y] = slot, w = 52, h = 18;
+      s += `<g ${a(p.id, true)}><rect class="${p.group === "Payloads" ? "g-payload" : "g-chip"}" x="${x}" y="${y}" ` +
+           `width="${w}" height="${h}" rx="4"/><text class="g-tiny g-in" x="${x + w / 2}" y="${y + 12.5}">` +
+           `${LABEL[p.id] || p.id}</text></g>`;
+    }
+    return s;
+  }
+
   // --- camera ---------------------------------------------------------------------
   // The stage's shape: the camera frames to it, so nothing is letterboxed.
   const ratio = () => (svg.clientWidth && svg.clientHeight ? svg.clientWidth / svg.clientHeight : VIEW[2] / VIEW[3]);
@@ -299,8 +333,10 @@ const Garage = (() => {
     svg.innerHTML = `<defs><radialGradient id="g-floor"><stop offset="0" class="g-floor-a"/>` +
       `<stop offset="1" class="g-floor-b"/></radialGradient></defs>` +
       `<ellipse cx="400" cy="214" rx="380" ry="196" fill="url(#g-floor)"/>` +
-      `<g class="g-vehicle">${DRAW[info.airframe](names)}</g>`;
-    if (changedFrame) { chipsFor(info.parts); focusKey = "overview"; }
+      `<g class="g-vehicle">${DRAW[info.airframe](names)}` +
+      `${modules(info.airframe, info.parts, info.levels)}</g>`;
+    chipsFor(info.parts.filter((x) => !(x.table && info.levels[x.id]?.id === "off")));
+    if (changedFrame) focusKey = "overview";
     light();
     cancelAnimationFrame(anim);
     view = frameOf(focusKey);  // a redraw keeps the camera on its part

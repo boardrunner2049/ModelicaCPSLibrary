@@ -74,6 +74,28 @@ system; the choice is remembered in the browser; `?theme=dark` for one page).
 The server listens on 127.0.0.1 only (`--host` to change) and refuses
 cross-origin POSTs.
 
+## Optional hardware
+
+Below the core parts, ArduPilot's [optional hardware](https://ardupilot.org/copter/docs/common-optional-hardware.html)
+in three groups, each off until picked:
+
+- **Peripherals** (`[peripherals.KIND]`, `Systems/Peripherals`): rangefinder,
+  airspeed, optical flow, RPM, power module and battery, temperature,
+  external AHRS, visual odometry, beacons, precision landing. Off, the ideal
+  level or the sampled level, a real device from `parts/KIND/`, and a mount
+  (`position`, `orientation`). The model computes the readings and SITL's
+  drivers report them.
+- **Payloads** (`[payloads.KIND]`, `Systems/Payloads`): gripper, winch,
+  parachute, sprayer, retractable gear, gimbal, power tether, generator.
+  Their servos are SERVO9 and up; their forces load the airframe.
+- **SITL devices** (`[sitl] devices`): the rest, which ArduPilot SITL
+  simulates itself or which need no simulation (ADS-B, relay, buttons,
+  buzzer, Remote ID, OSD, DroneCAN, ...), with what each needs. A device the
+  vehicle models as a payload is greyed out.
+
+Fitted peripherals and payloads appear in the garage as labelled modules
+(payloads dashed), and their chips take the camera to them.
+
 ## Where the parts come from
 
 Nothing is restated here (`parts.py`):

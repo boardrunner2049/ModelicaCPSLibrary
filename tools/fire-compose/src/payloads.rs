@@ -504,11 +504,11 @@ pub fn expand(root: &mut Table, reports: &mut Vec<Json>) -> Result<()> {
         let mut parameters = serde_json::Map::new();
         for (k, v) in &params {
             if sel.contains_key(k) {
-                parameters.insert(k.clone(), json!({"value": "explicit in the configuration"}));
+                parameters.insert(k.clone(), json!({"value": "explicit in the configuration", "how": "", "from": []}));
                 continue;
             }
             let why = how.iter().find(|(h, _)| h == k || h.starts_with(k)).map(|h| h.1.clone()).unwrap_or_default();
-            parameters.insert(k.clone(), json!({"value": v, "how": why}));
+            parameters.insert(k.clone(), json!({"value": v, "how": why, "from": []}));
             sel.insert(k.clone(), v.clone());
         }
         reports.push(json!({
