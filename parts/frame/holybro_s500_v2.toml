@@ -10,8 +10,7 @@ alone or the ARTF kit (with motors, ESCs and props). The same page's JSON-LD giv
 The arms are plastic (polyamide-nylon composite reinforced with carbon fibre rod), not carbon tubes.
 """
 
-source = { title = "Holybro S500 V2 Quadcopter Frame Kit (Flyingtech product page); cross-checked with PX4 User Guide 'Holybro S500 V2 + Pixhawk 4 Build' (v1.14)", revision = "not stated on pages; accessed 2026-11-09", url = "https://www.flyingtech.co.uk/product/holybro-s500-v2-quadcopter-frame-kit/", url_secondary = "https://docs.px4.io/v1.14/en/frames_multicopter/holybro_s500_v2_pixhawk4" }
-
+source = "Holybro S500 V2 Quadcopter Frame Kit (Flyingtech product page); cross-checked with PX4 User Guide 'Holybro S500 V2 + Pixhawk 4 Build' (v1.14), not stated on pages; accessed 2026-11-09, https://www.flyingtech.co.uk/product/holybro-s500-v2-quadcopter-frame-kit/"
 wheelbase_mm = 480                # Flyingtech, "S500 V2 ARF Kit Contents": "Wheelbase:480mm"; PX4 guide hardware table: "Wheelbase: 480mm"
 frame_mass_g = 782                # Flyingtech, "S500 V2 ARF Kit Contents": "Weight:782g" (scope not stated; see notes)
 arm_count = 4                     # PX4 guide, Kit contents hardware table (arms, quantity 4)

@@ -8,8 +8,7 @@ The manual's Specifications table gives no arm dimensions or materials.
 Retrieved from a third-party mirror (buzzflyer.co.uk) of the DJI PDF.
 """
 
-source = { title = "FlameWheel450 User Manual", revision = "V 1.6 (copyright 2010-2011)", url = "https://www.buzzflyer.co.uk/manuals/dji-hobby-f450-manual.pdf" }
-
+source = "FlameWheel450 User Manual, V 1.6 (copyright 2010-2011), https://www.buzzflyer.co.uk/manuals/dji-hobby-f450-manual.pdf"
 wheelbase_mm = 450                # Specifications (p.7) > Frame: "Diagonal Wheelbase 450mm"
 frame_mass_g = 282                # Specifications (p.7) > Frame: "Frame Weight 282g" (manual does not say what is included)
 takeoff_mass_g_min = 800          # Specifications (p.7) > Frame: "Takeoff Weight 800g ~ 1600g"

@@ -60,6 +60,20 @@ def run_file(sitl_name: str, physics: str, speedup: int = 4) -> str:
     return f'[sitl]\nname = "{sitl_name}"\nspeedup = {speedup}\n\n{body}\n'
 
 
+TUBE = """[mass]
+mode = "assembled"
+[mass.core]
+mass = 1.43
+inertia = [[0.018, 0.0, 0.0], [0.0, 0.018, 0.0], [0.0, 0.0, 0.036]]
+[mass.arm]
+part = "easycomposites_cf_tube_16x14"
+"""
+
+
+def max_tilt(log: str) -> float:
+    return float(re.search(r"max tilt ([\d.]+) deg", log).group(1))
+
+
 class StaticSanity(unittest.TestCase):
     def validate(self, text: str, table: str | None = None) -> subprocess.CompletedProcess:
         with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as f:
@@ -79,6 +93,15 @@ class StaticSanity(unittest.TestCase):
         bad = self.validate(base.replace('preset = "QuadX"', 'preset = "QuadX"\narmLength = 0.2'), "physics")
         self.assertNotEqual(bad.returncode, 0)
         self.assertIn("overlap", bad.stderr)
+
+    def test_arms_that_bend_or_break_are_refused(self):
+        # 16x14 mm carbon tube (64 GPa, 650 MPa) under 10 N of thrust: 1.0 m bends
+        # 3.9 % (allowed), 1.5 m 13 % (over the 5 % limit), 12 m breaks.
+        self.assertEqual(self.validate(quad("Sane", "armLength = 1.0", TUBE)).returncode, 0)
+        bent = self.validate(quad("Sane", "armLength = 1.5", TUBE))
+        self.assertIn("bends", bent.stderr)
+        broken = self.validate(quad("Sane", "armLength = 12.0", TUBE + "maxArmDeflection = 100.0\n"))
+        self.assertIn("breaks", broken.stderr)
 
     def test_placed_items_cannot_outweigh_the_vehicle(self):
         r = self.validate(quad("Sane", extra="").replace(
@@ -150,6 +173,14 @@ class FlightSanity(unittest.TestCase):
         tilt = max(math.degrees(math.acos(max(-1, min(1, math.cos(float(r["roll"])) * math.cos(float(r["pitch"]))))))
                    for r in rows)
         self.assertGreater(tilt, 45, "it should fall over on the ground")
+
+    def test_long_rigid_arms_fly_worse(self):
+        # Rigid-body trend (the deflection limit lifted on purpose): authority
+        # grows with the arm, inertia with its cube, so a 4 m frame overshoots.
+        short = self.fly("sanity_arm_short", quad("SanityArmShort", "armLength = 0.25", TUBE))
+        long = self.fly("sanity_arm_long", quad("SanityArmLong", "armLength = 4.0", TUBE + "maxArmDeflection = 100.0\n"))
+        self.assertIn("PASSED", short)
+        self.assertGreater(max_tilt(long), max_tilt(short) + 10, f"{max_tilt(short)} vs {max_tilt(long)}")
 
     def test_thrust_below_weight_does_not_leave_the_ground(self):
         # P0 rotors: 4 x kT omegaMax^2 = 4 x 1e-5 x 1000^2 = 40 N; 5 kg weighs 49 N.

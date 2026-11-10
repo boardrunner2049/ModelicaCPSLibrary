@@ -105,11 +105,17 @@ datasheet diameter is `geometry.propellerDiameter`, and propellers whose
 discs overlap are refused. In assembled mode, `[mass.arm] part =
 "easycomposites_cf_tube_16x14"` (parts/arm_tube/), or `massPerLength` with
 `tubeDiameter`, makes each arm a thin-walled tube from the reference to its
-rotor: its mass and inertia follow the frame's size.
+rotor: its mass and inertia follow the frame's size. With the tube's inner
+diameter, modulus and strength (an arm_tube part has them), each arm is checked
+as a cantilever with its rotor's full thrust at the tip (the propulsion's
+top speed, an upper bound): refused when the bending stress exceeds the
+strength, or when the tip deflects more than `maxArmDeflection` of the arm
+(default 5 %, a chosen limit). The figures are in the arm tube's report.
 
 Sanity: `python3 -m unittest tools/test_sanity.py` (static), and with
 `FIRE_TEST_SITL=1` the flights: the baseline flies, a CG outside the rotors
-tips over and never flies, thrust below weight never leaves the ground.
+tips over and never flies, thrust below weight never leaves the ground,
+long rigid arms fly worse (more tilt), arms that bend or break are refused.
 
 ## Real parts
 

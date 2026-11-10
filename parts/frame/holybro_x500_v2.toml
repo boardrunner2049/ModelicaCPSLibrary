@@ -8,8 +8,7 @@ The page does not say what the 610 g "Weight" covers (frame only, or the kit wit
 and props listed under "Included items"). Use it as frame mass with care.
 """
 
-source = { title = "PX4 Development Kit - X500 V2 (Holybro Docs)", revision = "not stated on page; accessed 2026-11-09", url = "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2" }
-
+source = "PX4 Development Kit - X500 V2 (Holybro Docs), not stated on page; accessed 2026-11-09, https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2"
 wheelbase_mm = 500                # "Mechanical Specification": "Wheelbase: 500mm"
 frame_mass_g = 610                # "Mechanical Specification": "Weight: 610g" (scope not stated; see notes)
 arm_tube_od_mm = 16               # "X500 V2 Frame Kit Details (SKU30120)": "16mm carbon fiber tubes" (arms)

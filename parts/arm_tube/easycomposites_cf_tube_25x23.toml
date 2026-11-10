@@ -8,8 +8,7 @@ All figures are from the product page's Specification table. The page's FAQ give
 which conflicts with the table.
 """
 
-source = { title = "25mm (23mm) Woven Finish Roll Wrapped Carbon Fibre Tube (Easy Composites product page)", revision = "not stated on page; accessed 2026-11-09", url = "https://www.easycomposites.co.uk/25mm-23mm-woven-finish-carbon-fibre-tube" }
-
+source = "25mm (23mm) Woven Finish Roll Wrapped Carbon Fibre Tube (Easy Composites product page), not stated on page; accessed 2026-11-09, https://www.easycomposites.co.uk/25mm-23mm-woven-finish-carbon-fibre-tube"
 od_mm = 25                        # Specification table: "Outside Diameter (OD)"
 id_mm = 23                        # Specification table: "Inside Diameter (ID)"
 wall_mm = 1                       # Specification table: "Wall Thickness 1 mm"

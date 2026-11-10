@@ -285,6 +285,77 @@ fn part(v: &Value, label: &str, position: [f64; 3]) -> Result<Value> {
     Ok(Value::Table(p))
 }
 
+/// Arm structure: each arm a cantilevered tube with its rotor's full thrust
+/// at the tip (the propulsion model's top speed, no load: an upper bound).
+/// Refused when the bending stress exceeds the tube's strength, or when the
+/// tip deflects more than maxArmDeflection of the arm's length (default 5 %,
+/// a chosen limit). The figures go into the arm tube's report (`checks`).
+fn check_arms(c: &mut ResolvedFireConfig) -> Result<()> {
+    if c.vehicle != "multirotor" {
+        return Ok(());
+    }
+    let Some(st) = c.mass.get("armStructure").and_then(Value::as_table) else {
+        return Ok(());
+    };
+    let f = |t: &Table, k: &str| t.get(k).and_then(|v| v.as_float().or(v.as_integer().map(|n| n as f64)));
+    let (Some(od), Some(id), Some(e)) = (f(st, "tubeDiameter"), f(st, "tubeInnerDiameter"), f(st, "tubeModulus")) else {
+        return Ok(());
+    };
+    let strength = f(st, "tubeStrength");
+    let limit = f(st, "maxArmDeflection").unwrap_or(0.05);
+    let area_moment = std::f64::consts::PI * (od.powi(4) - id.powi(4)) / 64.0;
+    let at = |t: &Table, k: &str, i: usize| {
+        t.get(k).and_then(|v| v.as_array()).and_then(|a| a.get(i)).and_then(|v| v.as_float().or(v.as_integer().map(|n| n as f64)))
+    };
+    let nr = c.geometry["nRotors"].as_integer().unwrap() as usize;
+    let mut lines = Vec::new();
+    for i in 0..nr {
+        // Top speed: P0's omegaMax; else the supply over the back-EMF constant.
+        let v = f(&c.power, "dcVoltage");
+        let omega = at(&c.motor, "omegaMax", i)
+            .or_else(|| Some(at(&c.motor, "Kv", i)? * v?))
+            .or_else(|| Some(v? / at(&c.motor, "k", i)?))
+            .or_else(|| Some(v? / (2.0 * at(&c.motor, "ke", i)?)));
+        let (Some(omega), Some(kt)) = (omega, at(&c.rotor, "kT", i)) else {
+            lines.push("arm check skipped: the propulsion's top speed is not known".to_string());
+            break;
+        };
+        let thrust = kt * omega * omega;
+        let tip = &c.geometry["rotorPosition_C"][i];
+        let x = |k: usize| tip[k].as_float().unwrap_or(0.0);
+        let length = (x(0) * x(0) + x(1) * x(1)).sqrt();
+        let deflection = thrust * length.powi(3) / (3.0 * e * area_moment);
+        let stress = thrust * length * (od / 2.0) / area_moment;
+        if i == 0 {
+            lines.push(format!(
+                "arm {:.3} m, full thrust {:.1} N at the tip: deflection {:.1} mm ({:.1} % of the arm, limit {:.0} %), \
+                 bending stress {:.0} MPa{}",
+                length, thrust, deflection * 1e3, 100.0 * deflection / length, 100.0 * limit, stress / 1e6,
+                strength.map(|s| format!(" (strength {:.0} MPa)", s / 1e6)).unwrap_or_default()
+            ));
+        }
+        if let Some(s) = strength {
+            if stress > s {
+                return Err(format!(
+                    "mass.arm: arm {} breaks at full thrust: bending stress {:.0} MPa over the tube's {:.0} MPa (arm {:.2} m, {:.1} N)",
+                    i + 1, stress / 1e6, s / 1e6, length, thrust
+                ));
+            }
+        }
+        if deflection > limit * length {
+            return Err(format!(
+                "mass.arm: arm {} bends {:.0} mm at full thrust, {:.1} % of its {:.2} m (limit maxArmDeflection {:.0} %): \
+                 a shorter arm or a stiffer tube",
+                i + 1, deflection * 1e3, 100.0 * deflection / length, length, 100.0 * limit
+            ));
+        }
+    }
+    if let Some(r) = c.parts.iter_mut().rev().find(|r| r["kind"] == "arm_tube") {
+        r["checks"] = serde_json::json!(lines);
+    }
+    Ok(())
+}
+
 /// Frame parts: `[geometry] frame = PART` sets armLength to half the
 /// wheelbase (the motor-to-motor diagonal); `[mass.arm] part = PART` (an arm
 /// tube) sets massPerLength and tubeDiameter. Explicit keys win.
@@ -316,13 +387,23 @@ fn expand_frame(root: &mut Table, reports: &mut Vec<serde_json::Value>) -> Resul
         arm.remove("part");
         arm.entry("massPerLength").or_insert(Value::Float(lambda));
         arm.entry("tubeDiameter").or_insert(Value::Float(od));
+        if let Some(id_mm) = num(&part, "id_mm") {
+            arm.entry("tubeInnerDiameter").or_insert(Value::Float(id_mm / 1000.0));
+        }
+        if let Some(e) = num(&part, "tensile_modulus_gpa") {
+            arm.entry("tubeModulus").or_insert(Value::Float(e * 1e9));
+        }
+        if let Some(sigma) = num(&part, "tensile_strength_mpa") {
+            arm.entry("tubeStrength").or_insert(Value::Float(sigma * 1e6));
+        }
         reports.push(json!({
             "kind": "arm_tube", "part": id, "name": part.get("name").and_then(Value::as_str).unwrap_or(&id),
             "source": part.get("source").and_then(Value::as_str).unwrap_or(""), "level": "assembled", "model": "arm",
             "parameters": {
                 "massPerLength": {"value": lambda, "how": "weight per metre", "from": ["mass_per_length_g_per_m"]},
                 "tubeDiameter": {"value": od, "how": "outside diameter", "from": ["od_mm"]}},
-            "assumed": ["the arm is the bare tube from the reference to the rotor (no connectors, clamps or wiring)"],
+            "assumed": ["the arm is the bare tube from the reference to the rotor (no connectors, clamps or wiring)",
+                        "the lengthwise tensile modulus and strength serve for bending (flexural figures not stated)"],
             "not_stated": {}, "not_represented": {},
         }));
     }
@@ -649,7 +730,8 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
         out.insert("core".into(), part(&m["core"], "mass.core", [0.; 3])?);
         let mut arm = table(
             &m["arm"],
-            &["mass", "inertia", "R_Cj", "componentIds", "massPerLength", "tubeDiameter"],
+            &["mass", "inertia", "R_Cj", "componentIds", "massPerLength", "tubeDiameter",
+              "tubeInnerDiameter", "tubeModulus", "tubeStrength", "maxArmDeflection"],
             "mass.arm",
         )?
         .clone();
@@ -669,6 +751,21 @@ fn mass(raw: &Value, g: &Table) -> Result<Table> {
             .transpose()?;
         if per_length.is_some() != tube.is_some() {
             return Err("mass.arm: massPerLength goes with tubeDiameter (the arm tube's outside diameter)".into());
+        }
+        // The tube's section and material, for the stiffness and strength checks.
+        let mut structure = Table::new();
+        for (key, positive) in [("tubeInnerDiameter", false), ("tubeModulus", true), ("tubeStrength", true),
+                                ("maxArmDeflection", true)] {
+            if let Some(v) = arm.remove(key) {
+                number(&v, &format!("mass.arm.{key}"), positive, !positive)?;
+                structure.insert(key.into(), v);
+            }
+        }
+        if let Some(d) = tube {
+            structure.insert("tubeDiameter".into(), Value::Float(d));
+        }
+        if !structure.is_empty() {
+            out.insert("armStructure".into(), Value::Table(structure));
         }
         let na = g["nArms"].as_integer().unwrap() as usize;
         let ids = arm.remove("componentIds").unwrap_or_else(|| {
@@ -785,6 +882,7 @@ pub fn parse_at(source: &str, path: Option<&str>) -> Result<ResolvedFireConfig> 
     };
     let mut c = resolve_root(Value::Table(expanded))?;
     c.parts = parts;
+    check_arms(&mut c)?;
     Ok(c)
 }
 
@@ -1488,5 +1586,36 @@ mod frame_part_tests {
         let arm = c.mass["arms"][0]["mass"].as_float().unwrap();
         assert!((arm - 0.0742 * 0.25).abs() < 1e-12, "74.2 g/m x 0.25 m: {arm}");
         assert!(c.parts.iter().any(|p| p["kind"] == "frame") && c.parts.iter().any(|p| p["kind"] == "arm_tube"));
+    }
+}
+
+#[cfg(test)]
+mod arm_structure_tests {
+    fn quad(arm: f64, extra: &str) -> crate::Result<super::ResolvedFireConfig> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/quad.toml");
+        let raw = std::fs::read_to_string(root).unwrap();
+        let (a, b) = (raw.find("[mass]").unwrap(), raw.find("[motor]").unwrap());
+        let raw = format!(
+            "{}[mass]\nmode = \"assembled\"\n[mass.core]\nmass = 1.2\ninertia = [[0.01,0,0],[0,0.01,0],[0,0,0.02]]\n\
+             [mass.arm]\npart = \"easycomposites_cf_tube_16x14\"\n{extra}\n{}",
+            &raw[..a], &raw[b..]
+        )
+        .replace("preset = \"QuadX\"", &format!("preset = \"QuadX\"\narmLength = {arm}"));
+        super::parse_at(&raw, None)
+    }
+
+    #[test]
+    fn arms_that_bend_or_break_are_refused() {
+        // 16x14 mm, 64 GPa: I = pi (16^4 - 14^4)/64 mm^4; full thrust 1e-5 x 1000^2 = 10 N.
+        let i = std::f64::consts::PI * (0.016f64.powi(4) - 0.014f64.powi(4)) / 64.0;
+        let bend = |l: f64| 10.0 * l.powi(3) / (3.0 * 64e9 * i);
+        let ok = quad(0.25, "").unwrap();
+        let line = ok.parts.iter().find(|p| p["kind"] == "arm_tube").unwrap()["checks"][0].as_str().unwrap().to_string();
+        assert!(line.contains(&format!("{:.1} mm", bend(0.25) * 1e3)), "{line}");
+        let e = quad(1.5, "").unwrap_err();
+        assert!(e.contains("bends"), "{e}");
+        assert!(quad(1.5, "maxArmDeflection = 0.5").is_ok(), "a looser limit");
+        let e = quad(12.0, "maxArmDeflection = 100.0").unwrap_err();
+        assert!(e.contains("breaks"), "{e}");
     }
 }
