@@ -405,7 +405,20 @@ cpv_open -> [cpv_set_parameter] -> cpv_initialize -> { set inputs; cpv_advance_t
 runtime/tests/run_conformance.sh          # builds FMUs, descriptors, shims, runtime (ASan/UBSan) and runs all
 python3 -m unittest tools/vehicle_interface/tests/test_checker.py
 cargo test --manifest-path tools/fire-compose/Cargo.toml
+python3 -m unittest tools/test_sanity.py                     # FIRE_TEST_SITL=1: also the SITL flights
 ```
+
+- **Peripherals, payloads, placements** (`cargo test`): every kind composes
+  and exports its capability; levels, keys and orientations are checked;
+  payload servos take aux channels in order; every library parameter of
+  `Systems/Peripherals`, `Systems/Payloads` and `Power.Battery` carries a
+  provenance tag, and a part's figures read as its datasheet's; a placed
+  battery moves the CG and inertia as the parallel-axis theorem says; arm
+  length, frame and arm-tube parts size and weigh the arms; arms that bend
+  or break and overlapping propellers are refused.
+- **Sanity** (`tools/test_sanity.py`): static refusals, and in SITL the
+  baseline flies, a CG outside the rotors tips over and never flies, thrust
+  below weight never leaves the ground, and long rigid arms fly worse.
 
 - **Composer** (`tools/fire-compose/src/vehicle.rs`): every rover and
   fixed-wing key is a parameter the Modelica plant, record or export
@@ -508,7 +521,24 @@ cargo test --manifest-path tools/fire-compose/Cargo.toml
   `earth_field_north_T`, `_east_T`, `_down_T`); the atmosphere is the ISA
   troposphere from the pressure and temperature at the origin.
 - Contact coupling, wind and other environment inputs beyond the external
-  wrench are future capabilities.
+  wrench are future capabilities (airspeed and parachute drag see no wind).
+- Peripherals and payloads: a part's figures are converted with recorded
+  provenance and the conversions are unit-tested in part, but no test yet
+  checks that a simulated device reproduces its datasheet (noise, resolution,
+  rate, limits, drift) except the motors against their bench tables. A "±x"
+  accuracy is read as 2 sigma; most datasheets do not define it.
+- In aggregate mass mode arms have no mass of their own: the frame's size
+  changes leverage only. Assembled mode with an arm tube adds the arms' mass
+  and inertia; the arms stay rigid in flight (bending is a static check).
+- Payload masses that empty (sprayer liquid, generator fuel) load the vehicle
+  as weight only; loads are point masses on elastic lines; the gimbal has no
+  reaction torque; the retracted gear keeps its ground contact.
+- ArduPilot host: the precision-landing camera is taken to look down; the
+  external AHRS is a sensor beside the EKF (navigating on it trips a
+  floating-point exception in 4.6.2's SITL arming checks); visual odometry
+  and beacons are fused as EKF source sets 2 and 3. Peripherals and payloads
+  are flown in SITL on the quad; rover and fixed-wing compose and conform
+  but are not flown with them.
 - Linking models (`CPV_MODELS`) needs GNU binutils (`ld -r`, `objcopy`) and is
   tested on Linux only; a linked model with resources refers to them by the
   absolute path of the prepared directory.

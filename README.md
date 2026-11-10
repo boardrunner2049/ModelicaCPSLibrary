@@ -29,7 +29,39 @@ the vehicle on a stationary horizontal plane. Set `landingGear(enabled=false)` f
 through the plane. P1 adds an ideal voltage-only ESC and voltage-to-speed surrogate.
 P2 adds inductive motor current, torque and load feedback. P3/P4 add three-phase
 commutation and a shared DC link, with averaged or switched inverters. General terrain,
-drag, battery chemistry/SOC and protocol models remain outside the active path.
+drag and protocol models remain outside the active path; a battery pack with its
+state of charge comes with a power module (below).
+
+## Optional hardware, real parts, and flying it
+
+- **Peripherals** ([`Systems/Peripherals`](Systems/Peripherals/README.md)): the
+  sensors on ArduPilot's [optional hardware](https://ardupilot.org/copter/docs/common-optional-hardware.html)
+  page (rangefinder, airspeed, optical flow, RPM, power module and battery,
+  temperature, external AHRS, visual odometry, beacons, precision landing),
+  each with an ideal and a sampled level: `[peripherals.KIND]`.
+- **Payloads** ([`Systems/Payloads`](Systems/Payloads/README.md)): gripper,
+  winch, parachute, sprayer, retractable gear, gimbal, power tether,
+  generator, loading the airframe and driven by the autopilot's servos:
+  `[payloads.KIND]`.
+- **Real parts** ([`parts/`](parts/README.md)): devices from their datasheets
+  (sensors, powertrain, peripherals, payloads, frames, arm tubes), converted
+  to model parameters with every figure's provenance
+  ([`tools/fire-compose`](tools/fire-compose/README.md): `fire-compose part`).
+- **Where things sit** ([`tools/fire-compose`](tools/fire-compose/README.md#where-things-sit)):
+  frame size, sensor mounts, mass placements, arm tubes checked for bending
+  and strength, propellers checked for overlap.
+- **ArduPilot SITL** ([`runtime/hosts/ardupilot`](runtime/hosts/ardupilot/README.md)):
+  one TOML to a flying vehicle; the model's sensors, peripherals and payloads
+  reach ArduPilot's own drivers; the rest of the optional hardware that SITL
+  simulates itself is a run's `[sitl] devices`.
+- **Compose** ([`tools/compose`](tools/compose/README.md)): a web page to pick
+  a vehicle's parts, levels and devices, move them in a drawing, see each
+  value's provenance, and fly it.
+- **Differential testing**: [inception](https://github.com/Arslan8/inception)
+  with the specs in [`tools/difftest`](tools/difftest/README.md).
+- **Sanity tests** (`tools/test_sanity.py`): what must hold physically (an
+  unbalanced or underpowered vehicle does not fly, bending or overlapping
+  arms are refused); `FIRE_TEST_SITL=1` adds the SITL flights.
 
 ## Sensor fidelity (2026-10-28, revised)
 
