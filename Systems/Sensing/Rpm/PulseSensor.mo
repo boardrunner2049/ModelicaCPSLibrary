@@ -19,8 +19,6 @@ model PulseSensor "E1: pulses from a phase-continuous shaft: exact edge count, l
   Real cycles(start=phaseOffset, fixed=true) "Pulse phase: rising edge k at cycles = k";
 protected
   discrete Integer rngState[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0, each fixed=true);
-  discrete Integer rngSeed[Modelica.Math.Random.Generators.Xorshift128plus.nState](each start=0, each fixed=true);
-  discrete Real normal[1](each start=0, each fixed=true);
   discrete Real previousEdgeTime(start=-1, fixed=true);
 initial equation
   assert(phaseOffset >= 0 and phaseOffset < 1 and edgeJitterStd >= 0 and timeout > 0, "Invalid pulse sensor parameters");
@@ -28,10 +26,9 @@ equation
   der(cycles) = abs(speed)*pulsesPerRevolution/(2*Modelica.Constants.pi);
   when cycles >= pre(count) + 1 then
     count = pre(count) + 1;
-    rngSeed = ModelicaCPSLibrary.Systems.Sensing.seededState(pre(rngState), pre(count) > 0, streamId, seed);
-    (normal, rngState) = ModelicaCPSLibrary.Systems.Sensing.normalDraw(1, rngSeed);
+    // The draw and its use in one equation (see reportedEdge).
+    (lastEdgeTime, rngState) = reportedEdge(time, edgeDelay, edgeJitterStd, pre(rngState), pre(count) > 0, streamId, seed);
     previousEdgeTime = pre(lastEdgeTime);
-    lastEdgeTime = time + edgeDelay + edgeJitterStd*normal[1];
     // A shift by concatenation: Rumoca rejects the equivalent for-loop in a
     // state-event clause.
     edgeTimes = cat(1, {lastEdgeTime}, pre(edgeTimes[1:bufferSize - 1]));
