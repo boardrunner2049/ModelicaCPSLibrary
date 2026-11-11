@@ -39,6 +39,12 @@ def _rumoca() -> Path:
     return Path(found)
 
 
+def rel(path) -> str:
+    """A path relative to the library root when it is inside it, else absolute."""
+    p = Path(path).resolve()
+    return str(p.relative_to(LIBRARY_ROOT)) if p.is_relative_to(LIBRARY_ROOT) else str(p)
+
+
 def file_sha256(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

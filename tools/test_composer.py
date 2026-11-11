@@ -52,6 +52,11 @@ class RustComposerTests(unittest.TestCase):
                 resolved = json.loads(run.stdout)
                 self.assertEqual(resolved['schema_version'], 3)
                 self.assertEqual(resolved['acquisition'], 'continuous')
+                if resolved['vehicle'] != 'multirotor':
+                    # Rover and fixed-wing defaults live in their Modelica
+                    # models; the multirotor frame assertions below do not apply.
+                    self.assertIn(resolved['vehicle'], ('rover', 'fixed_wing'))
+                    continue
                 self.assertLess(resolved['initial']['p_start'][2], 0)
                 self.assertEqual(resolved['geometry']['R_br'][0], [[1,0,0],[0,-1,0],[0,0,-1]])
                 self.assertLess(resolved['geometry']['armMount'][0][1], 0)

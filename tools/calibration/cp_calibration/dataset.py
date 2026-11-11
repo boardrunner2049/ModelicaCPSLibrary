@@ -117,3 +117,30 @@ def read(path: Path, expect: dict | None = None) -> Dataset:
     cols, ref_cols, _ = KINDS[meta.get("kind", "barometer")]
     return Dataset(base.name, readings_path, meta, _read_csv(readings_path, cols),
                    _read_csv(reference_path, ref_cols), sha, ref_sha)
+
+
+def obtain(spec: dict, base: Path, generate, kind: str) -> Dataset:
+    """The dataset an experiment's `[[datasets]]` entry names.
+
+    With `file` (relative to the experiment file), a recorded dataset is read
+    and must match the `sha256` and `reference_sha256` the entry states: a
+    measured dataset is named by its hashes, so it cannot change under an
+    experiment. Without `file`, `generate()` makes a synthetic one."""
+    if "file" not in spec:
+        return generate()
+    missing = [k for k in ("sha256", "reference_sha256") if not spec.get(k)]
+    if missing:
+        raise ValueError(f"dataset {spec.get('name')}: a recorded dataset must state {missing} "
+                         "(python -m cp_calibration hash <file> prints them)")
+    d = read(Path(base) / spec["file"], {"sha256": spec["sha256"], "reference_sha256": spec["reference_sha256"]})
+    if d.kind != kind:
+        raise ValueError(f"dataset {spec.get('name')}: its description says kind {d.kind!r}, the experiment {kind!r}")
+    return d
+
+
+def hashes(path: Path) -> dict:
+    """The two hashes an experiment states for a recorded dataset."""
+    base = Path(path)
+    base = base.with_name(base.name.removesuffix(".csv").removesuffix(".json"))
+    return {"sha256": file_sha256(base.with_name(base.name + ".csv")),
+            "reference_sha256": file_sha256(base.with_name(base.name + ".reference.csv"))}

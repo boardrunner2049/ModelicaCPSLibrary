@@ -22,7 +22,7 @@ from scipy import stats
 
 from . import dataset as dsmod
 from . import fitting
-from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain
+from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain, rel
 
 A1 = "Systems.Sensing.PowerModule.AnalogSensor"
 A2 = "Systems.Sensing.PowerModule.FirstOrderAnalogSensor"
@@ -190,7 +190,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
     e = exp["experiment"]
     out = Path(out or LIBRARY_ROOT / "build/calibration" / e["name"])
     out.mkdir(parents=True, exist_ok=True)
-    rep = {"experiment": e, "experiment_file": str(Path(experiment).relative_to(LIBRARY_ROOT)),
+    rep = {"experiment": e, "experiment_file": rel(experiment),
            "experiment_sha256": file_sha256(Path(experiment)),
            "created": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"), "versions": toolchain()}
     models = Models()
@@ -201,18 +201,21 @@ def run(experiment: Path, out: Path | None = None) -> dict:
         nominal = {k: v["value"] for k, v in ref["parameters"].items()
                    if k in ("voltageGain", "voltageOffset", "currentGain", "currentOffset", "outputMax", "outputMin")
                    and isinstance(v["value"], (int, float))}
-        truth = {**nominal, **exp["truth"]}
+        truth = {**nominal, **exp.get("truth", {})}
         lg = exp["logger"]
         meta = {"description": e["description"], "unit": e["unit"], "part": e["part"]}
-        data = {s["name"]: generate(models, s.get("generator", A1), {**truth, **s.get("truth", {})}, s, lg,
-                                    out / "data", meta) for s in exp["datasets"]}
-        rep["datasets"] = {n: {**d.summary(), "role": s["role"], "generator": s.get("generator", A1)}
+        data = {s["name"]: dsmod.obtain(s, Path(experiment).parent,
+                                        lambda s=s: generate(models, s.get("generator", A1), {**truth, **s.get("truth", {})},
+                                                             s, lg, out / "data", meta), "power_module")
+                for s in exp["datasets"]}
+        rep["datasets"] = {n: {**d.summary(), "role": s["role"],
+                               "generator": "recorded" if "file" in s else s.get("generator", A1)}
                            for (n, d), s in zip(data.items(), exp["datasets"])}
         role = lambda r, tag=None: [data[s["name"]] for s in exp["datasets"]
                                     if s["role"] == r and (tag is None or tag in s.get("tags", []))]
         th_path = Path(experiment).parent / e["thresholds"]
         thresholds = tomllib.loads(th_path.read_text())
-        rep["thresholds"] = {"file": str(th_path.relative_to(LIBRARY_ROOT)), "sha256": file_sha256(th_path),
+        rep["thresholds"] = {"file": rel(th_path), "sha256": file_sha256(th_path),
                              "values": thresholds, "read_before_holdout_evaluation": True}
         rep["logger_noise_v"] = lg["noise_v"]
 
@@ -239,7 +242,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
                              "currentOffset": (-0.2, 0.2), "currentTimeConstant": (1e-5, 0.05)},
                             scale={"currentGain": nominal["currentGain"], "currentOffset": 0.01, "currentTimeConstant": 1e-3})
         rep["calibration"] = {"static": fits, "time_constant": tc, "joint_current": joint}
-        tr = exp["truth"]
+        tr = exp.get("truth", {})   # absent for recorded data: no recovery
         rec = []
         for name, f in (("voltageGain", fits["voltage"]), ("voltageOffset", fits["voltage"]),
                         ("currentGain", fits["current"]), ("currentOffset", fits["current"]),
@@ -266,23 +269,26 @@ def run(experiment: Path, out: Path | None = None) -> dict:
             "product_v_per_a": prod, "A1_current_gain": static["currentGain"],
             "flagged": bool(idf["unidentifiable_directions"])}}
 
-        # Mismatch: a self-heating shunt fitted with the static model.
-        m = exp["mismatch"]
-        mt = {**a3, "amplifierOffset": tr.get("currentOffset", 0.0), **m["truth"]}
-        mtrain = generate(models, A3, mt, m["train"], lg, out / "data", {**meta, "generator": A3})
-        mhold = generate(models, A3, mt, m["holdout"], lg, out / "data", {**meta, "generator": A3})
-        mf = fitting.fit(residual_fn(models, A1, [mtrain], nominal, "current"), ["currentGain", "currentOffset"],
-                         {"currentGain": nominal["currentGain"], "currentOffset": 0.0},
-                         {"currentGain": (0.5 * nominal["currentGain"], 1.5 * nominal["currentGain"]), "currentOffset": (-0.2, 0.2)},
-                         scale={"currentGain": nominal["currentGain"], "currentOffset": 0.01})
-        mp = {**static, **mf["estimate"]}
-        rep["mismatch"] = {"generator": f"A3 with self-heating ({m['truth']})", "fitted": "A1",
-                           "fit": mf["estimate"], "training_rms_v": mf["rms"],
-                           "training_dwell_trend": dwell_trend(models, A1, mtrain, mp, "current"),
-                           "holdout": evaluate(models, mhold, mp, thresholds["holdout"]),
-                           "holdout_dwell_trend": dwell_trend(models, A1, mhold, mp, "current")}
-        rep["mismatch"]["revealed"] = bool(rep["mismatch"]["training_dwell_trend"]["structured"]
-                                           or not rep["mismatch"]["holdout"]["pass"])
+        # Mismatch: a self-heating shunt fitted with the static model (a
+        # design check on simulated data; optional for a recorded experiment).
+        rep["mismatch"] = None
+        m = exp.get("mismatch")
+        if m:
+            mt = {**a3, "amplifierOffset": tr.get("currentOffset", 0.0), **m["truth"]}
+            mtrain = generate(models, A3, mt, m["train"], lg, out / "data", {**meta, "generator": A3})
+            mhold = generate(models, A3, mt, m["holdout"], lg, out / "data", {**meta, "generator": A3})
+            mf = fitting.fit(residual_fn(models, A1, [mtrain], nominal, "current"), ["currentGain", "currentOffset"],
+                             {"currentGain": nominal["currentGain"], "currentOffset": 0.0},
+                             {"currentGain": (0.5 * nominal["currentGain"], 1.5 * nominal["currentGain"]), "currentOffset": (-0.2, 0.2)},
+                             scale={"currentGain": nominal["currentGain"], "currentOffset": 0.01})
+            mp = {**static, **mf["estimate"]}
+            rep["mismatch"] = {"generator": f"A3 with self-heating ({m['truth']})", "fitted": "A1",
+                               "fit": mf["estimate"], "training_rms_v": mf["rms"],
+                               "training_dwell_trend": dwell_trend(models, A1, mtrain, mp, "current"),
+                               "holdout": evaluate(models, mhold, mp, thresholds["holdout"]),
+                               "holdout_dwell_trend": dwell_trend(models, A1, mhold, mp, "current")}
+            rep["mismatch"]["revealed"] = bool(rep["mismatch"]["training_dwell_trend"]["structured"]
+                                               or not rep["mismatch"]["holdout"]["pass"])
 
         rep["holdout"] = [{"dataset": d.name, "calibrated": evaluate(models, d, static, thresholds["holdout"]),
                            "reference": evaluate(models, d, nominal, thresholds["holdout"])} for d in role("holdout")]
@@ -369,7 +375,7 @@ def write_profile(path: Path, exp, rep, fits):
                        next(s for s in exp["datasets"] if s["name"] == n).get("tags", []))
         for name, v in f["estimate"].items():
             L.append(f'{name} = {{ value = {float(v)!r}, class = "measured", dataset = "{dsn}", '
-                     f'how = "least squares through the A1 FMU", standard_error = {float(f["standard_error"][name])!r} }}')
+                     f'how = "least squares through the A1 FMU", standard_error = {float(f["standard_error_conservative"][name])!r} }}')
     L += ["", "[not_representable_at_W2]",
           f'currentTimeConstant = "measured {rep["calibration"]["time_constant"]["estimate"]["currentTimeConstant"]!r} s (A2); W2 is static"', ""]
     path.write_text("\n".join(L))
@@ -399,21 +405,29 @@ def markdown(r: dict) -> str:
     w("\nAssumed: " + "; ".join(ref["assumed"]) + ".\n")
     w("## Datasets\n\n| dataset | role | generator | rows | logger |\n|---|---|---|---|---|")
     for n, d in r["datasets"].items():
-        w(f"| {n} | {d['role']} | {d['generator'].rsplit('.', 1)[1]} | {d['rows']} | `{d['sha256'][:10]}…` |")
+        w(f"| {n} | {d['role']} | {d['generator'].rsplit('.', 1)[-1]} | {d['rows']} | `{d['sha256'][:10]}…` |")
     th = r["thresholds"]
     w(f"\nThresholds `{th['file']}` (sha256 `{th['sha256'][:12]}…`), read before held-out evaluation: {th['values']['holdout']}.\n")
     c = r["calibration"]
-    w("## Calibration\n\n**Stage 1, static (A1), least squares through the FMU:**\n\n| parameter | estimate | standard error |\n|---|---|---|")
+    w("## Calibration\n\n**Stage 1, static (A1), least squares through the FMU.** Standard errors assuming independent "
+      "residuals, and Newey-West (HAC) ones that allow for autocorrelation; the profile carries the larger.\n\n"
+      "| parameter | estimate | se (independent) | se (HAC) | residual lag-1 |\n|---|---|---|---|---|")
     for ch in ("voltage", "current"):
-        for k, x in c["static"][ch]["estimate"].items():
-            w(f"| `{k}` | {f(x, 7)} | {f(c['static'][ch]['standard_error'].get(k), 3)} |")
+        st = c["static"][ch]
+        for k, x in st["estimate"].items():
+            w(f"| `{k}` | {f(x, 7)} | {f(st['standard_error'].get(k), 3)} | {f(st.get('standard_error_hac', {}).get(k), 3)} | "
+              f"{f(st.get('residual_lag1'), 2)} |")
     w(f"\nResidual rms: voltage {f(c['static']['voltage']['rms'], 3)} V, current {f(c['static']['current']['rms'], 3)} V "
       f"(simulated logger noise {f(r['logger_noise_v'], 3)} V).\n")
     tc = c["time_constant"]
     w(f"**Stage 2, output response (A2):** currentTimeConstant {f(tc['estimate']['currentTimeConstant'])} s "
       f"± {f(tc['standard_error'].get('currentTimeConstant'), 3)} from a 20 kHz step. Jointly with gain and offset: "
       + ", ".join(f"{k} {f(x, 6)}" for k, x in c["joint_current"]["estimate"].items()) + ".\n")
-    w("## Same-model recovery (|z| ≤ 3)\n\n| parameter | truth | estimate | se | z | recovered |\n|---|---|---|---|---|---|")
+    w("## Same-model recovery (|z| ≤ 3)\n")
+    if not r["recovery"]:
+        w("Not applicable: the experiment states no generating truth (recorded data).\n")
+    else:
+        w("| parameter | truth | estimate | se | z | recovered |\n|---|---|---|---|---|---|")
     for x in r["recovery"]:
         w(f"| `{x['parameter']}` | {f(x['truth'], 6)} | {f(x['estimate'], 6)} | {f(x['standard_error'], 3)} | "
           f"{'' if x['z'] is None else format(x['z'], '+.2f')} | {'yes' if x['recovered'] else 'no'} |")
@@ -422,8 +436,11 @@ def markdown(r: dict) -> str:
       f"{'Flagged' if i['flagged'] else '**Not flagged**'}: {i['unidentifiable_directions']}. The product is determined: "
       f"{f(i['product_v_per_a'], 6)} V/A (A1 current gain {f(i['A1_current_gain'], 6)}).\n")
     m = r["mismatch"]
-    tt, ht = m["training_dwell_trend"], m["holdout_dwell_trend"]
-    w(f"## Model mismatch\n\nGenerator {m['generator']}; fitted {m['fitted']}. Training: residual trend within constant-current "
+    if m is None:
+        w("## Model mismatch\n\nNot run: the experiment has no `[mismatch]` design check.\n")
+    else:
+      tt, ht = m["training_dwell_trend"], m["holdout_dwell_trend"]
+      w(f"## Model mismatch\n\nGenerator {m['generator']}; fitted {m['fitted']}. Training: residual trend within constant-current "
       f"dwells, max |z| {f(tt['max_z'], 3)}, p {f(tt['p_value'], 3)} → {'**structured**' if tt['structured'] else 'none found'}. "
       f"Held out (sustained current): current mean error {f(m['holdout']['current']['mean_error_v'], 3)} V, rms "
       f"{f(m['holdout']['current']['rms_error_v'], 3)} V → {'pass' if m['holdout']['pass'] else '**fails the thresholds**'}; "
@@ -436,7 +453,8 @@ def markdown(r: dict) -> str:
               f"{x['current']['mean_error_v']*1e3:+.3f} / {x['current']['rms_error_v']*1e3:.3f} | {'pass' if x['pass'] else 'fail'} |")
     w(f"\n## Profile\n\nThe composer accepts it: evidence **{r['profile_in_composer']['evidence']}**.\n\n```toml\n{r['profile']['text'].strip()}\n```\n")
     w("## Limitations\n")
-    for x in ["All data is synthetic; no property of a real module is measured or validated here.",
+    for x in (["All data is synthetic; no property of a real module is measured or validated here."] if e.get("synthetic")
+              else ["Recorded data: the results hold for this unit, logger and conditions only."]) + [
               "The zero-current offset is not stated by the reference's documentation: the reference profile assumes 0.",
               "The logger is simulated as white Gaussian noise and quantization; a real logger's bandwidth, offset and "
               "clock must be characterized and enter the thresholds.",

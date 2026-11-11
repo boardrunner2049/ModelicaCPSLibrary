@@ -2,7 +2,9 @@
 
 The statistics, dataset and composer-profile tests always run (NumPy and SciPy).
 FIRE_TEST_FMU=1 adds the toolchain tests through the Rumoca-exported FMU (FMPy;
-build/venv-calib has it), and FIRE_TEST_CALIBRATION=1 the full DPS310 pilot.
+build/venv-calib has it), FIRE_TEST_FMU=1 FIRE_TEST_OMC=1 the Rumoca/OpenModelica
+cross-check, FIRE_TEST_CALIBRATION=1 the pilots, FIRE_TEST_MILUV=1 the MILUV reuse and
+FIRE_TEST_CHAMBERS=1 the Causal Chambers DPS310 noise comparison.
 """
 import json
 import math
@@ -70,6 +72,27 @@ class Stochastic(unittest.TestCase):
         self.assertAlmostEqual(slope, -0.5, delta=0.05)
 
 
+class Fitting(unittest.TestCase):
+    def test_hac_standard_error_allows_for_autocorrelated_residuals(self):
+        from cp_calibration import fitting
+        rng = np.random.default_rng(3)
+        t = np.linspace(0, 1, 2000)
+        ses, hacs, errs = [], [], []
+        for _ in range(40):
+            e = np.empty_like(t)
+            e[0] = rng.standard_normal()
+            for k in range(1, len(t)):
+                e[k] = 0.9 * e[k - 1] + math.sqrt(1 - 0.81) * rng.standard_normal()
+            y = 2.0 + 0.5 * t + e
+            f = fitting.fit(lambda p: y - p["a"] - p["b"] * t, ["a", "b"], {"a": 0.0, "b": 0.0},
+                            {"a": (-10, 10), "b": (-10, 10)}, scale={"a": 1.0, "b": 1.0})
+            ses.append(f["standard_error"]["a"]); hacs.append(f["standard_error_hac"]["a"]); errs.append(f["estimate"]["a"] - 2)
+            self.assertGreater(f["residual_lag1"], 0.8)
+        true_sd = float(np.std(errs))
+        self.assertLess(np.mean(ses), 0.5 * true_sd)            # independent errors understate it
+        self.assertGreater(np.mean(hacs), 2 * np.mean(ses))      # HAC moves toward it
+
+
 class ImuWorkflow(unittest.TestCase):
     def test_time_bins_of_an_irregular_stream(self):
         from cp_calibration import imu
@@ -104,6 +127,23 @@ class Datasets(unittest.TestCase):
             (Path(d) / "x.csv").write_text((Path(d) / "x.csv").read_text().replace("100000.0", "100001.0", 1))
             with self.assertRaises(ValueError):
                 dataset.read(Path(d) / "x", {"sha256": ds.sha256})
+
+    def test_recorded_dataset_is_named_by_its_hashes(self):
+        with tempfile.TemporaryDirectory() as d:
+            ds = dataset.write(Path(d) / "bench", {"time_s": [0.1], "edge": [1], "reference_time_s": [0.09]},
+                               {"time_s": [0.0], "speed_rad_s": [100.0]}, {"kind": "rpm"})
+            h = dataset.hashes(Path(d) / "bench.csv")
+            self.assertEqual(h, {"sha256": ds.sha256, "reference_sha256": ds.reference_sha256})
+            never = lambda: self.fail("a recorded dataset is not generated")
+            got = dataset.obtain({"name": "b", "file": "bench", **h}, Path(d), never, "rpm")
+            self.assertEqual(got.sha256, ds.sha256)
+            with self.assertRaises(ValueError):       # no hashes stated
+                dataset.obtain({"name": "b", "file": "bench"}, Path(d), never, "rpm")
+            with self.assertRaises(ValueError):       # another kind
+                dataset.obtain({"name": "b", "file": "bench", **h}, Path(d), never, "power_module")
+            with self.assertRaises(ValueError):       # changed reference
+                dataset.obtain({"name": "b", "file": "bench", **h, "reference_sha256": "0" * 64}, Path(d), never, "rpm")
+            self.assertEqual(dataset.obtain({"name": "g"}, Path(d), lambda: "generated", "rpm"), "generated")
 
 
 def part(*args):
@@ -245,6 +285,15 @@ class PowerAndRpmToolchain(unittest.TestCase):
         self.assertTrue(lost and all(x["count"] == x["expected"] for x in r["rows"]))
 
 
+@unittest.skipUnless(os.environ.get("FIRE_TEST_FMU") == "1" and os.environ.get("FIRE_TEST_OMC") == "1" and _fmpy(),
+                     "FIRE_TEST_FMU=1 FIRE_TEST_OMC=1 with FMPy and omc")
+class CompilerCrossCheck(unittest.TestCase):
+    def test_rumoca_and_openmodelica_agree(self):
+        from cp_calibration import crosscheck
+        r = crosscheck.run()
+        self.assertTrue(r["pass"], crosscheck.markdown(r))
+
+
 @unittest.skipUnless(os.environ.get("FIRE_TEST_CALIBRATION") == "1" and _fmpy(), "FIRE_TEST_CALIBRATION=1 with FMPy")
 class PowerAndRpmPilots(unittest.TestCase):
     def test_power_module(self):
@@ -294,6 +343,71 @@ class Pilot(unittest.TestCase):
         static = next(ev for ev in r["holdout"] if ev["dataset"] == "holdout_static")
         self.assertTrue(static["calibrated"]["pass"], static)
         self.assertEqual(r["profile_in_composer"]["evidence"], "synthetic-calibrated (not a device)")
+
+
+def recorded_experiment(synthetic: Path, run_dir: Path, work: Path) -> Path:
+    """The synthetic experiment's train and holdout datasets, copied as files
+    and named by their hashes, in an experiment with no truth and no mismatch
+    check: what a bench experiment looks like."""
+    import shutil
+    import tomllib
+    exp = tomllib.loads(synthetic.read_text())
+    (work / "data").mkdir(parents=True)
+    e = exp["experiment"]
+    lines = ["[experiment]"] + [f"{k} = {json.dumps(v)}" for k, v in e.items() if k != "thresholds"]
+    lines += [f'thresholds = "{(synthetic.parent / e["thresholds"]).as_posix()}"', ""]
+    for k in ("logger", "fit"):
+        if k in exp:
+            lines += [f"[{k}]"] + [f"{a} = {json.dumps(v)}" for a, v in exp[k].items()] + [""]
+    for spec in exp["datasets"]:
+        for suffix in (".csv", ".reference.csv", ".json"):
+            shutil.copy(run_dir / "data" / (spec["name"] + suffix), work / "data")
+        h = dataset.hashes(work / "data" / spec["name"])
+        keep = {k: v for k, v in spec.items() if k in ("name", "role", "tags", "rpm", "stimulus")}
+        lines += ["[[datasets]]"] + [f"{k} = {json.dumps(v)}" for k, v in {**keep, "file": f"data/{spec['name']}", **h}.items()] + [""]
+    path = work / "recorded.toml"
+    path.write_text("\n".join(lines))
+    return path
+
+
+@unittest.skipUnless(os.environ.get("FIRE_TEST_CALIBRATION") == "1" and _fmpy(), "FIRE_TEST_CALIBRATION=1 with FMPy")
+class RecordedData(unittest.TestCase):
+    """The pipelines on datasets read from files rather than generated."""
+
+    def check(self, module, name):
+        exp = ROOT / f"tools/calibration/experiments/{name}.toml"
+        with tempfile.TemporaryDirectory() as d:
+            synth = module.run(exp, Path(d) / "synthetic")
+            rec = module.run(recorded_experiment(exp, Path(d) / "synthetic", Path(d) / "rec"), Path(d) / "recorded")
+        self.assertEqual(rec["recovery"], [])
+        self.assertIsNone(rec["mismatch"])
+        self.assertTrue(all(d["sha256"] == synth["datasets"][n]["sha256"] for n, d in rec["datasets"].items()))
+        return synth, rec
+
+    def test_rpm(self):
+        from cp_calibration import rpm
+        synth, rec = self.check(rpm, "rpm_us5881_synthetic")
+        self.assertEqual(rec["calibration"]["edgeDelay"], synth["calibration"]["edgeDelay"])
+        self.assertEqual([h["calibrated"]["pass"] for h in rec["holdout"]], [h["calibrated"]["pass"] for h in synth["holdout"]])
+
+    def test_power_module(self):
+        from cp_calibration import power
+        synth, rec = self.check(power, "power_pm02_synthetic")
+        self.assertEqual(rec["calibration"]["static"]["current"]["estimate"],
+                         synth["calibration"]["static"]["current"]["estimate"])
+
+
+@unittest.skipUnless(os.environ.get("FIRE_TEST_CHAMBERS") == "1" and COMPOSE.exists(),
+                     "FIRE_TEST_CHAMBERS=1 (downloads 2.6 MB of Causal Chambers data once)")
+class CausalChambers(unittest.TestCase):
+    def test_dps310_noise_against_oversampling(self):
+        from cp_calibration import chambers
+        r = chambers.run()
+        self.assertEqual([s["oversampling"] for s in r["settings"]], [1, 8])
+        self.assertEqual(r["datasheet"]["fast_mode_pressureNoiseStd_pa"], 2.5)
+        for s in r["settings"]:
+            self.assertEqual(sorted(s["units"]), sorted(chambers.UNITS))
+            self.assertTrue(all(u["n"] == 100 for u in s["units"].values()))
 
 
 @unittest.skipUnless(os.environ.get("FIRE_TEST_MILUV") == "1" and _fmpy(),

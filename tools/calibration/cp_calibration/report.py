@@ -106,8 +106,11 @@ def markdown(r: dict) -> str:
     w("## Same-model recovery\n")
     w("Criterion: an identifiable parameter is recovered when |estimate − truth| ≤ 3 standard errors (z), the "
       "standard error taken from its 95 % interval; a 95 % interval misses the truth one time in twenty.\n")
-    w("| parameter | truth | estimate | interval / plausible | identifiable | truth in interval | z | recovered |\n"
-      "|---|---|---|---|---|---|---|---|")
+    if r["recovery"]:
+        w("| parameter | truth | estimate | interval / plausible | identifiable | truth in interval | z | recovered |\n"
+          "|---|---|---|---|---|---|---|---|")
+    else:
+        w("Not applicable: the experiment states no generating truth (recorded data).")
     for x in r["recovery"]:
         iv = _iv(x["interval95"]) if "interval95" in x else str(x.get("plausible", ""))
         z = x.get("z")
@@ -131,16 +134,19 @@ def markdown(r: dict) -> str:
 
     m = r["mismatch"]
     w("## Model mismatch\n")
-    st = m["training_temperature_structure"]
-    w(f"Generator: {m['generator']}; fitted: {m['fitted_model']}. Fitted offset {_f(m['pressureBias_fit'])} Pa.")
-    if st.get("tested"):
-        w(f"Training residual against temperature ({st['blocks']} blocks of 60 s): slope {_f(st['slope_pa_per_k'])} "
-          f"± {_f(st['slope_se'])} Pa/K, p = {_f(st['p_value'])} → "
-          f"{'**structured residual: behaviour the model does not represent**' if st['structured'] else 'no structure found'}.")
-    h = m["holdout"]
-    w(f"Held out at 45 °C: mean error {_f(h['mean_error_pa'])} Pa, innovation std {_f(h['innovation_std'])}, "
-      f"Ljung-Box p {_f(h['ljung_box_p'])} → {'pass' if h['pass'] else '**fails the thresholds**'}. "
-      f"Unexplained behaviour revealed: {_f(m['revealed'])}.\n")
+    if m is None:
+        w("Not run: the experiment has no `[mismatch]` design check.\n")
+    else:
+        st = m["training_temperature_structure"]
+        w(f"Generator: {m['generator']}; fitted: {m['fitted_model']}. Fitted offset {_f(m['pressureBias_fit'])} Pa.")
+        if st.get("tested"):
+            w(f"Training residual against temperature ({st['blocks']} blocks of 60 s): slope {_f(st['slope_pa_per_k'])} "
+              f"± {_f(st['slope_se'])} Pa/K, p = {_f(st['p_value'])} → "
+              f"{'**structured residual: behaviour the model does not represent**' if st['structured'] else 'no structure found'}.")
+        h = m["holdout"]
+        w(f"Held out at 45 °C: mean error {_f(h['mean_error_pa'])} Pa, innovation std {_f(h['innovation_std'])}, "
+          f"Ljung-Box p {_f(h['ljung_box_p'])} → {'pass' if h['pass'] else '**fails the thresholds**'}. "
+          f"Unexplained behaviour revealed: {_f(m['revealed'])}.\n")
 
     w("## Held-out comparison\n")
     w("| dataset | profile | mean error (Pa) | rms (Pa) | log-lik / reading | innovation std | Ljung-Box p | pass |\n"

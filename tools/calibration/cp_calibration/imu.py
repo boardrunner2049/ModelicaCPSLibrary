@@ -28,7 +28,7 @@ import numpy as np
 from scipy import signal
 
 from . import stochastic as st
-from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain
+from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain, rel
 
 AXES = ["gyro_x", "gyro_y", "gyro_z", "accel_x", "accel_y", "accel_z"]
 
@@ -252,10 +252,10 @@ def run(experiment: Path, out: Path | None = None) -> dict:
     data_dir = LIBRARY_ROOT / src["local_dir"]
     th_path = Path(experiment).parent / e["thresholds"]
     th = tomllib.loads(th_path.read_text())
-    rep = {"experiment": e, "experiment_file": str(Path(experiment).relative_to(LIBRARY_ROOT)),
+    rep = {"experiment": e, "experiment_file": rel(experiment),
            "experiment_sha256": file_sha256(Path(experiment)), "source": src,
            "created": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"), "versions": toolchain(),
-           "thresholds": {"file": str(th_path.relative_to(LIBRARY_ROOT)), "sha256": file_sha256(th_path), "values": th,
+           "thresholds": {"file": rel(th_path), "sha256": file_sha256(th_path), "values": th,
                           "read_before_holdout_evaluation": True}}
     bag = data_dir / src["bag"]
     rep["bag_sha256"] = src.get("bag_sha256") or file_sha256(bag)

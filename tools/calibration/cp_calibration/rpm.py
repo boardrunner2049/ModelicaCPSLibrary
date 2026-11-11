@@ -24,7 +24,7 @@ from scipy import stats
 
 from . import dataset as dsmod
 from . import fitting
-from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain
+from .fmu import LIBRARY_ROOT, Slave, Trace, export, file_sha256, toolchain, rel
 
 E1 = "Systems.Sensing.Rpm.PulseSensor"
 RAMP = Path(__file__).resolve().parents[1] / "models/RpmRamp.mo"
@@ -147,7 +147,8 @@ def generate(slave, ppr, truth, spec, out, meta) -> dsmod.Dataset:
 
 
 def timing_residual(ds) -> np.ndarray:
-    return ds.readings["time_s"] - ds.readings["reference_time_s"]
+    offset = float(ds.meta.get("reference", {}).get("clock_offset_s", 0.0))
+    return ds.readings["time_s"] - (ds.readings["reference_time_s"] + offset)
 
 
 def fit_timing(datasets) -> dict:
@@ -179,7 +180,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
     e = exp["experiment"]
     out = Path(out or LIBRARY_ROOT / "build/calibration" / e["name"])
     out.mkdir(parents=True, exist_ok=True)
-    rep = {"experiment": e, "experiment_file": str(Path(experiment).relative_to(LIBRARY_ROOT)),
+    rep = {"experiment": e, "experiment_file": rel(experiment),
            "experiment_sha256": file_sha256(Path(experiment)),
            "created": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"), "versions": toolchain()}
     s = Slave(export(E1))
@@ -188,19 +189,21 @@ def run(experiment: Path, out: Path | None = None) -> dict:
         rep["toolchain"] = contract_check(s, ramp)
         ppr = float(e["pulses_per_revolution"])
         rep["reference"] = reference_report(e["part"], ppr)
-        truth = exp["truth"]
+        truth = exp.get("truth", {})   # absent for recorded data: no recovery
         meta = {"description": e["description"], "unit": e["unit"], "part": e["part"]}
-        data = {sp["name"]: generate(s, ppr, truth, sp, out / "data", meta) for sp in exp["datasets"]}
+        data = {sp["name"]: dsmod.obtain(sp, Path(experiment).parent,
+                                         lambda sp=sp: generate(s, ppr, truth, sp, out / "data", meta), "rpm")
+                for sp in exp["datasets"]}
         rep["datasets"] = {n: {**d.summary(), "role": sp["role"], "rpm": sp["rpm"]}
                            for (n, d), sp in zip(data.items(), exp["datasets"])}
         th_path = Path(experiment).parent / e["thresholds"]
         thresholds = tomllib.loads(th_path.read_text())
-        rep["thresholds"] = {"file": str(th_path.relative_to(LIBRARY_ROOT)), "sha256": file_sha256(th_path),
+        rep["thresholds"] = {"file": rel(th_path), "sha256": file_sha256(th_path),
                              "values": thresholds, "read_before_holdout_evaluation": True}
         train = [data[sp["name"]] for sp in exp["datasets"] if sp["role"] == "train"]
         fit = fit_timing(train)
         rep["calibration"] = fit
-        rep["recovery"] = [
+        rep["recovery"] = [] if not truth else [
             {"parameter": "edgeDelay", "truth": truth["edgeDelay"], "estimate": fit["edgeDelay"],
              "standard_error": fit["edgeDelay_se"], **fitting.recovered(fit["edgeDelay"], truth["edgeDelay"], fit["edgeDelay_se"])},
             {"parameter": "edgeJitterStd", "truth": truth["edgeJitterStd"], "estimate": fit["edgeJitterStd"],
@@ -215,39 +218,44 @@ def run(experiment: Path, out: Path | None = None) -> dict:
             "question": "the sensor's edge delay and the offset between the sensor's and the reference's clocks, together?",
             "expected": "no: only their sum is determined; a common clock (or a measured offset) is needed",
             "unidentifiable_directions": idf["unidentifiable_directions"], "flagged": bool(idf["unidentifiable_directions"])}}
-        # Mismatch: a constant angular lag (a threshold in the field), fitted as a constant time delay.
-        m = exp["mismatch"]
-        lag = m["angular_lag_pulses"]
-        mtrain = [generate(s, ppr, {"edgeJitterStd": truth["edgeJitterStd"]},
-                           {**sp, "sensor_phase": -lag % 1.0, "phase": 0.0, "name": f"mismatch_{sp['name']}"},
-                           out / "data", meta) for sp in m["train"]]
-        mhold = generate(s, ppr, {"edgeJitterStd": truth["edgeJitterStd"]},
-                         {**m["holdout"], "sensor_phase": -lag % 1.0, "phase": 0.0}, out / "data", meta)
-        # The generator's phase wraps the lag within a pulse: reported edge k is
-        # matched to the reference edge it lags.
-        def lagged(ds):
-            e = timing_residual(ds)
-            period = 60 / (ds.meta["conditions"]["rpm"] * ppr)
-            return e - np.round((e - lag * period) / period) * period
-        mtr = np.concatenate([lagged(d) for d in mtrain])
-        speeds = np.concatenate([np.full(len(lagged(d)), d.meta["conditions"]["rpm"]) for d in mtrain])
-        mdelay, mjit = float(np.mean(mtr)), float(np.std(mtr, ddof=1))
-        means = [float(np.mean(lagged(d))) for d in mtrain]
-        inv = [60 / (d.meta["conditions"]["rpm"] * ppr) for d in mtrain]
-        reg = stats.linregress(inv, means) if len(mtrain) > 2 else None
-        ho = lagged(mhold) - mdelay
-        rep["mismatch"] = {
-            "generator": f"PulseSensor with a constant angular lag of {lag} pulse periods (edge delay 0)",
-            "fitted": "a constant time delay", "fit": {"edgeDelay": mdelay, "edgeJitterStd": mjit},
-            "training_delay_by_speed": [{"rpm": d.meta["conditions"]["rpm"], "mean_delay_s": mm} for d, mm in zip(mtrain, means)],
-            "training_trend": None if reg is None else {"slope_per_period": float(reg.slope), "p_value": float(reg.pvalue),
-                                                        "structured": bool(reg.pvalue < 0.01)},
-            "holdout": {"rpm": m["holdout"]["rpm"], "mean_error_s": float(np.mean(ho)),
-                        "pass": abs(float(np.mean(ho))) <= thresholds["holdout"]["mean_error_s"]}}
-        rep["mismatch"]["revealed"] = bool((reg is not None and reg.pvalue < 0.01) or not rep["mismatch"]["holdout"]["pass"])
+        # Mismatch: a constant angular lag (a threshold in the field), fitted as
+        # a constant time delay (a design check on simulated data; optional for
+        # a recorded experiment, which uses the fitted jitter).
+        jitter = truth.get("edgeJitterStd", fit["edgeJitterStd"])
+        rep["mismatch"] = None
+        m = exp.get("mismatch")
+        if m:
+            lag = m["angular_lag_pulses"]
+            mtrain = [generate(s, ppr, {"edgeJitterStd": jitter},
+                               {**sp, "sensor_phase": -lag % 1.0, "phase": 0.0, "name": f"mismatch_{sp['name']}"},
+                               out / "data", meta) for sp in m["train"]]
+            mhold = generate(s, ppr, {"edgeJitterStd": jitter},
+                             {**m["holdout"], "sensor_phase": -lag % 1.0, "phase": 0.0}, out / "data", meta)
+            # The generator's phase wraps the lag within a pulse: reported edge k is
+            # matched to the reference edge it lags.
+            def lagged(ds):
+                e = timing_residual(ds)
+                period = 60 / (ds.meta["conditions"]["rpm"] * ppr)
+                return e - np.round((e - lag * period) / period) * period
+            mtr = np.concatenate([lagged(d) for d in mtrain])
+            speeds = np.concatenate([np.full(len(lagged(d)), d.meta["conditions"]["rpm"]) for d in mtrain])
+            mdelay, mjit = float(np.mean(mtr)), float(np.std(mtr, ddof=1))
+            means = [float(np.mean(lagged(d))) for d in mtrain]
+            inv = [60 / (d.meta["conditions"]["rpm"] * ppr) for d in mtrain]
+            reg = stats.linregress(inv, means) if len(mtrain) > 2 else None
+            ho = lagged(mhold) - mdelay
+            rep["mismatch"] = {
+                "generator": f"PulseSensor with a constant angular lag of {lag} pulse periods (edge delay 0)",
+                "fitted": "a constant time delay", "fit": {"edgeDelay": mdelay, "edgeJitterStd": mjit},
+                "training_delay_by_speed": [{"rpm": d.meta["conditions"]["rpm"], "mean_delay_s": mm} for d, mm in zip(mtrain, means)],
+                "training_trend": None if reg is None else {"slope_per_period": float(reg.slope), "p_value": float(reg.pvalue),
+                                                            "structured": bool(reg.pvalue < 0.01)},
+                "holdout": {"rpm": m["holdout"]["rpm"], "mean_error_s": float(np.mean(ho)),
+                            "pass": abs(float(np.mean(ho))) <= thresholds["holdout"]["mean_error_s"]}}
+            rep["mismatch"]["revealed"] = bool((reg is not None and reg.pvalue < 0.01) or not rep["mismatch"]["holdout"]["pass"])
         rep["holdout"] = [{"dataset": sp["name"], "rpm": sp["rpm"],
                            "calibrated": evaluate(data[sp["name"]], fit["edgeDelay"], fit["edgeJitterStd"], thresholds["holdout"]),
-                           "reference": evaluate(data[sp["name"]], 0.0, max(truth["edgeJitterStd"] * 1e-3, 1e-12), thresholds["holdout"])}
+                           "reference": evaluate(data[sp["name"]], 0.0, max(jitter * 1e-3, 1e-12), thresholds["holdout"])}
                           for sp in exp["datasets"] if sp["role"] == "holdout"]
         prof = out / f"{e['name']}.profile.toml"
         L = ["# Calibration profile written by tools/calibration (cp_calibration.rpm).",
@@ -299,7 +307,9 @@ def markdown(r: dict) -> str:
     w(f"## Calibration\n\nEdge delay {f(c['edgeDelay']*1e6)} µs ± {f(c['edgeDelay_se']*1e6, 2)}; jitter "
       f"{f(c['edgeJitterStd']*1e6)} µs ± {f(c['edgeJitterStd_se']*1e6, 2)} ({c['n']} edges); lag-1 autocorrelation of the "
       f"timing residual {f(c['lag1_autocorrelation'], 2)}.\n")
-    w("## Same-model recovery (|z| ≤ 3)\n\n| parameter | truth | estimate | se | z | recovered |\n|---|---|---|---|---|---|")
+    w("## Same-model recovery (|z| ≤ 3)\n")
+    w("Not applicable: the experiment states no generating truth (recorded data).\n" if not r["recovery"]
+      else "| parameter | truth | estimate | se | z | recovered |\n|---|---|---|---|---|---|")
     for x in r["recovery"]:
         w(f"| `{x['parameter']}` | {f(x['truth'])} | {f(x['estimate'])} | {f(x['standard_error'], 2)} | "
           f"{format(x['z'], '+.2f')} | {'yes' if x['recovered'] else 'no'} |")
@@ -307,8 +317,8 @@ def markdown(r: dict) -> str:
     w(f"\n## Identifiability\n\n- {i['question']} Expected: {i['expected']}. {'Flagged' if i['flagged'] else '**Not flagged**'}: "
       f"{i['unidentifiable_directions']}.\n")
     m = r["mismatch"]
-    tt = m["training_trend"]
-    w(f"## Model mismatch\n\nGenerator: {m['generator']}; fitted: {m['fitted']}. Mean delay by training speed: "
+    tt = m and m["training_trend"]
+    w("## Model mismatch\n\nNot run: the experiment has no `[mismatch]` design check.\n") if m is None else w(f"## Model mismatch\n\nGenerator: {m['generator']}; fitted: {m['fitted']}. Mean delay by training speed: "
       + ", ".join(f"{x['rpm']} rpm {x['mean_delay_s']*1e6:.2f} µs" for x in m["training_delay_by_speed"])
       + (f". Against the pulse period: slope {f(tt['slope_per_period'], 3)}, p {f(tt['p_value'], 2)} → "
          f"{'**structured: the delay scales with the period (an angle, not a time)**' if tt['structured'] else 'none'}" if tt else "")
@@ -323,7 +333,8 @@ def markdown(r: dict) -> str:
     w(f"\nThe reference profile states no delay or jitter (both 0); its ratio is against a negligible jitter.\n")
     w(f"## Profile\n\nThe composer accepts it: evidence **{r['profile_in_composer']['evidence']}**.\n\n```toml\n{r['profile']['text'].strip()}\n```\n")
     w("## Limitations\n")
-    for x in ["All data is synthetic; no real sensor's delay or jitter is measured here.",
+    for x in (["All data is synthetic; no real sensor's delay or jitter is measured here."] if e.get("synthetic")
+              else ["Recorded data: the results hold for this sensor, magnet ring, reference encoder and clock setup only."]) + [
               "Missed pulses, the 10 kHz switching limit and magnet spacing errors are not modelled.",
               "Delay and jitter are characterized only against edge-level reference timestamps on a common clock.",
               "The buffer is 32 edges per shaft by default; a consumer stepping longer than 32 pulse periods keeps an "

@@ -1,4 +1,4 @@
-"""python -m cp_calibration {toolchain,datasheet,run} (from tools/calibration)."""
+"""python -m cp_calibration {toolchain,datasheet,run,crosscheck,hash,chambers} (from tools/calibration)."""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +22,27 @@ def main(argv=None) -> int:
     r = sub.add_parser("run", help="the full pipeline for an experiment file")
     r.add_argument("experiment", type=Path)
     r.add_argument("--out", type=Path)
+    h = sub.add_parser("hash", help="the sha256 and reference_sha256 an experiment states for a recorded dataset")
+    h.add_argument("dataset", type=Path)
+    sub.add_parser("chambers", help="DPS310 noise against oversampling on the Causal Chambers wind tunnel data")
+    x = sub.add_parser("crosscheck", help="the new sensor models simulated by Rumoca and by OpenModelica, compared")
+    x.add_argument("--out", type=Path)
     a = parser.parse_args(argv)
+    if a.command == "chambers":
+        from . import chambers
+        rep = chambers.run()
+        print(chambers.markdown(rep))
+        return 0
+    if a.command == "hash":
+        from . import dataset
+        for k, v in dataset.hashes(a.dataset).items():
+            print(f'{k} = "{v}"')
+        return 0
+    if a.command == "crosscheck":
+        from . import crosscheck
+        rep = crosscheck.run(a.out)
+        print(crosscheck.markdown(rep))
+        return 0 if rep["pass"] else 1
     if a.command == "toolchain":
         m = baro.Model()
         try:

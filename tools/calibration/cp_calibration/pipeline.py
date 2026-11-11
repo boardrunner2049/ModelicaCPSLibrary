@@ -26,7 +26,7 @@ from scipy import stats
 from . import barometer as baro
 from . import dataset as dsmod
 from . import stochastic as st
-from .fmu import LIBRARY_ROOT, Trace, file_sha256, toolchain
+from .fmu import LIBRARY_ROOT, Trace, file_sha256, toolchain, rel
 
 HERE = Path(__file__).resolve().parents[1]
 MISMATCH_MODEL = HERE / "models/BarometerTemperatureOffset.mo"
@@ -253,7 +253,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
     e = exp["experiment"]
     out = Path(out or LIBRARY_ROOT / "build/calibration" / e["name"])
     out.mkdir(parents=True, exist_ok=True)
-    report = {"experiment": e, "experiment_file": str(Path(experiment).relative_to(LIBRARY_ROOT)),
+    report = {"experiment": e, "experiment_file": rel(experiment),
               "experiment_sha256": file_sha256(Path(experiment)),
               "created": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")}
     model = baro.Model()
@@ -266,11 +266,13 @@ def run(experiment: Path, out: Path | None = None) -> dict:
         T = float(ds_params["samplePeriod"])
         quantum = float(ds_params.get("pressureQuantum", 0.0))
 
-        truth = {**ds_params, **exp["truth"]}
+        truth = {**ds_params, **exp.get("truth", {})}
         meta = {"description": e["description"], "unit": e["unit"], "part": e["part"], "mode": e.get("mode", "")}
         data = {}
         for spec in exp["datasets"]:
-            data[spec["name"]] = generate(model, truth, spec, out / "data", meta)
+            data[spec["name"]] = dsmod.obtain(spec, Path(experiment).parent,
+                                              lambda spec=spec: generate(model, truth, spec, out / "data", meta),
+                                              "barometer")
         report["datasets"] = {n: {**d.summary(), "role": s["role"]}
                               for (n, d), s in zip(data.items(), exp["datasets"])}
         train = [data[s["name"]] for s in exp["datasets"] if s["role"] == "train"]
@@ -281,7 +283,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
         # Thresholds are fixed before the held-out data is evaluated.
         th_path = Path(experiment).parent / e["thresholds"]
         thresholds = tomllib.loads(th_path.read_text())
-        report["thresholds"] = {"file": str(th_path.relative_to(LIBRARY_ROOT)), "sha256": file_sha256(th_path),
+        report["thresholds"] = {"file": rel(th_path), "sha256": file_sha256(th_path),
                                 "values": thresholds, "read_before_holdout_evaluation": True}
 
         fit = exp["fit"]
@@ -306,41 +308,47 @@ def run(experiment: Path, out: Path | None = None) -> dict:
             calibrated.update(pressureDriftStd=est["sigma_d"], pressureDriftTau=est["tau"])
 
         # Recovery (synthetic only): truth inside each identifiable interval.
-        tr = exp["truth"]
+        # Recorded data states no truth; the design checks below then simulate
+        # with the calibrated values.
+        if "truth" not in exp:
+            truth = {**truth, **calibrated}
+        tr = exp.get("truth")
         rec = []
-        pairs = [("pressureBias", "b"), ("pressureNoiseStd", "sigma_w"), ("pressureDriftStd", "sigma_d"),
-                 ("pressureDriftTau", "tau")]
-        for name, key in pairs:
-            pr = prof[key]
-            lo, hi = pr["interval95"]
-            inside = (lo is None or lo <= tr[name]) and (hi is None or tr[name] <= hi)
-            # Recovery criterion: within 3 standard errors, the standard error
-            # taken from the 95 % interval (in log space for scale parameters).
-            z = None
-            if lo is not None and hi is not None:
-                if key == "b":
-                    z = (est[key] - tr[name]) / ((hi - lo) / (2 * 1.959964))
-                else:
-                    z = math.log(est[key] / tr[name]) / (math.log(hi / lo) / (2 * 1.959964))
-            rec.append({"parameter": name, "truth": tr[name], "estimate": est[key], "interval95": [lo, hi],
-                        "identifiable": pr["identifiable"], "weakly_identified": pr.get("weakly_identified", False),
-                        "truth_in_interval": bool(inside), "z": z,
-                        "recovered": bool(z is not None and abs(z) <= 3) if pr["identifiable"] else None})
-        rec.append({"parameter": "latencySamples", "truth": tr["latencySamples"], "estimate": L,
-                    "plausible": lat["plausible"], "identifiable": lat["identifiable"],
-                    "truth_in_interval": tr["latencySamples"] in lat["plausible"],
-                    "recovered": L == tr["latencySamples"]})
-        rec.append({"parameter": "temperatureBias", "truth": tr["temperatureBias"],
-                    "estimate": tb["estimate"]["temperatureBias"],
-                    "identifiable": not tb["unidentifiable_directions"],
-                    "truth_in_interval": abs(tb["estimate"]["temperatureBias"] - tr["temperatureBias"])
-                    <= max(4 * tb["standard_error_white"].get("temperatureBias", 0), 0.005 + 1e-9),
-                    "recovered": abs(tb["estimate"]["temperatureBias"] - tr["temperatureBias"])
-                    <= max(3 * tb["standard_error_white"].get("temperatureBias", 0), 0.01 / math.sqrt(12))})
+        if tr is not None:
+            pairs = [("pressureBias", "b"), ("pressureNoiseStd", "sigma_w"), ("pressureDriftStd", "sigma_d"),
+                     ("pressureDriftTau", "tau")]
+            for name, key in pairs:
+                pr = prof[key]
+                lo, hi = pr["interval95"]
+                inside = (lo is None or lo <= tr[name]) and (hi is None or tr[name] <= hi)
+                # Recovery criterion: within 3 standard errors, the standard error
+                # taken from the 95 % interval (in log space for scale parameters).
+                z = None
+                if lo is not None and hi is not None:
+                    if key == "b":
+                        z = (est[key] - tr[name]) / ((hi - lo) / (2 * 1.959964))
+                    else:
+                        z = math.log(est[key] / tr[name]) / (math.log(hi / lo) / (2 * 1.959964))
+                rec.append({"parameter": name, "truth": tr[name], "estimate": est[key], "interval95": [lo, hi],
+                            "identifiable": pr["identifiable"], "weakly_identified": pr.get("weakly_identified", False),
+                            "truth_in_interval": bool(inside), "z": z,
+                            "recovered": bool(z is not None and abs(z) <= 3) if pr["identifiable"] else None})
+            rec.append({"parameter": "latencySamples", "truth": tr["latencySamples"], "estimate": L,
+                        "plausible": lat["plausible"], "identifiable": lat["identifiable"],
+                        "truth_in_interval": tr["latencySamples"] in lat["plausible"],
+                        "recovered": L == tr["latencySamples"]})
+            rec.append({"parameter": "temperatureBias", "truth": tr["temperatureBias"],
+                        "estimate": tb["estimate"]["temperatureBias"],
+                        "identifiable": not tb["unidentifiable_directions"],
+                        "truth_in_interval": abs(tb["estimate"]["temperatureBias"] - tr["temperatureBias"])
+                        <= max(4 * tb["standard_error_white"].get("temperatureBias", 0), 0.005 + 1e-9),
+                        "recovered": abs(tb["estimate"]["temperatureBias"] - tr["temperatureBias"])
+                        <= max(3 * tb["standard_error_white"].get("temperatureBias", 0), 0.01 / math.sqrt(12))})
         report["recovery"] = rec
 
         report["identifiability"] = identifiability_cases(model, exp, truth, out, base, bounds, T, quantum, meta)
-        report["mismatch"] = mismatch_case(exp, truth, out, base, T, quantum, thresholds, meta)
+        report["mismatch"] = (mismatch_case(exp, truth, out, base, T, quantum, thresholds, meta)
+                              if "mismatch" in exp else None)
 
         evals = []
         for spec, d in holdout:
@@ -348,7 +356,7 @@ def run(experiment: Path, out: Path | None = None) -> dict:
                           "calibrated": evaluate(model, d, calibrated, T, quantum, thresholds["holdout"]),
                           "datasheet_derived": evaluate(model, d, {**base, "latencySamples": 0}, T, quantum,
                                                         thresholds["holdout"]),
-                          "timing": timing_check(d, T, tr["latencySamples"])})
+                          "timing": timing_check(d, T, (tr or {}).get("latencySamples", L))})
         report["holdout"] = evals
 
         report["profile"] = write_profile(out / f"{e['name']}.profile.toml", exp, report, calibrated, prof, lat, tb)

@@ -10,11 +10,17 @@ value recorded. It covers four cases:
 | Analog power module, Holybro PM02 V3 as the reference configuration | A1–A3 `Systems.Sensing.PowerModule.*`; vehicle level W2 | `power_pm02_synthetic.toml` | synthetic bench |
 | Pulse RPM sensor, Melexis US5881 on a 12-magnet ring | E1 `Systems.Sensing.Rpm.PulseSensor`; vehicle level R2 | `rpm_us5881_synthetic.toml` | synthetic edges |
 | Existing IMU, reuse case | I1 `Systems.Sensing.IMU.StatisticalSensor` | `imu_miluv_static.toml` | public MILUV static recordings (CC BY 4.0) |
+| DPS310 noise against oversampling | the part's datasheet figures | `python -m cp_calibration chambers` | public Causal Chambers wind tunnel, four DPS310 units (CC BY 4.0) |
 
 The power module and RPM references are named configurations, not the lab's
-hardware, which is still to be identified. Only the IMU case uses real
-measurements, and its chips are not identified, so it tests the workflow and
-validates no part.
+hardware, which is still to be identified. Two cases use real measurements:
+- **IMU:** its chips are not identified, so it tests the workflow and
+  validates no part.
+- **DPS310 (Causal Chambers):** real DPS310 units, but it tests only the
+  per-reading noise figures.
+
+The bench plans for the lab's hardware are in
+[sensor-bench-plans.md](sensor-bench-plans.md).
 
 COMPOSE owns the sensor's behaviour and its timing. It exposes them through
 the model and FMU interfaces. FastDyn decides how those outputs reach
@@ -157,6 +163,9 @@ Code lives in `tools/calibration/cp_calibration`:
 | `barometer.py` | the datasheet report via `fire-compose part --json`; structural variants; least squares through the FMU; latency by profile over compiled variants |
 | `stochastic.py` | exact Kalman likelihood of white noise + first-order Gauss-Markov drift, profile-likelihood intervals, Allan deviation, Ljung-Box |
 | `pipeline.py` | toolchain check, synthetic generation, staged fit, identifiability and mismatch cases, held-out evaluation, profile and report |
+| `power.py`, `rpm.py`, `imu.py` | the power-module, RPM and IMU pipelines |
+| `crosscheck.py` | the same test models simulated by Rumoca and by OpenModelica, compared |
+| `chambers.py` | DPS310 noise on the Causal Chambers wind tunnel data |
 
 ```sh
 python3 -m venv build/venv-calib && build/venv-calib/bin/pip install fmpy scipy numpy
@@ -168,8 +177,19 @@ PATH=<without ~/bin> ../../build/venv-calib/bin/python -m cp_calibration toolcha
 ```
 
 To run the tests, use `python3 tools/test_calibration.py` for the statistics,
-datasets and composer profiles. With the venv's Python, `FIRE_TEST_FMU=1`
-adds the toolchain check and `FIRE_TEST_CALIBRATION=1` adds the whole pilot.
+datasets and composer profiles. With the venv's Python, these flags add
+further tests:
+- `FIRE_TEST_FMU=1`: the toolchain checks;
+- `FIRE_TEST_FMU=1 FIRE_TEST_OMC=1`: the compiler cross-check;
+- `FIRE_TEST_CALIBRATION=1`: the pilots, and the pipelines on recorded files;
+- `FIRE_TEST_MILUV=1`: the MILUV IMU reuse;
+- `FIRE_TEST_CHAMBERS=1`: the Causal Chambers comparison.
+
+**Recorded data.** A `[[datasets]]` entry with `file`, `sha256` and
+`reference_sha256` is read from disk rather than generated. `python -m
+cp_calibration hash <file>` prints the two hashes. An experiment without
+`[truth]` skips same-model recovery, and `[mismatch]` becomes optional. See
+[sensor-bench-plans.md](sensor-bench-plans.md) for the layout.
 
 ### Workflow
 
@@ -250,6 +270,27 @@ not test a DPS310.
   - for sampled sensors, `sequence` makes missed readings countable;
   - for the RPM sensor, the count plus the edge buffer carry every edge (see
     below).
+- **A random draw in a state-event clause lagged by one event (fixed).**
+  In `PulseSensor`, the jitter draw `(normal, rngState) = normalDraw(...)`
+  and its use `lastEdgeTime = time + ... + edgeJitterStd*normal[1]` were two
+  equations in a `when cycles >= ...` clause. Rumoca's FMU gave each edge the
+  previous edge's draw, and the first edge none; OpenModelica gave the
+  current one.
+  - **Check:** OpenModelica matched an independent run of the MSL
+    `ModelicaRandom.c` generator draw for draw.
+  - **Fix:** the draw and its use are now one equation (`Rpm.reportedEdge`).
+  - **Effect on results:** the jitter's distribution was unaffected, so the
+    earlier RPM estimates stand statistically.
+  - **Not affected:** sample-clocked sensors (barometer, magnetometer,
+    `Sampler`) agree between the two compilers to round-off.
+- **Cross-check against OpenModelica** (`python -m cp_calibration
+  crosscheck`). It covers power-module A1–A3, the pulse sensor with jitter,
+  the barometer with noise, drift and quantization, `Sampler`, and the
+  magnetometer. Agreement:
+  - continuous outputs within 1e-7 relative;
+  - edge and sample times within 1e-13 s;
+  - counts and sequences exact.
+  - The composed W2 and R2 vehicles pass OpenModelica `checkModel`.
 - **Rumoca reads every `.mo` file under the library root.** Keep generated
   Modelica out of the tree. The harness writes its wrappers to a temporary
   directory.
@@ -293,6 +334,11 @@ resistance is identifiable, not the two factors.
 reference plus a logger's samples of the two outputs, taken off the stimulus
 clock. The logger is simulated: 1 mV rms noise, 16 bits.
 - Static gains and offsets are fitted through the A1 FMU.
+  - **Two standard errors are reported:** one assuming independent residuals,
+    and a Newey–West (HAC) one that allows for autocorrelation, with the
+    residuals' lag-1 correlation.
+  - **The profile carries the larger.** A real logger's filtering or slow
+    drift would otherwise make the independent ones optimistic.
 - The output time constant is fitted from a 20 kHz current step (A2), then
   refined jointly with the gain and offset.
 - **Identifiability:** A3's amplifier gain and shunt resistance must be
@@ -408,6 +454,35 @@ IMU, both at 200 Hz.
   spread 16 Pa, against the MS5611's 1.2–6.5 Pa. It cannot be attributed to
   the Pixhawk 4's MS5611, so no barometer noise is reported from it. The
   screen was written after a first look at the level.
+
+## DPS310 noise on public data (Causal Chambers)
+
+The Causal Chambers wind tunnel (Gamella, Peters and Bühlmann, 2025; data
+CC BY 4.0) carries four DPS310s. Its firmware reads them with Infineon's
+library at 1×–8× oversampling. Dataset `wt_test_v1`, experiment
+`osr_barometers`, holds 100 readings of all four at 1×, then 100 at 8×.
+`cp_calibration.chambers` downloads the 2.6 MB archive and checks its
+published MD5. It then reports each unit's noise after removing a linear
+trend, with chi-square intervals.
+
+| oversampling | datasheet (Table 16) | units (Pa) | ratio |
+|---|---|---|---|
+| 1× (the composer's `fast` mode) | 2.5 Pa | 1.54, 1.54, 1.62, 2.12 | 0.62–0.85 |
+| 8× | 0.4 Pa | 0.25, 0.26, 0.29, 0.29 | 0.61–0.72 |
+
+- **Datasheet figures are conservative.** All four units are at or below
+  them; the figures behave as typical values.
+- **Scaling matches.** The pooled 8×/1× ratio (0.157) matches the
+  datasheet's (0.160). Independent averaging alone would give 0.354.
+- **Composer default.** The `fast` mode default (2.5 Pa) is therefore
+  conservative for these units.
+- **Not tested:** absolute accuracy, drift, the temperature coefficient,
+  latency and 64×. There is no reference instrument, and each setting is
+  only 15 s.
+- **Shared variation.** The units share some variation (flow or ambient),
+  which the per-unit figures include.
+- **Thresholds.** The comparison was written after the data was first
+  examined, so it reports ratios, not a pass/fail verdict.
 
 ## Data a real calibration needs
 
