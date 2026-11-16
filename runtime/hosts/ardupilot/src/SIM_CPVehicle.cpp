@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <SITL/SITL.h>
 #include <AP_Declination/AP_Declination.h>
@@ -227,6 +228,16 @@ void CPVehicle::update(const struct sitl_input &input)
         }
     }
 
+    // One command is submitted before a real step. Readback comes after that step,
+    // independently of the slower navigation acquisition clock.
+    if (model_gnss && model_sensors.gps.ubx.present &&
+        fabs(sitl->gps_ubx_command[0] - model_sensors.gps.ubx.response[0]) > 0) {
+        const cpv_status_t status = cpv_set_gnss_ubx_command(vehicle, sitl->gps_ubx_command, 20);
+        if (status >= CPV_UNSUPPORTED) {
+            fail("set GNSS UBX command", status);
+        }
+    }
+
     // Advance to the end of this frame, in integer microseconds from start.
     const double target_s = (time_now_us + frame_time_us - start_time_us) * 1.0e-6;
     double reached_s = 0;
@@ -406,8 +417,8 @@ void CPVehicle::read_peripherals()
 
 /*
   The model's own magnetometer, GNSS and barometer, where it has them, replace
-  SITL's simulation of those sensors (SITL's SIM_MAG/SIM_GPS/SIM_BARO error
-  settings still apply on top where the drivers add them).
+  SITL's simulation of those sensors. Individual backends may add SITL errors;
+  model-owned UBX observations bypass generic GPS errors.
  */
 void CPVehicle::read_model_sensors()
 {
@@ -421,17 +432,65 @@ void CPVehicle::read_model_sensors()
         mag_bf = Vector3f(mag.field_frd_gauss[0], mag.field_frd_gauss[1],
                           mag.field_frd_gauss[2]) * 1000.0f;
     }
+    auto &gps = model_sensors.gps;
+    gps = {};
     if (model_gnss) {
         cpv_gnss_t gnss;
         if ((status = cpv_get_gnss(vehicle, &gnss)) >= CPV_UNSUPPORTED) {
             fail("read GNSS", status);
         }
-        model_sensors.gps_valid = true;
-        model_sensors.gps_latitude = gnss.latitude_deg;
-        model_sensors.gps_longitude = gnss.longitude_deg;
-        model_sensors.gps_altitude = gnss.altitude_wgs84_m;
-        model_sensors.gps_velocity_ned = Vector3f(gnss.velocity_ned[0], gnss.velocity_ned[1],
-                                                  gnss.velocity_ned[2]);
+        gps.valid = true;
+        gps.latitude = gnss.latitude_deg;
+        gps.longitude = gnss.longitude_deg;
+        gps.altitude = gnss.altitude_wgs84_m;
+        gps.velocity_ned = Vector3f(gnss.velocity_ned[0], gnss.velocity_ned[1], gnss.velocity_ned[2]);
+        // Receiver extensions belong to GNSS. The selected Modelica subtype
+        // exports these optional UBX ports; ordinary G0/G1 exports omit them.
+        auto optional = [this](const char *name, double *values, size_t count) {
+            const cpv_status_t result = cpv_get_field(vehicle, name, values, count);
+            if (result != CPV_UNSUPPORTED && result >= CPV_ERR_ARGUMENT) {
+                fail(name, result);
+            }
+            return result != CPV_UNSUPPORTED;
+        };
+        double pvt[14] {}, command[20] {};
+        auto &m = gps.ubx;
+        const bool pvt_present = optional("gnss_ubx_pvt", pvt, ARRAY_SIZE(pvt));
+        const bool response_present = optional("gnss_ubx_response", m.response, ARRAY_SIZE(m.response));
+        const bool command_present = optional("gnss_ubx_command", command, ARRAY_SIZE(command));
+        if (pvt_present != command_present || pvt_present != response_present) {
+            fail("GNSS UBX requires PVT, command and response together", CPV_ERR_CAPABILITY);
+        }
+        if (pvt_present) {
+            // Integer-valued fields must be checked before narrowing FMI Float64.
+            const uint8_t integer_fields[] = {0, 2, 3, 4, 5};
+            for (uint8_t i : integer_fields) {
+                const double maximum = i == 0 ? UINT32_MAX : i == 2 ? 604799999 : 255;
+                if (pvt[i] < 0 || pvt[i] > maximum || floor(pvt[i]) < pvt[i]) {
+                    fail("invalid GNSS UBX integer field", CPV_ERR_FMU);
+                }
+            }
+            m.present = true;
+            for (uint8_t i : {0, 3}) {
+                const double maximum = i==0 ? INT32_MAX : 4;
+                if (m.response[i]<0 || m.response[i]>maximum || floor(m.response[i])<m.response[i]) {
+                    fail("invalid GNSS UBX response control field", CPV_ERR_FMU);
+                }
+            }
+            m.sequence = uint32_t(pvt[0]);
+            m.itow_ms = uint32_t(pvt[2]);
+            m.fix_type = uint8_t(pvt[3]);
+            m.flags = uint8_t(pvt[4]);
+            m.num_sats = uint8_t(pvt[5]);
+            m.horizontal_acc = pvt[6];
+            m.vertical_acc = pvt[7];
+            m.speed_acc = pvt[8];
+            m.pdop = pvt[9];
+            m.ground_speed = pvt[10];
+            m.course_deg = pvt[11];
+            m.course_acc_deg = pvt[12];
+            m.geoid_separation = pvt[13];
+        }
     }
     if (model_baro) {
         cpv_baro_t baro;

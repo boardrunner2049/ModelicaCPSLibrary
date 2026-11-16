@@ -1,0 +1,435 @@
+diff --git a/libraries/SITL/SIM_GPS.cpp b/libraries/SITL/SIM_GPS.cpp
+index 31698fa..6ed2705 100644
+--- a/libraries/SITL/SIM_GPS.cpp
++++ b/libraries/SITL/SIM_GPS.cpp
+@@ -74,6 +74,13 @@ uint32_t GPS::device_baud() const
+  */
+ ssize_t GPS::write_to_autopilot(const char *p, size_t size) const
+ {
++    if (instance == 0 && _sitl->state.model_sensors.gps.ubx.present) {
++        // GNSS UBX frames are enqueued whole, so replies can retry without interleaving.
++        if (to_autopilot->space() < size) {
++            return 0;
++        }
++        return SerialDevice::write_to_autopilot(p, size);
++    }
+     // the second GPS instance fails in a different way to the first;
+     // the first will start sending back 3 satellites, the second just
+     // stops responding when disabled.  This is not necessarily a good
+@@ -309,21 +316,66 @@ void GPS::update()
+         return;
+     }
+ 
++    const auto &model = _sitl->state.model_sensors;
++    if (model.gps.ubx.present) {
++        if (instance != 0) {
++            return;
++        }
++#if AP_SIM_GPS_UBLOX_ENABLED
++        if (allocated_type != uint8_t(Type::UBLOX)) {
++            AP_HAL::panic("GNSS UBX observations require SIM_GPS_TYPE=1 (UBlox)");
++        }
++#else
++        AP_HAL::panic("GNSS UBX observations require the UBlox simulator");
++#endif
++        const auto &m = model.gps.ubx;
++        backend->update_read();
++        if (m.sequence == last_model_sequence) {
++            return;
++        }
++        // A serial backend can open or reopen after model acquisition has started.
++        if (last_model_sequence != 0 && m.sequence != last_model_sequence + 1) {
++            AP_HAL::panic("GNSS UBX observation sequence skipped or reset");
++        }
++        GPS_Data d {};
++        d.from_model = true;
++        d.latitude = model.gps.latitude;
++        d.longitude = model.gps.longitude;
++        d.altitude = model.gps.altitude;
++        d.speedN = model.gps.velocity_ned.x;
++        d.speedE = model.gps.velocity_ned.y;
++        d.speedD = model.gps.velocity_ned.z;
++        d.itow_ms = m.itow_ms;
++        d.fix_type = m.fix_type;
++        d.flags = m.flags;
++        d.num_sats = m.num_sats;
++        d.horizontal_acc = m.horizontal_acc;
++        d.vertical_acc = m.vertical_acc;
++        d.speed_acc = m.speed_acc;
++        d.pdop = m.pdop;
++        d.ground_speed = m.ground_speed;
++        d.course_deg = m.course_deg;
++        d.course_acc_deg = m.course_acc_deg;
++        d.geoid_separation = m.geoid_separation;
++        backend->publish(&d);
++        last_model_sequence = m.sequence;
++        return;
++    }
++
+     double latitude =_sitl->state.latitude;
+     double longitude = _sitl->state.longitude;
+     float altitude = _sitl->state.altitude;
+     double speedN = _sitl->state.speedN;
+     double speedE = _sitl->state.speedE;
+     double speedD = _sitl->state.speedD;
+-    const auto &model = _sitl->state.model_sensors;
+-    if (model.gps_valid) {
++    if (model.gps.valid) {
+         // the vehicle model's own GNSS receiver
+-        latitude = model.gps_latitude;
+-        longitude = model.gps_longitude;
+-        altitude = model.gps_altitude;
+-        speedN = model.gps_velocity_ned.x;
+-        speedE = model.gps_velocity_ned.y;
+-        speedD = model.gps_velocity_ned.z;
++        latitude = model.gps.latitude;
++        longitude = model.gps.longitude;
++        altitude = model.gps.altitude;
++        speedN = model.gps.velocity_ned.x;
++        speedE = model.gps.velocity_ned.y;
++        speedD = model.gps.velocity_ned.z;
+     }
+     const uint32_t now_ms = AP_HAL::millis();
+ 
+diff --git a/libraries/SITL/SIM_GPS.h b/libraries/SITL/SIM_GPS.h
+index 1bdb583..b7f50c9 100644
+--- a/libraries/SITL/SIM_GPS.h
++++ b/libraries/SITL/SIM_GPS.h
+@@ -49,6 +49,10 @@ struct GPS_Data {
+     float vertical_acc;
+     float speed_acc;
+     uint8_t num_sats;
++    bool from_model;
++    uint32_t itow_ms;
++    uint8_t fix_type, flags;
++    float pdop, ground_speed, course_deg, course_acc_deg, geoid_separation;
+ 
+     // Get course over ground [rad], where 0 = North in WGS-84 coordinate system.
+     // Calculated from 2D velocity.
+@@ -147,6 +151,7 @@ private:
+ 
+     // The last time GPS data was written [mS]
+     uint32_t last_write_update_ms;
++    uint32_t last_model_sequence = 0;
+ 
+     // last 20 samples, allowing for up to 20 samples of delay
+     GPS_Data _gps_history[20];
+diff --git a/libraries/SITL/SIM_GPS_UBLOX.cpp b/libraries/SITL/SIM_GPS_UBLOX.cpp
+index ce77a44..728c910 100644
+--- a/libraries/SITL/SIM_GPS_UBLOX.cpp
++++ b/libraries/SITL/SIM_GPS_UBLOX.cpp
+@@ -11,28 +11,187 @@ using namespace SITL;
+ /*
+   send a UBLOX GPS message
+  */
+-void GPS_UBlox::send_ubx(uint8_t msgid, uint8_t *buf, uint16_t size)
++bool GPS_UBlox::send_ubx(uint8_t msgid, const uint8_t *buf, uint16_t size, uint8_t msgclass)
+ {
+-    const uint8_t PREAMBLE1 = 0xb5;
+-    const uint8_t PREAMBLE2 = 0x62;
+-    const uint8_t CLASS_NAV = 0x1;
+-    uint8_t hdr[6], chk[2];
+-    hdr[0] = PREAMBLE1;
+-    hdr[1] = PREAMBLE2;
+-    hdr[2] = CLASS_NAV;
+-    hdr[3] = msgid;
+-    hdr[4] = size & 0xFF;
+-    hdr[5] = size >> 8;
+-    chk[0] = chk[1] = hdr[2];
+-    chk[1] += (chk[0] += hdr[3]);
+-    chk[1] += (chk[0] += hdr[4]);
+-    chk[1] += (chk[0] += hdr[5]);
+-    for (uint16_t i=0; i<size; i++) {
+-        chk[1] += (chk[0] += buf[i]);
++    uint8_t packet[256] {0xb5, 0x62, msgclass, msgid, uint8_t(size), uint8_t(size >> 8)};
++    if (size > sizeof(packet)-8) {
++        AP_HAL::panic("Simulated UBX packet too large");
++    }
++    memcpy(packet+6, buf, size);
++    uint8_t a=0, b=0;
++    for (uint16_t i=2; i<size+6; i++) {
++        b += (a += packet[i]);
++    }
++    packet[size+6]=a;
++    packet[size+7]=b;
++    if (instance != 0 || !_sitl->state.model_sensors.gps.ubx.present) {
++        // Preserve the stock header/payload/checksum writes, including short-buffer behavior.
++        write_to_autopilot((const char*)packet, 6);
++        write_to_autopilot((const char*)packet+6, size);
++        write_to_autopilot((const char*)packet+size+6, 2);
++        return true;
++    }
++    return write_to_autopilot((const char*)packet, size+8)==size+8;
++}
++
++// Framing only: completed requests are interpreted by the Modelica receiver.
++bool GPS_UBlox::parse_config_byte(uint8_t byte)
++{
++    switch (parse_state) {
++    case 0:
++        if (byte==0xb5) { parse_state=1; }
++        return false;
++    case 1:
++        parse_state=byte==0x62 ? 2 : byte==0xb5 ? 1 : 0;
++        checksum_a=checksum_b=0;
++        return false;
++    case 2: case 3: case 4: case 5:
++        header[parse_state-2]=byte;
++        if (++parse_state==6) {
++            payload_length=uint16_t(header[2]) | (uint16_t(header[3])<<8);
++            payload_offset=0;
++            if (payload_length==0) { parse_state=7; }
++        }
++        break;
++    case 6:
++        if (payload_offset < sizeof(payload)) { payload[payload_offset]=byte; }
++        if (++payload_offset==payload_length) { parse_state=7; }
++        break;
++    case 7:
++        parse_state=byte==checksum_a ? 8 : byte==0xb5 ? 1 : 0;
++        return false;
++    case 8:
++        parse_state=0;
++        if (byte==checksum_b) { return true; }
++        if (byte==0xb5) { parse_state=1; }
++        return false;
++    }
++    checksum_b += (checksum_a += byte);
++    return false;
++}
++
++void GPS_UBlox::submit_config()
++{
++    double *request=_sitl->gps_ubx_command;
++    if (request[0]>=INT32_MAX) { AP_HAL::panic("GNSS UBX command identifier exhausted"); }
++    pending_request=uint32_t(request[0])+1;
++    memset(request, 0, sizeof(_sitl->gps_ubx_command));
++    request[0]=pending_request;
++    request[1]=header[0];
++    request[2]=header[1];
++    request[3]=payload_length==0 ? 0 : 2;
++    if (header[0]==6 && header[1]==0x24 && payload_length==sizeof(Nav5)) {
++        Nav5 nav;
++        memcpy(&nav, payload, sizeof(nav));
++        request[3]=1;
++        request[4]=nav.mask;
++        request[5]=nav.dynamic_model;
++        request[6]=nav.fix_mode;
++        request[7]=nav.fixed_alt*0.01;
++        request[8]=nav.fixed_alt_variance*0.0001;
++        request[9]=nav.min_elevation;
++        request[10]=double(nav.pdop)/10;
++        request[11]=nav.tdop*0.1;
++        request[12]=nav.position_accuracy;
++        request[13]=nav.time_accuracy;
++        request[14]=double(nav.static_speed)/100;
++        request[15]=nav.dgnss_timeout;
++        request[16]=nav.cno_count;
++        request[17]=nav.cno;
++        request[18]=nav.static_distance;
++        request[19]=nav.utc;
++    }
++}
++
++void GPS_UBlox::update_read()
++{
++    if (!_sitl->state.model_sensors.gps.ubx.present || instance!=0) {
++        GPS_Backend::update_read();
++        return;
++    }
++    if (pending_request!=0) {
++        const double *response=_sitl->state.model_sensors.gps.ubx.response;
++        if (uint32_t(response[0])!=pending_request) { return; }
++        if (uint8_t(response[3])==4) {
++            ::printf("GNSS UBX configuration coverage gap: class=%u id=%u\n",
++                     unsigned(header[0]), unsigned(header[1]));
++        } else {
++            if (uint8_t(response[3])!=1 && uint8_t(response[3])!=2) {
++                AP_HAL::panic("Invalid GNSS UBX configuration response");
++            }
++            if (uint8_t(response[3])==1 && !readback_sent && header[0]==10 && header[1]==4) {
++                struct {
++                    char software[30], hardware[10], extension[3][30];
++                } version {};
++                static_assert(sizeof(version)==130, "MON-VER payload");
++                const unsigned major=uint8_t(response[5]), minor=uint8_t(response[6]);
++                snprintf(version.software, sizeof(version.software), "EXT CORE %u.%02u (emulated)", major, minor);
++                snprintf(version.hardware, sizeof(version.hardware), "%08u", uint32_t(response[4])%100000000U);
++                snprintf(version.extension[0], sizeof(version.extension[0]), "FWVER=SPG %u.%02u", major, minor);
++                snprintf(version.extension[1], sizeof(version.extension[1]), "PROTVER=%u.%02u", unsigned(uint8_t(response[7])), unsigned(uint8_t(response[8])));
++                snprintf(version.extension[2], sizeof(version.extension[2]), "MOD=NEO-M%uN", unsigned(uint8_t(response[9])));
++                if (!send_ubx(4, (const uint8_t*)&version, sizeof(version), 10)) { return; }
++                readback_sent=true;
++            }
++            if (uint8_t(response[3])==1 && !readback_sent && header[0]==6 && header[1]==0) {
++                struct PACKED {
++                    uint8_t port_id, reserved0;
++                    uint16_t tx_ready;
++                    uint32_t mode, baud;
++                    uint16_t input_protocols, output_protocols, flags, reserved1;
++                } port {};
++                static_assert(sizeof(port)==20, "CFG-PRT UART payload");
++                port.port_id=uint8_t(response[4]);
++                port.tx_ready=uint16_t(response[5]);
++                port.mode=uint32_t(response[6]);
++                port.baud=uint32_t(response[7]);
++                port.input_protocols=uint16_t(response[8]);
++                port.output_protocols=uint16_t(response[9]);
++                port.flags=uint16_t(response[10]);
++                if (!send_ubx(0, (const uint8_t*)&port, sizeof(port), 6)) { return; }
++                readback_sent=true;
++            }
++            if (uint8_t(response[3])==1 && !readback_sent && header[0]==6 && header[1]==0x24) {
++                Nav5 nav {};
++                nav.mask=uint16_t(response[4]);
++                nav.dynamic_model=uint8_t(response[5]);
++                nav.fix_mode=uint8_t(response[6]);
++                nav.fixed_alt=int32_t(lround(response[7]*100));
++                nav.fixed_alt_variance=uint32_t(lround(response[8]*10000));
++                nav.min_elevation=int8_t(response[9]);
++                nav.pdop=uint16_t(lround(response[10]*10));
++                nav.tdop=uint16_t(lround(response[11]*10));
++                nav.position_accuracy=uint16_t(response[12]);
++                nav.time_accuracy=uint16_t(response[13]);
++                nav.static_speed=uint8_t(lround(response[14]*100));
++                nav.dgnss_timeout=uint8_t(response[15]);
++                nav.cno_count=uint8_t(response[16]);
++                nav.cno=uint8_t(response[17]);
++                nav.static_distance=uint16_t(response[18]);
++                nav.utc=uint8_t(response[19]);
++                if (!send_ubx(0x24, (const uint8_t*)&nav, sizeof(nav), 6)) { return; }
++                readback_sent=true;
++            }
++            if (uint8_t(response[3])==1 && !readback_sent) {
++                AP_HAL::panic("Unsupported GNSS UBX poll response");
++            }
++            if (header[0]==6) {
++                const uint8_t ack[2] {header[0], header[1]};
++                if (!send_ubx(1, ack, sizeof(ack), 5)) { return; }
++            }
++        }
++        pending_request=0;
++        readback_sent=false;
++    }
++    // The existing UART buffer queues later commands while this one is in flight.
++    for (uint16_t budget=0; budget<2048; budget++) {
++        char byte;
++        if (read_from_autopilot(&byte, 1)!=1) { return; }
++        if (parse_config_byte(uint8_t(byte))) {
++            submit_config();
++            return;
++        }
+     }
+-    write_to_autopilot((char*)hdr, sizeof(hdr));
+-    write_to_autopilot((char*)buf, size);
+-    write_to_autopilot((char*)chk, sizeof(chk));
+ }
+ 
+ /*
+@@ -188,6 +347,32 @@ void GPS_UBlox::publish(const GPS_Data *d)
+ 
+     uint32_t _next_nav_sv_info_time = 0;
+ 
++    if (d->from_model) {
++        pvt.itow = d->itow_ms;
++        pvt.fix_type = d->fix_type;
++        pvt.flags = d->flags;
++        pvt.num_sv = d->num_sats;
++        pvt.lon = d->longitude * 1.0e7;
++        pvt.lat = d->latitude * 1.0e7;
++        pvt.height = d->altitude * 1000.0;
++        pvt.h_msl = (d->altitude - d->geoid_separation) * 1000.0;
++        pvt.h_acc = d->horizontal_acc * 1000.0f;
++        pvt.v_acc = d->vertical_acc * 1000.0f;
++        pvt.velN = d->speedN * 1000.0;
++        pvt.velE = d->speedE * 1000.0;
++        pvt.velD = d->speedD * 1000.0;
++        pvt.gspeed = d->ground_speed * 1000.0f;
++        pvt.head_mot = d->course_deg * 1.0e5;
++        pvt.headVeh = pvt.head_mot;
++        pvt.s_acc = d->speed_acc * 1000.0f;
++        pvt.head_acc = d->course_acc_deg * 1.0e5;
++        pvt.p_dop = roundf(d->pdop * 100.0f);
++        if (!send_ubx(MSG_PVT, (uint8_t*)&pvt, sizeof(pvt))) {
++            AP_HAL::panic("GNSS UBX navigation UART full or unavailable");
++        }
++        return;
++    }
++
+     const auto gps_tow = gps_time();
+ 
+     pos.time = gps_tow.ms;
+diff --git a/libraries/SITL/SIM_GPS_UBLOX.h b/libraries/SITL/SIM_GPS_UBLOX.h
+index 6ab5d01..bd56863 100644
+--- a/libraries/SITL/SIM_GPS_UBLOX.h
++++ b/libraries/SITL/SIM_GPS_UBLOX.h
+@@ -13,9 +13,30 @@ public:
+     using GPS_Backend::GPS_Backend;
+ 
+     void publish(const GPS_Data *d) override;
++    void update_read() override;
+ 
+ private:
+-    void send_ubx(uint8_t msgid, uint8_t *buf, uint16_t size);
++    bool send_ubx(uint8_t msgid, const uint8_t *buf, uint16_t size, uint8_t msgclass=1);
++    bool parse_config_byte(uint8_t byte);
++    void submit_config();
++    struct PACKED Nav5 {
++        uint16_t mask;
++        uint8_t dynamic_model, fix_mode;
++        int32_t fixed_alt;
++        uint32_t fixed_alt_variance;
++        int8_t min_elevation;
++        uint8_t reserved0;
++        uint16_t pdop, tdop, position_accuracy, time_accuracy;
++        uint8_t static_speed, dgnss_timeout, cno_count, cno;
++        uint8_t reserved1[2];
++        uint16_t static_distance;
++        uint8_t utc, reserved2[5];
++    };
++    static_assert(sizeof(Nav5)==36, "SPG 4.04 NAV5 size");
++    uint8_t parse_state=0, header[4] {}, payload[36] {}, checksum_a=0, checksum_b=0;
++    uint16_t payload_length=0, payload_offset=0;
++    uint32_t pending_request=0;
++    bool readback_sent=false;
+ };
+ 
+ };
+diff --git a/libraries/SITL/SITL.h b/libraries/SITL/SITL.h
+index 87065d7..61157c7 100644
+--- a/libraries/SITL/SITL.h
++++ b/libraries/SITL/SITL.h
+@@ -57,10 +57,20 @@ class FlightAxis;
+ // valid, the SITL GPS and barometer report them instead of simulating them
+ // from the vehicle's truth.
+ struct sitl_model_sensors {
+-    bool gps_valid;
+-    double gps_latitude, gps_longitude; // degrees
+-    double gps_altitude;                // m, as sitl_fdm::altitude
+-    Vector3f gps_velocity_ned;          // m/s
++    struct {
++        bool valid;
++        double latitude, longitude; // degrees
++        double altitude;            // m, as sitl_fdm::altitude
++        Vector3f velocity_ned;      // m/s
++        struct {
++            bool present;
++            double response[20];
++            uint32_t sequence, itow_ms;
++            uint8_t fix_type, flags, num_sats;
++            float horizontal_acc, vertical_acc, speed_acc, pdop;
++            float ground_speed, course_deg, course_acc_deg, geoid_separation;
++        } ubx;
++    } gps;
+     bool baro_valid;
+     float baro_pressure_pa;
+     float baro_temperature_c;
+@@ -178,6 +188,8 @@ static inline sitl_fdm external_ahrs_view(const sitl_fdm &state)
+ 
+ class SIM {
+ public:
++    // Input mailbox, separate from the copied aircraft output structure.
++    double gps_ubx_command[20] {};
+ 
+     SIM() {
+         AP_Param::setup_object_defaults(this, var_info);

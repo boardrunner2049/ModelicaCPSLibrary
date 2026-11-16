@@ -1,7 +1,7 @@
 //! Magnetometer (M0/M1), barometer (B0/B1) and GNSS (G0/G1) selection:
 //! `[models.KIND] model = ...` picks the level, `[KIND]` sets its parameters.
 //! Every vehicle kind composes them into `sensors(...)` the same way.
-use crate::composition::Modifier;
+use crate::composition::{Modifier, Value as ModelicaValue};
 use crate::config::{array, integer, number, table, Table};
 use crate::Result;
 use toml::Value;
@@ -145,6 +145,22 @@ pub const GNSS: Sensor = Sensor {
 
 pub const SENSORS: [&Sensor; 3] = [&MAGNETOMETER, &BAROMETER, &GNSS];
 
+// Parameter name and whether zero is allowed; Modelica enforces device-specific bounds.
+const M9N_PARAMETERS: &[(&str, bool)] = &[
+    ("samplePeriod", false),
+    ("reportedPdop", true),
+    ("pdopLimit", false),
+    ("staticHoldSpeedThreshold", true),
+    ("staticHoldMaxDistance", true),
+];
+
+pub(crate) fn check_m9n_binding(models: &Table, vehicle: &str, profile: &str) -> Result<()> {
+    if GNSS.m9n(models) && (vehicle != "multirotor" || profile != "vio") {
+        return Err("gnss vendor m9n requires vehicle multirotor with export profile vio".into());
+    }
+    Ok(())
+}
+
 impl Sensor {
     pub fn level(&self, model: &str) -> Option<&'static Level> {
         self.levels.iter().find(|l| l.model == model)
@@ -181,23 +197,32 @@ impl Sensor {
             .and_then(Value::as_str)
             .unwrap_or("ideal")
     }
+
+    pub(crate) fn m9n(&self, models: &Table) -> bool {
+        self.name == "gnss"
+            && models.get("gnss")
+                .and_then(Value::as_table)
+                .and_then(|t| t.get("vendor"))
+                .and_then(Value::as_str) == Some("m9n")
+    }
 }
 
 /// `[models.KIND]`: `model = "<level model>"` (legacy `response = "ideal"`).
 pub fn selection(sensor: &Sensor, raw: &Value) -> Result<Table> {
     let label = format!("models.{}", sensor.name);
-    let t = table(raw, &["model", "response"], &label)?;
+    let keys: &[&str] = if sensor.name == "gnss" {
+        &["model", "response", "vendor"]
+    } else {
+        &["model", "response"]
+    };
+    let t = table(raw, keys, &label)?;
     let name = match (t.get("model"), t.get("response")) {
         (Some(m), None) => m.as_str(),
         (None, Some(r)) if r.as_str() == Some("ideal") => Some("ideal"),
         _ => None,
     };
-    match name.and_then(|n| sensor.level(n)) {
-        Some(level) => Ok(Table::from_iter([(
-            "model".into(),
-            Value::String(level.model.into()),
-        )])),
-        None => Err(format!(
+    let level = name.and_then(|n| sensor.level(n)).ok_or_else(|| {
+        format!(
             "{label}.model must be {}",
             sensor
                 .levels
@@ -205,14 +230,29 @@ pub fn selection(sensor: &Sensor, raw: &Value) -> Result<Table> {
                 .map(|l| format!("\"{}\" ({})", l.model, l.level))
                 .collect::<Vec<_>>()
                 .join(" or ")
-        )),
+        )
+    })?;
+    let mut selected = Table::from_iter([(
+        "model".into(),
+        Value::String(level.model.into()),
+    )]);
+    if let Some(vendor) = t.get("vendor") {
+        if vendor.as_str() != Some("m9n") || level.model != "ideal" {
+            return Err(format!("{label}: vendor must be m9n with physics model ideal"));
+        }
+        selected.insert("vendor".into(), vendor.clone());
     }
+    Ok(selected)
 }
 
 /// `[KIND]`: the selected level's parameters, checked.
 pub fn resolve(sensor: &Sensor, raw: &Value, models: &Table) -> Result<Table> {
     let model = sensor.selected(models);
-    let keys = sensor.keys(model);
+    let m9n = sensor.m9n(models);
+    let mut keys = sensor.keys(model);
+    if m9n {
+        keys.push("m9n");
+    }
     let t = table(raw, &keys, sensor.name).map_err(|e| {
         format!(
             "{e} ({} model \"{model}\"; select another in [models.{}])",
@@ -220,6 +260,14 @@ pub fn resolve(sensor: &Sensor, raw: &Value, models: &Table) -> Result<Table> {
         )
     })?;
     for (key, value) in t {
+        if m9n && key == "m9n" {
+            let keys = M9N_PARAMETERS.iter().map(|p| p.0).collect::<Vec<_>>();
+            for (key, value) in table(value, &keys, "gnss.m9n")? {
+                let zero = M9N_PARAMETERS.iter().find(|p| p.0 == key).unwrap().1;
+                number(value, &format!("gnss.m9n.{key}"), !zero, zero)?;
+            }
+            continue;
+        }
         let label = format!("{}.{key}", sensor.name);
         match sensor.shape(model, key).expect("accepted keys have shapes") {
             Shape::Positive => {
@@ -287,18 +335,49 @@ pub fn modifiers(models: &Table, tables: [&Table; 3]) -> Result<Vec<Modifier>> {
         let level = sensor
             .level(sensor.selected(models))
             .expect("resolved selection");
-        if level.model != sensor.levels[0].model {
+        let m9n = sensor.m9n(models);
+        if m9n {
+            out.push(Modifier::RedeclareModel {
+                name: sensor.replaceable.into(),
+                class: "ModelicaCPSLibrary.Systems.Sensing.GNSS.Device".into(),
+                modifiers: vec![Modifier::RedeclareModel {
+                    name: "PhysicsModel".into(),
+                    class: level.class.into(),
+                    modifiers: vec![],
+                }],
+            });
+        } else if level.model != sensor.levels[0].model {
             out.push(Modifier::RedeclareModel {
                 name: sensor.replaceable.into(),
                 class: level.class.into(),
                 modifiers: vec![],
             });
         }
-        if !parameters.is_empty() {
-            let fields = parameters
-                .iter()
+        let mut fields = Vec::new();
+        for (key, value) in parameters {
+            if m9n && key == "m9n" {
+                continue;
+            }
+            fields.push(Modifier::Bind(key.clone(), crate::lower::literal(value)?));
+        }
+        if m9n {
+            let params = parameters.get("m9n").and_then(Value::as_table)
+                .cloned().unwrap_or_default();
+            let mut config = params.iter()
                 .map(|(k, v)| Ok(Modifier::Bind(k.clone(), crate::lower::literal(v)?)))
                 .collect::<Result<Vec<_>>>()?;
+            config.push(Modifier::Bind(
+                "configCommand".into(),
+                ModelicaValue::Reference("gnss_ubx_command".into()),
+            ));
+            fields.push(Modifier::RedeclareModel {
+                name: "VendorConfigModel".into(),
+                class: "ModelicaCPSLibrary.Systems.Sensing.GNSS.VendorConfig.M9N".into(),
+                modifiers: vec![],
+            });
+            fields.push(Modifier::Nested("vendorConfig".into(), config));
+        }
+        if !fields.is_empty() {
             out.push(Modifier::Nested(sensor.component.into(), fields));
         }
     }
@@ -343,6 +422,68 @@ mod tests {
         assert!(resolve(&GNSS, &g, &models("gnss", "statistical")).is_err());
     }
 
+    #[test]
+    fn gnss_physics_and_vendor_are_selected_separately() {
+        for model in ["ideal", "statistical"] {
+            let raw: Value = toml::from_str(&format!("model = \"{model}\"")).unwrap();
+            let plain = selection(&GNSS, &raw).unwrap();
+            assert_eq!(plain["model"].as_str(), Some(model));
+            assert!(!plain.contains_key("vendor"));
+        }
+        let raw: Value = toml::from_str("model = \"ideal\"\nvendor = \"m9n\"").unwrap();
+        let wrapped = selection(&GNSS, &raw).unwrap();
+        assert_eq!(wrapped["model"].as_str(), Some("ideal"));
+        assert_eq!(wrapped["vendor"].as_str(), Some("m9n"));
+        for raw in [
+            "model = \"statistical\"\nvendor = \"m9n\"",
+            "model = \"ideal\"\nvendor = \"unknown\"",
+            "model = \"ideal\"\nvendor = 9",
+            "model = \"m9n\"",
+        ] {
+            assert!(selection(&GNSS, &toml::from_str(raw).unwrap()).is_err());
+        }
+        assert!(selection(&BAROMETER, &toml::from_str("vendor = \"m9n\"").unwrap()).is_err());
+        assert!(crate::config::parse(
+            "schema_version=3\n[models.gnss]\npart=\"ublox_neo_m9n\"\nlevel=\"G0\"\nvendor=\"m9n\"\n"
+        ).is_err());
+    }
+
+    #[test]
+    fn m9n_parameters_are_forwarded_and_scoped() {
+        let config = crate::config::parse(
+            "schema_version = 3\n[models.gnss]\nmodel = \"ideal\"\nvendor = \"m9n\"\n\
+             [gnss]\npositionBias = [1, 2, 3]\n[gnss.m9n]\n\
+             staticHoldSpeedThreshold = 0.25\nstaticHoldMaxDistance = 10\n",
+        )
+        .unwrap();
+        let source = crate::lower::compose(&config, "vio").unwrap().emit().unwrap();
+        assert!(source.contains("staticHoldSpeedThreshold=0.25"));
+        assert!(source.contains("staticHoldMaxDistance=10"));
+        assert_eq!(source.matches("positionBias={1,2,3}").count(), 1);
+        assert!(source.contains("redeclare model PhysicsModel=ModelicaCPSLibrary.Systems.Sensing.GNSS.Sensor("));
+
+        let selected = config.models;
+        let disabled: Value = toml::from_str(
+            "[m9n]\nstaticHoldSpeedThreshold = 0\nstaticHoldMaxDistance = 0",
+        )
+        .unwrap();
+        assert!(resolve(&GNSS, &disabled, &selected).is_ok());
+        for model in ["ideal", "statistical"] {
+            assert!(resolve(&GNSS, &disabled, &models("gnss", model)).is_err());
+        }
+        for raw in [
+            "[m9n]\nstaticHoldSpeedThreshold = -0.01",
+            "[m9n]\nstaticHoldMaxDistance = -1",
+            "[m9n]\nstaticHoldSpeedThreshold = [0.25]",
+            "[m9n]\nstaticHoldMaxDistance = \"10\"",
+            "[m9n]\nstaticHoldUnknown = 1",
+            "[m9n]\npositionBias = [1,2,3]",
+            "staticHoldMaxDistance = 10",
+        ] {
+            assert!(resolve(&GNSS, &toml::from_str(raw).unwrap(), &selected).is_err());
+        }
+    }
+
     /// Every parameter a level accepts is declared by its Modelica class.
     #[test]
     fn parameters_are_declared_by_the_classes() {
@@ -367,6 +508,18 @@ mod tests {
                     assert!(declared, "{} does not declare parameter {key}", level.class);
                 }
             }
+        }
+        let source =
+            std::fs::read_to_string(root.join("Systems/Sensing/GNSS/VendorConfig/M9N.mo")).unwrap();
+        for &(key, _) in M9N_PARAMETERS {
+            assert!(
+                source.lines().any(|line| {
+                    line.trim_start().starts_with("parameter")
+                        && line.split(|c: char| !c.is_alphanumeric() && c != '_')
+                            .any(|word| word == key)
+                }),
+                "M9N does not declare {key}"
+            );
         }
     }
 

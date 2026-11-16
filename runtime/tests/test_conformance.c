@@ -389,6 +389,73 @@ edits:;
   free(text);
 }
 
+static void test_gnss_inputs(void) {
+  double command[20] = {1, 6, 36, 0}, response[20] = {0};
+  CHECK(cpv_set_gnss_ubx_command(NULL, command, 20) == CPV_ERR_ARGUMENT, "NULL instance accepted");
+  cpv_vehicle_t *v = open_vehicle(quad, ALL, 7);
+  if (!v) return;
+  CHECK(cpv_set_gnss_ubx_command(v, NULL, 20) == CPV_ERR_ARGUMENT, "NULL command accepted");
+  CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_ERR_STATE, "command before initialization");
+  OK(cpv_initialize(v, 0));
+  CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_UNSUPPORTED, "absent GNSS input accepted");
+  cpv_close(v);
+
+  char path[1200];
+  snprintf(path, sizeof(path), "%s/quad_m9n/vehicle.json", vehicles);
+  const char *const capabilities[] = {"gnss_v1"};
+  v = open_vehicle(path, capabilities, 1);
+  if (!v)
+    return;
+  OK(cpv_initialize(v, 0));
+  CHECK(cpv_set_gnss_ubx_command(v, command, 19) == CPV_ERR_ARGUMENT, "short command accepted");
+  command[19] = NAN;
+  CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_ERR_ARGUMENT, "NaN command accepted");
+  command[19] = 0;
+  OK(cpv_set_gnss_ubx_command(v, command, 20));
+  CHECK(cpv_time(v) == 0, "setting a command advanced time");
+  OK(cpv_advance_to(v, 0.001, NULL));
+  OK(cpv_get_field(v, "gnss_ubx_response", response, 20));
+  CHECK(response[0] == 1 && response[3] == 1 && response[10] == 3 && response[14] == 0,
+        "initial NAV5 poll/readback differs");
+
+  command[0] = 2; command[3] = 1; command[4] = 0x50;
+  command[10] = 1.1; command[12] = 100; command[14] = 2.55; command[18] = 65535;
+  double before = cpv_time(v);
+  OK(cpv_set_gnss_ubx_command(v, command, 20));
+  CHECK(cpv_time(v) == before, "writing settings advanced time");
+  OK(cpv_advance_to(v, 0.002, NULL));
+  OK(cpv_get_field(v, "gnss_ubx_response", response, 20));
+  CHECK(response[0] == 2 && response[3] == 2 && response[10] == 1.1 &&
+        response[14] == 2.55 && response[18] == 65535, "fractional NAV5 write/readback differs");
+  command[10] = 2.2;
+  OK(cpv_set_gnss_ubx_command(v, command, 20));
+  OK(cpv_advance_to(v, 0.0025, NULL));
+  OK(cpv_get_field(v, "gnss_ubx_response", response, 20));
+  CHECK(response[0] == 2 && response[10] == 1.1, "repeated request ID reapplied changed payload");
+
+  command[0] = 3; command[2] = 8; command[3] = 0;
+  OK(cpv_set_gnss_ubx_command(v, command, 20));
+  OK(cpv_advance_to(v, 0.003, NULL));
+  OK(cpv_get_field(v, "gnss_ubx_response", response, 20));
+  CHECK(response[0] == 3 && response[3] == 4 && response[10] == 1.1,
+        "unmodeled request changed configuration or fabricated acceptance");
+  OK(cpv_advance_to(v, 0.201, NULL));
+  double pvt[14] = {0};
+  OK(cpv_get_field(v, "gnss_ubx_pvt", pvt, 14));
+  CHECK(pvt[0] == 2 && pvt[3] == 3 && pvt[4] == 0,
+        "PDOP change did not affect the next acquisition's validity");
+  command[0] = 2147483647.0; command[2] = 36;
+  OK(cpv_set_gnss_ubx_command(v, command, 20));
+  OK(cpv_advance_to(v, .202, NULL));
+  OK(cpv_get_field(v, "gnss_ubx_response", response, 20));
+  CHECK(response[0] == 2147483647.0 && response[3] == 1,
+        "receiver rejected the maximum legal request ID");
+  OK(cpv_reset(v));
+  CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_ERR_STATE, "command after reset before init");
+  cpv_close(v);
+
+}
+
 int main(int argc, char **argv) {
   if (argc != 2) {
     fprintf(stderr, "usage: %s VEHICLES_DIR\n", argv[0]);
@@ -403,6 +470,7 @@ int main(int argc, char **argv) {
   test_actuator_channels();
   test_instances_and_reset();
   test_parameters();
+  test_gnss_inputs();
   test_refusals();
   printf("conformance: %d checks, %d failure(s)\n", checks, failures);
   return failures != 0;

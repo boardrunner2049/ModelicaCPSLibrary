@@ -1,0 +1,52 @@
+# Multirotor with G0 GNSS physics and the M9N receiver wrapper. Emit with --profile vio.
+schema_version = 3
+model_name = "ConfiguredQuadM9N"
+
+[geometry]
+preset = "QuadX"
+nActuators = 4
+actuatorIndex = [3, 2, 4, 1]
+spinSign = [-1, 1, -1, 1]
+
+[mass]
+mode = "aggregate"
+[mass.aggregate]
+mass = 1.5
+inertia = [[0.02, 0.0, 0.0], [0.0, 0.02, 0.0], [0.0, 0.0, 0.04]]
+
+[motor]
+omegaMax = 1000.0
+tau = 0.03
+[rotor]
+kT = 0.00001
+kQ = 0.00000015
+
+[initial]
+p_start = [0.0, 0.0, -0.12]
+q_start = [1.0, 0.0, 0.0, 0.0]
+
+[landing_gear]
+enabled = true
+groundZ = 0.0
+stiffness = 3000.0
+damping = 150.0
+tangentialDamping = 25.0
+frictionCoefficient = 0.6
+
+[models]
+esc = "pass_through"
+motor = "first_order_speed"
+rotor = "quadratic_blade"
+
+[models.gnss]
+model = "ideal"
+vendor = "m9n"
+
+[gnss.m9n]
+samplePeriod = 0.2
+reportedPdop = 2.0 # Fixed scenario quality; not a receiver configuration key.
+pdopLimit = 3.0 # Initial receiver output-filter setting.
+
+[interface]
+pwm_min = 1100.0
+pwm_max = 1900.0

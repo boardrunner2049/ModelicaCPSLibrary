@@ -1,5 +1,7 @@
 PartialSensor
 Sensor
+VendorConfig
+Device
 PartialSampledSensor
 StatisticalSensor
 Reference

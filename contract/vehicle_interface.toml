@@ -227,6 +227,29 @@ required = false
 unit = "m"
 meaning = "Spherical Earth radius of the local geodetic conversion."
 
+[[capabilities.gnss_v1.fields]]
+name = "gnss_ubx_pvt"
+type = "Float64"
+causality = "output"
+shape = [14]
+required = false
+meaning = "Decoded NAV-PVT observation, atomic with gps and vel_ned; layout in docs/m9n.md."
+
+[[capabilities.gnss_v1.fields]]
+name = "gnss_ubx_command"
+type = "Float64"
+causality = "input"
+shape = [20]
+required = false
+meaning = "Decoded receiver request; export with PVT and response. Layout in docs/m9n.md."
+[[capabilities.gnss_v1.fields]]
+name = "gnss_ubx_response"
+type = "Float64"
+causality = "output"
+shape = [20]
+required = false
+meaning = "Receiver completion/readback; export with PVT and command. Layout in docs/m9n.md."
+
 [capabilities.barometer_v1]
 summary = "Latest barometer reading."
 [[capabilities.barometer_v1.fields]]

@@ -88,10 +88,11 @@ class ContractTests(unittest.TestCase):
 
     def test_documentation_names_every_field(self):
         doc = (LIBRARY_ROOT / "docs" / "vehicle-interface.md").read_text()
+        doc += (LIBRARY_ROOT / "docs" / "m9n.md").read_text()
         for cap in CONTRACT.capabilities.values():
             self.assertIn(cap.name, doc)
             for f in cap.fields:
-                self.assertIn(f"`{f.name}`", doc, f"docs/vehicle-interface.md lacks {f.name}")
+                self.assertIn(f"`{f.name}`", doc, f"interface documentation lacks {f.name}")
         self.assertIn(CONTRACT.marker.name, doc)
 
 
@@ -202,6 +203,21 @@ class CheckerTests(unittest.TestCase):
         report = run(v)
         self.assertEqual(report.errors, [])
         self.assertIsNone(report.provided["gnss_v1"]["yaw_deg"])
+
+    def test_optional_gnss_io_requires_base_fields(self):
+        base = standard_variables()
+        for name in ("gps", "vel_ned", "yaw_deg"):
+            del base[name]
+        # Shared parameters alone do not imply a GNSS implementation.
+        self.assertEqual(run(base, required=[]).errors, [])
+        for name, size, direction in (("gnss_ubx_pvt", 14, "output"),
+                                      ("gnss_ubx_command", 20, "input"),
+                                      ("gnss_ubx_response", 20, "output")):
+            with self.subTest(field=name):
+                v = dict(base)
+                v[name] = var(name, 999, dims=[size], causality=direction)
+                self.assertTrue(any("gnss_v1 is partially exported" in e
+                                    for e in run(v, required=[]).errors))
 
     def test_fmi_interface_requirements(self):
         self.assertTrue(any("not FMI 3" in e for e in run(fmi="2.0").errors))

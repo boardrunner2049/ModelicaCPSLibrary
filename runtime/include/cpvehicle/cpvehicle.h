@@ -156,6 +156,7 @@ cpv_status_t cpv_get_baro(cpv_vehicle_t *vehicle, cpv_baro_t *baro);
 
 /* Any contract field the model provides, by its exported name; count must equal its size. */
 cpv_status_t cpv_get_field(cpv_vehicle_t *vehicle, const char *name, double *values, size_t count);
+cpv_status_t cpv_set_gnss_ubx_command(cpv_vehicle_t *vehicle, const double *values, size_t count);
 
 /* Return to the instantiated state (fmi3Reset). Parameter overrides and input
  * vectors return to the descriptor's; call cpv_initialize again. */

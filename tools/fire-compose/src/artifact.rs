@@ -232,6 +232,12 @@ fn multirotor_manifest(
         ]);
         manifest_value["imu"]["samplePeriod_s"] = json!(config.imu["samplePeriod"]);
     }
+    if crate::sensors::GNSS.m9n(&config.models) {
+        manifest_value["event_requirements"]["sampled_sensors"] = json!(true);
+        manifest_value["physics"]["sensors"] = json!("selected_sensor_models");
+        manifest_value["physics"]["acquisition"] = json!("per_sensor_model");
+        manifest_value["imu"]["other_sensors"] = json!("includes_m9n_receiver");
+    }
     if profile == "vio" {
         manifest_value["input_adapter"] = json!({
             "class":"ModelicaCPSLibrary.Adapters.VirtualIO.PwmInput",

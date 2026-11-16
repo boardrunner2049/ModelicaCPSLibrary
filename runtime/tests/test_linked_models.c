@@ -110,6 +110,13 @@ static void compare_run(const cpv_model_t *m) {
   }
   CHECK(cpv_initialize(a, 0.0) == CPV_OK, "%s: %s", m->name, cpv_last_error(a));
   CHECK(cpv_initialize(b, 0.0) == CPV_OK, "%s: %s", m->name, cpv_last_error(b));
+  double command[20] = {0};
+  const int ubx = cpv_get_field(a, "gnss_ubx_command", command, 20) == CPV_OK;
+  if (ubx) {
+    const double poll[20] = {1, 6, 36, 0};
+    CHECK(cpv_set_gnss_ubx_command(a, poll, 20) == CPV_OK, "%s: linked M9N poll", m->name);
+    CHECK(cpv_set_gnss_ubx_command(b, poll, 20) == CPV_OK, "%s: descriptor M9N poll", m->name);
+  }
   size_t n = cpv_pwm_count(a);
   double pwm[16];
   int frames = 0, mismatches = 0;
@@ -128,6 +135,21 @@ static void compare_run(const cpv_model_t *m) {
     if (sa > CPV_WARNING || sb > CPV_WARNING) {
       CHECK(0, "%s: step at t=%.3f: %s / %s", m->name, t, cpv_last_error(a), cpv_last_error(b));
       break;
+    }
+    if (i == 1 && ubx) {
+      double response_a[20] = {0}, response_b[20] = {0}, pvt_a[14] = {0}, pvt_b[14] = {0};
+      CHECK(cpv_get_field(a, "gnss_ubx_response", response_a, 20) == CPV_OK &&
+            cpv_get_field(b, "gnss_ubx_response", response_b, 20) == CPV_OK &&
+            cpv_get_field(a, "gnss_ubx_pvt", pvt_a, 14) == CPV_OK &&
+            cpv_get_field(b, "gnss_ubx_pvt", pvt_b, 14) == CPV_OK, "%s: M9N fields", m->name);
+      for (size_t k = 0; k < 20; k++)
+        CHECK(response_a[k] == response_b[k], "%s: M9N response[%zu] differs", m->name, k);
+      for (size_t k = 0; k < 14; k++)
+        CHECK(pvt_a[k] == pvt_b[k], "%s: M9N PVT[%zu] differs", m->name, k);
+      CHECK(response_a[0] == 1 && response_a[1] == 6 && response_a[2] == 36 && response_a[3] == 1 &&
+            response_a[10] == 3 && response_a[14] == 0, "%s: initial M9N readback", m->name);
+      CHECK(pvt_a[0] == 1 && pvt_a[1] == 0 && pvt_a[3] == 3 && pvt_a[4] == 1,
+            "%s: initial coherent valid M9N acquisition", m->name);
     }
     snapshot_t x, y;
     cpv_status_t ra = snapshot(a, &x), rb = snapshot(b, &y);

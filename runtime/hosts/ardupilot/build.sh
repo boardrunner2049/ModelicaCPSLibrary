@@ -12,7 +12,7 @@
 # Steps, all idempotent:
 #   1. third_party/ardupilot at its pinned upstream commit (git submodule);
 #   2. the three ArduPilot hooks (hooks.patch: model table entry, --cpvehicle
-#      waf option, link flags) applied to that working tree, and this
+#      waf option, link flags) and GNSS extension (gnss.patch) applied, and this
 #      directory's SIM_CPVehicle.{cpp,h} linked into libraries/SITL;
 #   3. each configuration composed and exported to an FMU (compiled again only
 #      when the composed model, library or compiler changed), checked, and
@@ -37,8 +37,12 @@ git submodule update --init third_party/ardupilot
 # The nested modules a SITL build uses (not ChibiOS and the other board-only ones).
 git -C "$ap" submodule update --init --recursive modules/waf modules/mavlink modules/gtest \
   modules/DroneCAN
-if ! git -C "$ap" apply --reverse --check "$here/hooks.patch" 2>/dev/null; then
-  git -C "$ap" apply "$here/hooks.patch"
+# The GNSS extension changes base-hook context; check it before the base patch.
+if ! git -C "$ap" apply --reverse --check "$here/gnss.patch" 2>/dev/null; then
+  if ! git -C "$ap" apply --reverse --check "$here/hooks.patch" 2>/dev/null; then
+    git -C "$ap" apply "$here/hooks.patch"
+  fi
+  git -C "$ap" apply "$here/gnss.patch"
 fi
 for f in SIM_CPVehicle.cpp SIM_CPVehicle.h; do
   ln -sfn "$here/src/$f" "$ap/libraries/SITL/$f"

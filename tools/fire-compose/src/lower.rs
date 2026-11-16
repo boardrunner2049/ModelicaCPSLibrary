@@ -124,6 +124,7 @@ fn reference(name: &str) -> Value {
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
+    crate::sensors::check_m9n_binding(&c.models, &c.vehicle, crate::canonical_profile(profile)?)?;
     if c.vehicle != "multirotor" {
         return crate::vehicle::compose(c, profile);
     }
@@ -489,7 +490,7 @@ pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec>
     })
 }
 
-/// Inputs the selected IMU and acoustic vulnerability add to the composed model.
+/// Inputs and outputs the selected sensors add to the composed model.
 pub(crate) fn sensor_components(
     c: &ResolvedFireConfig,
     components: &mut Vec<Instance>,
@@ -532,6 +533,23 @@ pub(crate) fn sensor_components(
         components.push(pressure);
     }
     acoustic_components(c, components)?;
+    if crate::sensors::GNSS.m9n(&c.models) {
+        for (name, member, size, input) in [
+            ("gnss_ubx_command", "configCommand", 20, true),
+            ("gnss_ubx_response", "configResponse", 20, false),
+            ("gnss_ubx_pvt", "navPvt", 14, false),
+        ] {
+            let mut port = instance("Real", name, vec![size], vec![]);
+            port.prefix = if input { Prefix::Input } else { Prefix::Output };
+            if input {
+                port.modifiers.push(Modifier::Bind("start".into(),
+                    Value::Array(vec![Value::Real(0.); size])));
+            } else {
+                port.binding = Some(reference(&format!("plant.sensors.gnss.vendorConfig.{member}")));
+            }
+            components.push(port);
+        }
+    }
     Ok(())
 }
 
@@ -717,4 +735,54 @@ fn acoustic_components(c: &ResolvedFireConfig, components: &mut Vec<Instance>) -
         modifiers,
     ));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn m9n_observation_is_optional_and_requires_multirotor_vio() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs");
+        let m9n = crate::config::parse(
+            &std::fs::read_to_string(root.join("quad_m9n.toml")).unwrap(),
+        )
+        .unwrap();
+        let source = compose(&m9n, "vio").unwrap().emit().unwrap();
+        assert!(source.contains("output Real gnss_ubx_pvt[14]"));
+        assert!(source.contains("input Real gnss_ubx_command[20]"));
+        assert!(source.contains("vendorConfig("));
+        assert!(source.contains("configCommand=gnss_ubx_command"));
+        assert!(source.contains("redeclare model VendorConfigModel=ModelicaCPSLibrary.Systems.Sensing.GNSS.VendorConfig.M9N("));
+        assert!(source.contains("output Real gnss_ubx_response[20]"));
+        assert!(source.contains(" = plant.sensors.gnss.vendorConfig.navPvt;"));
+        assert!(source.contains("pdopLimit=3.0"));
+        assert!(source.contains("redeclare model GnssModel=ModelicaCPSLibrary.Systems.Sensing.GNSS.Device("));
+        assert!(source.contains("redeclare model PhysicsModel=ModelicaCPSLibrary.Systems.Sensing.GNSS.Sensor("));
+        assert!(compose(&m9n, "plant")
+            .unwrap_err()
+            .contains("requires vehicle multirotor with export profile vio"));
+
+        let ideal = crate::config::parse(
+            &std::fs::read_to_string(root.join("quad.toml")).unwrap(),
+        )
+        .unwrap();
+        assert!(!compose(&ideal, "vio")
+            .unwrap()
+            .emit()
+            .unwrap()
+            .contains("gnss_ubx_pvt"));
+
+        for vehicle in ["rover", "fixed_wing"] {
+            let plain = format!("schema_version=3\nvehicle=\"{vehicle}\"\n");
+            let config = crate::config::parse(&plain).unwrap();
+            assert!(crate::vehicle::compose(&config, "vio").is_ok());
+            let config = crate::config::parse(&(plain +
+                "[models.gnss]\nmodel=\"ideal\"\nvendor=\"m9n\"\n")).unwrap();
+            for result in [compose(&config, "vio"), crate::vehicle::compose(&config, "vio")] {
+                assert!(result.unwrap_err()
+                    .contains("requires vehicle multirotor with export profile vio"));
+            }
+        }
+    }
 }

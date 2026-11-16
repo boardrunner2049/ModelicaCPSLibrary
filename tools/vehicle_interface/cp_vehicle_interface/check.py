@@ -108,8 +108,9 @@ def _check_capability(report: Report, cap: Capability, meta: Metadata,
     if missing:
         # Parameters such as the geodetic origin are shared vocabulary; only an
         # exported input or output shows that the model attempted the capability.
+        fields = cap.fields if cap.name == "gnss_v1" else cap.required_fields
         if any(f.name in present and "parameter" not in f.causality
-               for f in cap.required_fields):
+               for f in fields):
             report.error(f"{cap.name} is partially exported; missing required field(s) "
                          f"{', '.join(missing)}")
         return None

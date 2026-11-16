@@ -17,7 +17,7 @@ mkdir -p "$out"
 cd "$root"
 
 # Every vehicle is a fire-compose configuration; rover_i2 is rover with an I2 IMU.
-vehicles=(quad hex rover plane rover_i2)
+vehicles=(quad hex rover plane rover_i2 quad_m9n)
 for vehicle in "${vehicles[@]}"; do
   config=configs/$vehicle.toml
   if [[ ${1:-} == --rebuild-fmus || ! -f $out/$vehicle.fmu || $config -nt $out/$vehicle.fmu ]]; then

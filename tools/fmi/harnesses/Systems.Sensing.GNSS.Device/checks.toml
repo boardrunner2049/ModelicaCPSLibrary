@@ -1,0 +1,183 @@
+# Analytic NED motion; 200 ms acquisitions. STATIC epochs are 3, 4, 7 and 10.
+# Commands invalidate at 0.65 s and disable hold at 1.25 s: acquisitions
+# 0.8 s and 1.4 s must immediately restore moving P/V and nonzero course.
+
+[[check]]
+variable = "m.*"
+at = "all"
+finite = true
+why = "All recorded model values remain finite"
+
+[[check]]
+variable = "m.navPvt[1]"
+at = "end"
+near = 10
+tol = 0
+why = "Ten acquisitions through 1.8 s, including rejected fixes"
+
+[[check]]
+expr = "{m.navPvt[1]} - floor((t+1e-9)/0.2) - 1"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Every acquisition appears once on the 200 ms clock"
+
+[[check]]
+expr = "{m.navPvt[2]} - 0.2*({m.navPvt[1]}-1)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Acquisition time and sequence agree"
+
+[[check]]
+expr = "{m.navPvt[3]} - 1000*{m.navPvt[2]}"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "iTOW is the same acquisition expressed in milliseconds"
+
+[[check]]
+expr = "{m.navPvt[5]} - (0 if {m.navPvt[1]} == 5 else 1)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Only epoch 0.8 s is receiver-invalid; restored PDOP applies at 1.0 s"
+
+[[check]]
+expr = "{m.navPvt[11]} - (0 if {m.navPvt[1]} in (3,4,7,10) else hypot(0.25,0.5))"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Ground speed follows reported velocity during hold and release"
+
+[[check]]
+expr = "{m.navPvt[12]} - (0 if {m.navPvt[1]} in (3,4,7,10) else atan2(0.5,0.25)*180/pi)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Course is zero in hold and atan2(0.5,0.25) on every moving epoch, including 0.8/1.4 s releases"
+
+[[check]]
+expr = "{m.position[1]} - (10+(0.25)*(0.4 if {m.navPvt[1]} in (3,4) else 1.2 if {m.navPvt[1]} == 7 else 1.8 if {m.navPvt[1]} == 10 else {m.navPvt[2]}))"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Position axis 1 is analytic truth at the acquisition or captured hold anchor"
+
+[[check]]
+expr = "{m.velocity[1]} - (0 if {m.navPvt[1]} in (3,4,7,10) else 0.25)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Velocity axis 1 is zero only for the expected held acquisitions"
+
+[[check]]
+expr = "{m.position[2]} - (-4+(0.5)*(0.4 if {m.navPvt[1]} in (3,4) else 1.2 if {m.navPvt[1]} == 7 else 1.8 if {m.navPvt[1]} == 10 else {m.navPvt[2]}))"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Position axis 2 is analytic truth at the acquisition or captured hold anchor"
+
+[[check]]
+expr = "{m.velocity[2]} - (0 if {m.navPvt[1]} in (3,4,7,10) else 0.5)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Velocity axis 2 is zero only for the expected held acquisitions"
+
+[[check]]
+expr = "{m.position[3]} - (1+(-0.125)*(0.4 if {m.navPvt[1]} in (3,4) else 1.2 if {m.navPvt[1]} == 7 else 1.8 if {m.navPvt[1]} == 10 else {m.navPvt[2]}))"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Position axis 3 is analytic truth at the acquisition or captured hold anchor"
+
+[[check]]
+expr = "{m.velocity[3]} - (0 if {m.navPvt[1]} in (3,4,7,10) else -0.125)"
+at = "all"
+from = 0.002
+near = 0
+tol = 1e-08
+why = "Velocity axis 3 is zero only for the expected held acquisitions"
+
+[[check]]
+variable = "m.response[1]"
+at = "end"
+near = 15
+tol = 0
+why = "All fifteen requests completed in order (also enforced before each new command)"
+
+[[check]]
+expr = "{m.response[2]} - (10 if {m.response[1]} == 14 else 6)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 2: echoed UBX class; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[3]} - (0 if {m.response[1]} == 13 else 4 if {m.response[1]} == 14 else 36)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 3: echoed message ID; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[4]} - (4 if {m.response[1]} == 11 else 2 if {m.response[1]} in (2,4,6,7,9,15) else 1)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 4: poll/write/gap status; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[6]} - (0 if {m.response[1]} == 13 else 4 if {m.response[1]} == 14 else 0 if {m.response[1]} == 1 else 8)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 6: live dynamic model or identity/port; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[10]} - (1 if {m.response[1]} == 13 else 9 if {m.response[1]} == 14 else 5 if {m.response[1]} == 1 else 7)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 10: live elevation or identity/port; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[11]} - (0 if {m.response[1]} in (13,14) else 1 if {m.response[1]} in (4,5) else 3)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 11: live PDOP limit; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[15]} - (0 if {m.response[1]} in (13,14) else 1 if {m.response[1]} < 7 else 0 if {m.response[1]} < 9 else 2.55)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 15: live static speed; unsupported mask and mask-zero writes preserve live state"
+
+[[check]]
+expr = "{m.response[19]} - (0 if {m.response[1]} in (13,14) else 2 if {m.response[1]} < 7 else 0 if {m.response[1]} < 9 else 65535)"
+at = "all"
+from = 0.06
+near = 0
+tol = 1e-08
+why = "Response field 19: live static distance; unsupported mask and mask-zero writes preserve live state"

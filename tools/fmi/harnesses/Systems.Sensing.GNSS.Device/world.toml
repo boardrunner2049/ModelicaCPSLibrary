@@ -1,0 +1,52 @@
+[World]
+start = 0
+stop = 1910000000
+step = 2000000
+time_unit = "ns"
+
+[Models.m]
+path = "out/model.fmu"
+
+[World.Inputs]
+command_1 = "m.command[1]"
+command_2 = "m.command[2]"
+command_3 = "m.command[3]"
+command_4 = "m.command[4]"
+command_5 = "m.command[5]"
+command_6 = "m.command[6]"
+command_7 = "m.command[7]"
+command_8 = "m.command[8]"
+command_9 = "m.command[9]"
+command_10 = "m.command[10]"
+command_11 = "m.command[11]"
+command_12 = "m.command[12]"
+command_13 = "m.command[13]"
+command_14 = "m.command[14]"
+command_15 = "m.command[15]"
+command_16 = "m.command[16]"
+command_17 = "m.command[17]"
+command_18 = "m.command[18]"
+command_19 = "m.command[19]"
+command_20 = "m.command[20]"
+
+[World.Outputs]
+response_1 = "m.response[1]"
+response_4 = "m.response[4]"
+navpvt_1 = "m.navPvt[1]"
+navpvt_5 = "m.navPvt[5]"
+navpvt_12 = "m.navPvt[12]"
+position_1 = "m.position[1]"
+position_2 = "m.position[2]"
+position_3 = "m.position[3]"
+velocity_1 = "m.velocity[1]"
+
+[Trace]
+every_step = true
+models = ["m"]
+output = "out/trace.csv"
+
+[Logging]
+output = "out/runtime.log"
+
+[Frontend]
+enabled = false
