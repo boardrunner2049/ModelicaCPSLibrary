@@ -25,6 +25,7 @@
 #include <math.h>
 
 #include <SITL/SITL.h>
+#include <SITL/SIM_BMP280.h>
 #include <AP_Declination/AP_Declination.h>
 
 using namespace SITL;
@@ -235,6 +236,15 @@ void CPVehicle::update(const struct sitl_input &input)
         const cpv_status_t status = cpv_set_gnss_ubx_command(vehicle, sitl->gps_ubx_command, 20);
         if (status >= CPV_UNSUPPORTED) {
             fail("set GNSS UBX command", status);
+        }
+    }
+    if (model_baro && model_sensors.baro.bmp280.present) {
+        double command[3];
+        if (BMP280::next_command(model_sensors.baro.bmp280.response[0], command)) {
+            const cpv_status_t result = cpv_set_baro_bmp280_command(vehicle, command, 3);
+            if (result >= CPV_UNSUPPORTED) {
+                fail("set barometer BMP280 command", result);
+            }
         }
     }
 
@@ -497,9 +507,35 @@ void CPVehicle::read_model_sensors()
         if ((status = cpv_get_baro(vehicle, &baro)) >= CPV_UNSUPPORTED) {
             fail("read barometer", status);
         }
-        model_sensors.baro_valid = true;
-        model_sensors.baro_pressure_pa = baro.pressure_pa;
-        model_sensors.baro_temperature_c = baro.temperature_c;
+        auto &m = model_sensors.baro;
+        m = {};
+        m.valid = true;
+        m.pressure_pa = baro.pressure_pa;
+        m.temperature_c = baro.temperature_c;
+        double command[3];
+        const cpv_status_t response_status = cpv_get_field(vehicle, "baro_bmp280_response", m.bmp280.response, 20);
+        const cpv_status_t command_status = cpv_get_field(vehicle, "baro_bmp280_command", command, 3);
+        if ((response_status == CPV_UNSUPPORTED) != (command_status == CPV_UNSUPPORTED)) {
+            fail("BMP280 requires command and response together", CPV_ERR_CAPABILITY);
+        }
+        if (response_status != CPV_UNSUPPORTED) {
+            if (response_status >= CPV_ERR_ARGUMENT || command_status >= CPV_ERR_ARGUMENT) {
+                fail("read barometer BMP280 ports", response_status >= CPV_ERR_ARGUMENT ? response_status : command_status);
+            }
+            m.bmp280.present = true;
+            for (uint8_t i = 0; i < 19; i++) {
+                const double minimum = (i == 8 || i == 9 || i >= 11) ? -32768 : 0;
+                const double maximum = i == 0 ? INT32_MAX : i == 1 ? 3 :
+                    i == 4 || i == 5 ? 1048575 : i >= 7 ? (i == 7 || i == 10 ? 65535 : 32767) : 255;
+                const double value = m.bmp280.response[i];
+                if (!isfinite(value) || value < minimum || value > maximum || floor(value) < value) {
+                    fail("invalid barometer BMP280 register field", CPV_ERR_FMU);
+                }
+            }
+            if (uint8_t(m.bmp280.response[1]) == 3) {
+                fail("BMP280 configuration coverage gap", CPV_ERR_FMU);
+            }
+        }
     }
 }
 

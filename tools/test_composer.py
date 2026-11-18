@@ -5,16 +5,133 @@ from itertools import product
 import math
 import os
 import csv
+import re
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / 'tools/fire-compose/target/debug/fire-compose'
+
+
+class ComposeGuiTests(unittest.TestCase):
+    """The GUI must select physics independently from optional device behavior."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('compose_parts', ROOT / 'tools/compose/parts.py')
+        cls.parts = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.parts)
+
+    def catalog(self):
+        metadata = {
+            'gnss': ('G', 'm9n', 'ublox_neo_m9n', 'NEO-M9N', 'GNSS', 'pdopLimit'),
+            'barometer': ('B', 'bmp280', 'bosch_bmp280', 'BMP280', 'Barometer',
+                          'normalModeConfigWritesAccepted'),
+        }
+        cc = {'models': {}, 'vendor_configs': {}}
+        for kind, (prefix, vendor, part, name, family, key) in metadata.items():
+            cc['models'][kind] = [
+                {'model': model, 'level': f'{prefix}{i}', 'description': model, 'keys': ['bias']}
+                for i, model in enumerate(('ideal', 'sampled'))]
+            cc['vendor_configs'][kind] = [{
+                'vendor': vendor, 'part': part, 'name': name, 'levels': [f'{prefix}0'],
+                'vendor_model': f'ModelicaCPSLibrary.Systems.Sensing.{family}.VendorConfig.{name if vendor == "bmp280" else "M9N"}',
+                'keys': [key]}]
+        legacy = [{'id': 'legacy', 'name': 'Legacy', 'source': '', 'levels': {}}]
+        with patch.object(self.parts, 'devices', side_effect=lambda *_: [dict(d) for d in legacy]):
+            parts = [self.parts.sensor_part(cc, kind, []) for kind in metadata]
+        return {'airframes': {'quad': {'vehicle': 'multirotor', 'model_name': 'GuiQuad', 'parts': parts}}}
+
+    def test_vendor_device_preserves_physics_and_accepts_only_its_fields(self):
+        cat = self.catalog()
+        choice = {'airframe': 'quad', 'levels': {'gnss': 'G0', 'barometer': 'B0'},
+                  'devices': {'gnss': 'ublox_neo_m9n', 'barometer': 'bosch_bmp280'},
+                  'values': {'gnss.bias': '1', 'gnss.m9n.pdopLimit': '0.1',
+                             'barometer.bmp280.normalModeConfigWritesAccepted': 'false',
+                             'gnss.m9n.unknown': '42'}}
+        _, doc = self.parts.compose(choice, cat)
+        self.assertEqual(doc['models']['gnss'], {'model': 'ideal', 'vendor': 'm9n'})
+        self.assertEqual(doc['models']['barometer'], {'model': 'ideal', 'vendor': 'bmp280'})
+        self.assertEqual(doc['gnss'], {'bias': 1, 'm9n': {'pdopLimit': 0.1}})
+        self.assertFalse(doc['barometer']['bmp280']['normalModeConfigWritesAccepted'])
+        # Generic selection drops stale device fields; legacy datasheet selection stays unchanged.
+        choice['devices'] = {'gnss': 'legacy'}
+        _, doc = self.parts.compose(choice, cat)
+        self.assertEqual(doc['models']['gnss'], {'part': 'legacy', 'level': 'G0'})
+        self.assertNotIn('m9n', doc['gnss'])
+        self.assertNotIn('barometer', doc)
+
+    def test_vendor_device_rejects_a_second_acquisition_clock(self):
+        cat = self.catalog()
+        for kind, level, device in [('gnss', 'G1', 'ublox_neo_m9n'),
+                                    ('barometer', 'B1', 'bosch_bmp280')]:
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, 'not supported'):
+                self.parts.compose({'airframe': 'quad', 'levels': {kind: level},
+                                    'devices': {kind: device}}, cat)
+
+    def test_stale_release_does_not_hide_current_debug_or_source_changes(self):
+        with tempfile.TemporaryDirectory() as work, patch.object(self.parts, 'COMPOSE', Path(work)):
+            crate = Path(work)
+            (crate / 'src').mkdir()
+            source = crate / 'src/main.rs'
+            source.write_text('fn main() {}')
+            name = 'fire-compose.exe' if os.name == 'nt' else 'fire-compose'
+            release = crate / 'target/release' / name
+            debug = crate / 'target/debug' / name
+            for exe in (release, debug):
+                exe.parent.mkdir(parents=True)
+                exe.touch()
+            stamp = source.stat().st_mtime_ns
+            second = 1_000_000_000
+            os.utime(release, ns=(stamp - second, stamp - second))
+            os.utime(debug, ns=(stamp + second, stamp + second))
+            with patch.object(self.parts.subprocess, 'run') as build:
+                self.assertEqual(self.parts.compose_binary(), debug)
+                build.assert_not_called()
+                os.utime(source, ns=(stamp + 2 * second, stamp + 2 * second))
+                self.assertEqual(self.parts.compose_binary(), debug)
+                build.assert_called_once()
+
+    @unittest.skipUnless(shutil.which('node'), 'JavaScript selection check requires Node.js')
+    def test_device_picker_keeps_physics_and_clears_only_device_fields(self):
+        html = (ROOT / 'tools/compose/index.html').read_text(encoding='utf-8')
+        script = next(s for s in re.findall(r'<script>(.*?)</script>', html, re.S)
+                      if 'let catalog = null' in s)
+        # Run the actual selection functions without a browser render or a server request.
+        stubs = """
+const document={getElementById:()=>({addEventListener(){},value:''}),querySelectorAll:()=>[]};
+const Garage={mount(){},key:'overview'},Terminal={mount(){}};
+const fetch=()=>new Promise(()=>{});const clearTimeout=()=>{},setTimeout=()=>{};
+"""
+        checks = """
+render=()=>{};
+const part={id:'gnss',levels:[
+ {id:'G0',fields:[{path:['gnss','bias'],value:'0'}]},
+ {id:'G1',fields:[{path:['gnss','samplePeriod'],value:'0.2'}]}],
+ devices:[{id:'m9n',vendor:'m9n',supported_levels:['G0'],
+ fields:[{path:['gnss','m9n','pdopLimit'],value:'3'}]}]};
+state.levels.gnss='G1';state.values['gnss.samplePeriod']='0.5';
+pickDevice(part,'m9n');
+if(state.levels.gnss!=='G1'||state.values['gnss.samplePeriod']!=='0.5'
+   ||state.values['gnss.m9n.pdopLimit']!=='3'||fieldsOf(part).length!==2)
+ throw Error('Device selection changed physics or omitted its fields');
+pickLevel(part,'G0');
+if(state.values['gnss.bias']!=='0'||state.values['gnss.m9n.pdopLimit']!=='3')
+ throw Error('Physics selection changed device settings');
+pickDevice(part,'');
+if('gnss.m9n.pdopLimit' in state.values||fieldsOf(part).length!==1)
+ throw Error('Generic selection retained device fields');
+"""
+        run = subprocess.run(['node', '-e', stubs + script + checks], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
 
 
 class RustComposerTests(unittest.TestCase):

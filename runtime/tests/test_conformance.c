@@ -391,13 +391,22 @@ edits:;
 
 static void test_gnss_inputs(void) {
   double command[20] = {1, 6, 36, 0}, response[20] = {0};
+  double baro_command[3] = {1, 0xF5, 0x10};
   CHECK(cpv_set_gnss_ubx_command(NULL, command, 20) == CPV_ERR_ARGUMENT, "NULL instance accepted");
+  CHECK(cpv_set_baro_bmp280_command(NULL, baro_command, 3) == CPV_ERR_ARGUMENT, "NULL barometer instance accepted");
   cpv_vehicle_t *v = open_vehicle(quad, ALL, 7);
   if (!v) return;
   CHECK(cpv_set_gnss_ubx_command(v, NULL, 20) == CPV_ERR_ARGUMENT, "NULL command accepted");
   CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_ERR_STATE, "command before initialization");
+  CHECK(cpv_set_baro_bmp280_command(v, baro_command, 3) == CPV_ERR_STATE, "barometer command before initialization");
   OK(cpv_initialize(v, 0));
   CHECK(cpv_set_gnss_ubx_command(v, command, 20) == CPV_UNSUPPORTED, "absent GNSS input accepted");
+  CHECK(cpv_set_baro_bmp280_command(v, NULL, 3) == CPV_ERR_ARGUMENT, "NULL barometer command accepted");
+  CHECK(cpv_set_baro_bmp280_command(v, baro_command, 2) == CPV_ERR_ARGUMENT, "short barometer command accepted");
+  baro_command[2] = NAN;
+  CHECK(cpv_set_baro_bmp280_command(v, baro_command, 3) == CPV_ERR_ARGUMENT, "NaN barometer command accepted");
+  baro_command[2] = 0x10;
+  CHECK(cpv_set_baro_bmp280_command(v, baro_command, 3) == CPV_UNSUPPORTED, "absent barometer input accepted");
   cpv_close(v);
 
   char path[1200];

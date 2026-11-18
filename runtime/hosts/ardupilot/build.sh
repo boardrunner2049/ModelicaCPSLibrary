@@ -12,8 +12,8 @@
 # Steps, all idempotent:
 #   1. third_party/ardupilot at its pinned upstream commit (git submodule);
 #   2. the three ArduPilot hooks (hooks.patch: model table entry, --cpvehicle
-#      waf option, link flags) and GNSS extension (gnss.patch) applied, and this
-#      directory's SIM_CPVehicle.{cpp,h} linked into libraries/SITL;
+#      waf option, link flags), GNSS and BMP280 extensions applied, and this
+#      directory's simulator sources linked into libraries/SITL;
 #   3. each configuration composed and exported to an FMU (compiled again only
 #      when the composed model, library or compiler changed), checked, and
 #      written as a linkable shim;
@@ -37,14 +37,17 @@ git submodule update --init third_party/ardupilot
 # The nested modules a SITL build uses (not ChibiOS and the other board-only ones).
 git -C "$ap" submodule update --init --recursive modules/waf modules/mavlink modules/gtest \
   modules/DroneCAN
-# The GNSS extension changes base-hook context; check it before the base patch.
-if ! git -C "$ap" apply --reverse --check "$here/gnss.patch" 2>/dev/null; then
-  if ! git -C "$ap" apply --reverse --check "$here/hooks.patch" 2>/dev/null; then
-    git -C "$ap" apply "$here/hooks.patch"
+# Later extensions change earlier patch context; check the final one first.
+if ! git -C "$ap" apply --reverse --check "$here/bmp280.patch" 2>/dev/null; then
+  if ! git -C "$ap" apply --reverse --check "$here/gnss.patch" 2>/dev/null; then
+    if ! git -C "$ap" apply --reverse --check "$here/hooks.patch" 2>/dev/null; then
+      git -C "$ap" apply "$here/hooks.patch"
+    fi
+    git -C "$ap" apply "$here/gnss.patch"
   fi
-  git -C "$ap" apply "$here/gnss.patch"
+  git -C "$ap" apply "$here/bmp280.patch"
 fi
-for f in SIM_CPVehicle.cpp SIM_CPVehicle.h; do
+for f in SIM_CPVehicle.cpp SIM_CPVehicle.h SIM_BMP280.cpp SIM_BMP280.h; do
   ln -sfn "$here/src/$f" "$ap/libraries/SITL/$f"
 done
 

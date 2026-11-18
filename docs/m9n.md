@@ -9,6 +9,11 @@ and the production ArduPilot u-blox driver.
 
 ## Selection and settings
 
+In Compose, select **G0** physics and **u-blox NEO-M9N** in **Device**.
+The device fields configure the receiver layer; physics bias and mounting
+remain separate. The GUI starts scenario PDOP at 1.0; the Modelica parameter's
+default remains 2. Restart a running Compose server after updating its catalog.
+
 ```toml
 [models.gnss]
 model = "ideal"

@@ -253,6 +253,20 @@ meaning = "Receiver completion/readback; export with PVT and command. Layout in 
 [capabilities.barometer_v1]
 summary = "Latest barometer reading."
 [[capabilities.barometer_v1.fields]]
+name = "baro_bmp280_command"
+type = "Float64"
+causality = "input"
+shape = [3]
+required = false
+meaning = "Ordered BMP280 register write: increasing ID, register address, byte value; export with response."
+[[capabilities.barometer_v1.fields]]
+name = "baro_bmp280_response"
+type = "Float64"
+causality = "output"
+shape = [20]
+required = false
+meaning = "BMP280 completion, registers, ADC counts, identity, calibration and next device event; layout in docs/bmp280.md."
+[[capabilities.barometer_v1.fields]]
 name = "baro_pressure_pa"
 type = "Float64"
 causality = "output"

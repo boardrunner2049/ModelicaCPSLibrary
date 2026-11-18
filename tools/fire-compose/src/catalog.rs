@@ -43,6 +43,22 @@ pub fn catalog() -> Value {
             "gnss": sensor_levels(&sensors::GNSS),
         },
         "parts": parts::catalog(),
+        "vendor_configs": {
+            "gnss": [{
+                "vendor": "m9n", "part": "ublox_neo_m9n", "name": "u-blox NEO-M9N",
+                "model": "ideal", "levels": ["G0"],
+                "vendor_model": "ModelicaCPSLibrary.Systems.Sensing.GNSS.VendorConfig.M9N",
+                "defaults": {"reportedPdop": 1.0},
+                "keys": ["samplePeriod", "reportedPdop", "pdopLimit", "staticHoldSpeedThreshold", "staticHoldMaxDistance"]
+            }],
+            "barometer": [{
+                "vendor": "bmp280", "part": "bosch_bmp280", "name": "Bosch BMP280",
+                "source": "BMP280 vendor configuration model", "model": "ideal", "levels": ["B0"],
+                "vendor_model": "ModelicaCPSLibrary.Systems.Sensing.Barometer.VendorConfig.BMP280",
+                "defaults": {"pressureNoiseStd": 1.3},
+                "keys": ["initialFilter", "normalModeConfigWritesAccepted", "pressureNoiseStd"]
+            }]
+        },
         "peripherals": crate::peripherals::catalog(),
         "payloads": crate::payloads::catalog(),
     })
@@ -81,5 +97,9 @@ mod tests {
         for kind in ["multirotor", "rover", "fixed_wing"] {
             assert!(c["vehicles"][kind].is_object(), "{kind}");
         }
+        assert_eq!(c["models"]["gnss"].as_array().unwrap().len(), 2);
+        assert_eq!(c["models"]["barometer"].as_array().unwrap().len(), 2);
+        assert_eq!(c["vendor_configs"]["gnss"][0]["vendor"], "m9n");
+        assert_eq!(c["vendor_configs"]["barometer"][0]["vendor"], "bmp280");
     }
 }

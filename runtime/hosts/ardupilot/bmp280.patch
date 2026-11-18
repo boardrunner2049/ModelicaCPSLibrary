@@ -1,0 +1,90 @@
+diff --git a/libraries/SITL/SITL.h b/libraries/SITL/SITL.h
+--- a/libraries/SITL/SITL.h
++++ b/libraries/SITL/SITL.h
+@@ -72,6 +72,12 @@
+-    bool baro_valid;
+-    float baro_pressure_pa;
+-    float baro_temperature_c;
++    struct {
++        bool valid;
++        float pressure_pa, temperature_c;
++        struct {
++            bool present;
++            // ID,status,CTRL,CONFIG,rawP,rawT,chipID,trim[12],next transition.
++            double response[20];
++        } bmp280;
++    } baro;
+     // Peripherals (Systems.Peripherals): "present" when the model has the
+     // device, so SITL's own simulation of it is replaced; "valid" per reading.
+     bool airspeed_present;
+diff --git a/libraries/AP_Baro/AP_Baro_SITL.cpp b/libraries/AP_Baro/AP_Baro_SITL.cpp
+--- a/libraries/AP_Baro/AP_Baro_SITL.cpp
++++ b/libraries/AP_Baro/AP_Baro_SITL.cpp
+@@ -67,10 +67,10 @@
+     }
+ 
+     const auto &model = _sitl->state.model_sensors;
+-    if (model.baro_valid) {
++    if (model.baro.valid) {
+         // the vehicle model's own barometer: its pressure and temperature
+-        _recent_press = model.baro_pressure_pa;
+-        _recent_temp = model.baro_temperature_c;
++        _recent_press = model.baro.pressure_pa;
++        _recent_temp = model.baro.temperature_c;
+         _has_sample = true;
+         return;
+     }
+diff --git a/libraries/SITL/SIM_I2C.cpp b/libraries/SITL/SIM_I2C.cpp
+--- a/libraries/SITL/SIM_I2C.cpp
++++ b/libraries/SITL/SIM_I2C.cpp
+@@ -37,6 +37,9 @@
+ #include "SIM_MS5525.h"
+ #include "SIM_MS5611.h"
+ #include "SIM_QMC5883L.h"
++#if defined(AP_SIM_CPVEHICLE_ENABLED) && AP_SIM_CPVEHICLE_ENABLED
++#include "SIM_BMP280.h"
++#endif
+ 
+ #include <signal.h>
+ 
+@@ -72,6 +75,9 @@
+ static ICM40609 icm40609;
+ static MS5525 ms5525;
+ static MS5611 ms5611;
++#if defined(AP_SIM_CPVEHICLE_ENABLED) && AP_SIM_CPVEHICLE_ENABLED
++static BMP280 bmp280;
++#endif
+ #if AP_SIM_LP5562_ENABLED
+ static LP5562 lp5562;
+ #endif
+@@ -118,6 +124,9 @@
+ #endif
+ #if AP_SIM_TSYS03_ENABLED
+     { 2, 0x40, tsys03 },
++#endif
++#if defined(AP_SIM_CPVEHICLE_ENABLED) && AP_SIM_CPVEHICLE_ENABLED
++    { 2, 0x76, bmp280 },        // Optional Modelica BMP280, native driver
+ #endif
+     { 2, 0x77, ms5611 },        // MS5611: BARO_PROBE_EXT = 2
+ #if AP_SIM_COMPASS_QMC5883L_ENABLED
+diff --git a/libraries/AP_Baro/AP_Baro.cpp b/libraries/AP_Baro/AP_Baro.cpp
+--- a/libraries/AP_Baro/AP_Baro.cpp
++++ b/libraries/AP_Baro/AP_Baro.cpp
+@@ -539,6 +539,17 @@
+     if (sitl == nullptr) {
+         AP_HAL::panic("No SITL pointer");
+     }
++#if defined(AP_SIM_CPVEHICLE_ENABLED) && AP_SIM_CPVEHICLE_ENABLED && AP_BARO_BMP280_ENABLED
++    if (sitl->state.model_sensors.baro.bmp280.present) {
++        // Simulator-only bus selection; use the unchanged hardware backend.
++        ADD_BACKEND(AP_Baro_BMP280::probe(*this,
++                    std::move(hal.i2c_mgr->get_device(2, HAL_BARO_BMP280_I2C_ADDR))));
++        if (_num_drivers == 0) {
++            AP_HAL::panic("Modelica BMP280: native driver probe failed");
++        }
++        return;
++    }
++#endif
+ #if !AP_TEST_DRONECAN_DRIVERS
+     // use dronecan instances instead of SITL instances
+     for(uint8_t i = 0; i < sitl->baro_count; i++) {

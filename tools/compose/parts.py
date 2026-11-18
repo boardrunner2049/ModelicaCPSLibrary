@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -118,13 +119,17 @@ def load_config(name: str) -> dict:
 # --- sources -----------------------------------------------------------------
 
 def compose_binary() -> Path:
+    """Use a current executable, rebuilding when composer source has changed."""
+    inputs = [COMPOSE / "Cargo.toml", COMPOSE / "Cargo.lock", *COMPOSE.glob("src/**/*.rs")]
+    source_time = max(p.stat().st_mtime_ns for p in inputs if p.is_file())
+    name = "fire-compose.exe" if os.name == "nt" else "fire-compose"
     for profile in ("release", "debug"):
-        exe = COMPOSE / "target" / profile / "fire-compose"
-        if exe.is_file():
+        exe = COMPOSE / "target" / profile / name
+        if exe.is_file() and exe.stat().st_mtime_ns >= source_time:
             return exe
-    subprocess.run(["cargo", "build", "-q", "--manifest-path", str(COMPOSE / "Cargo.toml")],
+    subprocess.run(["cargo", "build", "-q", "--locked", "--manifest-path", str(COMPOSE / "Cargo.toml")],
                    check=True)
-    return COMPOSE / "target" / "debug" / "fire-compose"
+    return COMPOSE / "target" / "debug" / name
 
 
 def compose_catalog() -> dict:
@@ -137,7 +142,7 @@ def modelica_parameters(*files: str) -> dict[str, tuple[str, str]]:
     """name -> (default expression, description) of `parameter` declarations."""
     found = {}
     for f in files:
-        text = re.sub(r"//[^\n]*", "", (ROOT / f).read_text())
+        text = re.sub(r"//[^\n]*", "", (ROOT / f).read_text(encoding="utf-8"))
         for stmt in re.findall(r'(?:[^;"]|"[^"]*")+', text):
             stmt = " ".join(stmt.split())
             m = re.search(r"\bparameter\s+[\w.]+(?:\s*\([^)]*\))?\s+(\w+)\s*(?:\[[^\]]*\])?"
@@ -378,8 +383,22 @@ def sensor_part(cc: dict, sensor: str, mounts: list[dict]) -> dict:
         levels.append({"id": spec["level"], "label": f"{spec['level']} {spec['model']}",
                        "description": spec["description"] + ".",
                        "select": {f"models.{sensor}.model": spec["model"]}, "fields": fields})
+    options = devices(cc, sensor, [lv["id"] for lv in levels])
+    for vendor in cc.get("vendor_configs", {}).get(sensor, []):
+        option = next((d for d in options if d["id"] == vendor["part"]), None)
+        if option is None:
+            option = {"id": vendor["part"], "name": vendor["name"], "source": "", "levels": {}}
+            options.append(option)
+        path = vendor["vendor_model"].removeprefix("ModelicaCPSLibrary.").replace(".", "/") + ".mo"
+        parameters = modelica_parameters(path)
+        option.update(vendor=vendor["vendor"], supported_levels=vendor["levels"],
+                      fields=[{"path": [sensor, vendor["vendor"], key],
+                               "value": literal(vendor["defaults"][key]) if key in vendor.get("defaults", {}) else "",
+                               "default": parameters.get(key, ("library default", ""))[0],
+                               "description": parameters.get(key, ("", ""))[1]}
+                              for key in vendor["keys"]])
     return {"id": sensor, "title": SENSOR_TITLE[sensor], "levels": levels, "fields": mounts,
-            "devices": devices(cc, sensor, [lv["id"] for lv in levels])}
+            "devices": options}
 
 
 # --- peripherals, payloads and SITL devices ------------------------------------
@@ -501,6 +520,7 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
         level = next((lv for lv in part["levels"]
                       if lv["id"] == choice.get("levels", {}).get(part["id"])), part["levels"][0])
         device = choice.get("devices", {}).get(part["id"])
+        selected_device = next((d for d in part.get("devices", []) if d["id"] == device), None)
         if part.get("table"):
             # A peripheral or payload: off, or its table with a level and device.
             if level["id"] == "off":
@@ -522,7 +542,16 @@ def compose(choice: dict, cat: dict | None = None) -> tuple[dict, dict]:
                          for o in s["options"])}
         if picked:
             put(physics, ["models", part["id"]], {**picked, "level": level["id"]})
-        elif device and any(d["id"] == device for d in part.get("devices", [])):
+        elif selected_device and selected_device.get("vendor"):
+            if level["id"] not in selected_device["supported_levels"]:
+                supported = ", ".join(selected_device["supported_levels"])
+                raise ValueError(f"{selected_device['name']} requires {supported} physics; "
+                                 f"{level['id']} is not supported")
+            for dotted, value in level["select"].items():
+                put(physics, dotted.split("."), value)
+            put(physics, ["models", part["id"], "vendor"], selected_device["vendor"])
+            allowed |= {".".join(f["path"]) for f in selected_device["fields"]}
+        elif selected_device:
             put(physics, ["models", part["id"], "part"], device)
             put(physics, ["models", part["id"], "level"], level["id"])
         else:

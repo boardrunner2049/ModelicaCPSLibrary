@@ -124,7 +124,7 @@ fn reference(name: &str) -> Value {
 }
 
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
-    crate::sensors::check_m9n_binding(&c.models, &c.vehicle, crate::canonical_profile(profile)?)?;
+    crate::sensors::check_vendor_binding(&c.models, &c.vehicle, crate::canonical_profile(profile)?)?;
     if c.vehicle != "multirotor" {
         return crate::vehicle::compose(c, profile);
     }
@@ -550,6 +550,23 @@ pub(crate) fn sensor_components(
             components.push(port);
         }
     }
+    if crate::sensors::BAROMETER.vendor(&c.models) == Some("bmp280") {
+        let mut command = instance("Real", "baro_bmp280_command", vec![3], vec![]);
+        command.prefix = Prefix::Input;
+        command.modifiers.push(Modifier::Bind("start".into(),
+            Value::Array(vec![Value::Real(0.); 3])));
+        components.push(command);
+        let device = "plant.sensors.barometer.vendorConfig";
+        let mut state = ["processedCommandSequence", "commandStatus", "ctrlMeas", "config",
+            "rawPressure", "rawTemperature", "chipId"].iter()
+            .map(|name| reference(&format!("{device}.{name}"))).collect::<Vec<_>>();
+        state.extend((1..=12).map(|index| reference(&format!("{device}.calibration[{index}]"))));
+        state.push(reference(&format!("{device}.nextTransition")));
+        let mut response = instance("Real", "baro_bmp280_response", vec![20], vec![]);
+        response.prefix = Prefix::Output;
+        response.binding = Some(Value::Array(state));
+        components.push(response);
+    }
     Ok(())
 }
 
@@ -783,6 +800,28 @@ mod tests {
                 assert!(result.unwrap_err()
                     .contains("requires vehicle multirotor with export profile vio"));
             }
+        }
+    }
+
+    #[test]
+    fn bmp280_register_ports_are_optional_and_compose_with_gnss() {
+        let plain = crate::config::parse("schema_version=3\n").unwrap();
+        assert!(!compose(&plain, "vio").unwrap().emit().unwrap().contains("baro_bmp280"));
+        let config = crate::config::parse(
+            "schema_version=3\n[models.barometer]\nmodel=\"ideal\"\nvendor=\"bmp280\"\n\
+             [models.gnss]\nmodel=\"ideal\"\nvendor=\"m9n\"\n",
+        ).unwrap();
+        let source = compose(&config, "vio").unwrap().emit().unwrap();
+        assert!(source.contains("input Real baro_bmp280_command[3]"));
+        assert!(source.contains("output Real baro_bmp280_response[20]"));
+        assert!(source.contains("commandValue=baro_bmp280_command[3]"));
+        assert!(source.contains("plant.sensors.barometer.vendorConfig.calibration[12],plant.sensors.barometer.vendorConfig.nextTransition}"));
+        assert!(source.contains("output Real gnss_ubx_pvt[14]"));
+        for vehicle in ["rover", "fixed_wing"] {
+            let config = crate::config::parse(&format!(
+                "schema_version=3\nvehicle=\"{vehicle}\"\n[models.barometer]\nmodel=\"ideal\"\nvendor=\"bmp280\"\n",
+            )).unwrap();
+            assert!(crate::vehicle::compose(&config, "vio").unwrap_err().contains("barometer vendor bmp280 requires"));
         }
     }
 }

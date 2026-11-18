@@ -458,7 +458,7 @@ pub fn parse(root: &Table, vehicle: &str) -> Result<ResolvedFireConfig> {
 /// Compose `model NAME extends EXPORT(interface, initial, plant(..., sensors(...)))`
 /// plus the selected sensors' boundary variables.
 pub fn compose(c: &ResolvedFireConfig, profile: &str) -> Result<CompositionSpec> {
-    crate::sensors::check_m9n_binding(&c.models, &c.vehicle, crate::canonical_profile(profile)?)?;
+    crate::sensors::check_vendor_binding(&c.models, &c.vehicle, crate::canonical_profile(profile)?)?;
     let kind = kind(&c.vehicle)?;
     if crate::canonical_profile(profile)? != "vio" {
         return Err(format!(

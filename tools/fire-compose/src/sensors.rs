@@ -154,9 +154,13 @@ const M9N_PARAMETERS: &[(&str, bool)] = &[
     ("staticHoldMaxDistance", true),
 ];
 
-pub(crate) fn check_m9n_binding(models: &Table, vehicle: &str, profile: &str) -> Result<()> {
-    if GNSS.m9n(models) && (vehicle != "multirotor" || profile != "vio") {
-        return Err("gnss vendor m9n requires vehicle multirotor with export profile vio".into());
+pub(crate) fn check_vendor_binding(models: &Table, vehicle: &str, profile: &str) -> Result<()> {
+    for sensor in [&GNSS, &BAROMETER] {
+        if let Some(vendor) = sensor.vendor(models) {
+            if vehicle != "multirotor" || profile != "vio" {
+                return Err(format!("{} vendor {vendor} requires vehicle multirotor with export profile vio", sensor.name));
+            }
+        }
     }
     Ok(())
 }
@@ -199,18 +203,19 @@ impl Sensor {
     }
 
     pub(crate) fn m9n(&self, models: &Table) -> bool {
-        self.name == "gnss"
-            && models.get("gnss")
-                .and_then(Value::as_table)
-                .and_then(|t| t.get("vendor"))
-                .and_then(Value::as_str) == Some("m9n")
+        self.name == "gnss" && self.vendor(models) == Some("m9n")
+    }
+
+    pub(crate) fn vendor<'a>(&self, models: &'a Table) -> Option<&'a str> {
+        models.get(self.name).and_then(Value::as_table)
+            .and_then(|t| t.get("vendor")).and_then(Value::as_str)
     }
 }
 
 /// `[models.KIND]`: `model = "<level model>"` (legacy `response = "ideal"`).
 pub fn selection(sensor: &Sensor, raw: &Value) -> Result<Table> {
     let label = format!("models.{}", sensor.name);
-    let keys: &[&str] = if sensor.name == "gnss" {
+    let keys: &[&str] = if ["gnss", "barometer"].contains(&sensor.name) {
         &["model", "response", "vendor"]
     } else {
         &["model", "response"]
@@ -237,8 +242,9 @@ pub fn selection(sensor: &Sensor, raw: &Value) -> Result<Table> {
         Value::String(level.model.into()),
     )]);
     if let Some(vendor) = t.get("vendor") {
-        if vendor.as_str() != Some("m9n") || level.model != "ideal" {
-            return Err(format!("{label}: vendor must be m9n with physics model ideal"));
+        let supported = if sensor.name == "gnss" { "m9n" } else { "bmp280" };
+        if vendor.as_str() != Some(supported) || level.model != "ideal" {
+            return Err(format!("{label}: vendor must be {supported} with physics model ideal"));
         }
         selected.insert("vendor".into(), vendor.clone());
     }
@@ -249,9 +255,13 @@ pub fn selection(sensor: &Sensor, raw: &Value) -> Result<Table> {
 pub fn resolve(sensor: &Sensor, raw: &Value, models: &Table) -> Result<Table> {
     let model = sensor.selected(models);
     let m9n = sensor.m9n(models);
+    let bmp280 = sensor.vendor(models) == Some("bmp280");
     let mut keys = sensor.keys(model);
     if m9n {
         keys.push("m9n");
+    }
+    if bmp280 {
+        keys.push("bmp280");
     }
     let t = table(raw, &keys, sensor.name).map_err(|e| {
         format!(
@@ -265,6 +275,22 @@ pub fn resolve(sensor: &Sensor, raw: &Value, models: &Table) -> Result<Table> {
             for (key, value) in table(value, &keys, "gnss.m9n")? {
                 let zero = M9N_PARAMETERS.iter().find(|p| p.0 == key).unwrap().1;
                 number(value, &format!("gnss.m9n.{key}"), !zero, zero)?;
+            }
+            continue;
+        }
+        if bmp280 && key == "bmp280" {
+            for (key, value) in table(value, &["initialFilter", "normalModeConfigWritesAccepted", "pressureNoiseStd"], "barometer.bmp280")? {
+                let label = format!("barometer.bmp280.{key}");
+                if key == "initialFilter" {
+                    let coefficient = integer(value, &label, 0)?;
+                    if ![0, 2, 4, 8, 16].contains(&coefficient) {
+                        return Err(format!("{label}: expected 0, 2, 4, 8 or 16"));
+                    }
+                } else if key == "pressureNoiseStd" {
+                    number(value, &label, false, true)?;
+                } else if value.as_bool().is_none() {
+                    return Err(format!("{label}: expected a boolean"));
+                }
             }
             continue;
         }
@@ -335,11 +361,15 @@ pub fn modifiers(models: &Table, tables: [&Table; 3]) -> Result<Vec<Modifier>> {
         let level = sensor
             .level(sensor.selected(models))
             .expect("resolved selection");
-        let m9n = sensor.m9n(models);
-        if m9n {
+        let vendor = sensor.vendor(models);
+        if vendor.is_some() {
             out.push(Modifier::RedeclareModel {
                 name: sensor.replaceable.into(),
-                class: "ModelicaCPSLibrary.Systems.Sensing.GNSS.Device".into(),
+                class: if sensor.name == "gnss" {
+                    "ModelicaCPSLibrary.Systems.Sensing.GNSS.Device"
+                } else {
+                    "ModelicaCPSLibrary.Systems.Sensing.Barometer.Device"
+                }.into(),
                 modifiers: vec![Modifier::RedeclareModel {
                     name: "PhysicsModel".into(),
                     class: level.class.into(),
@@ -355,24 +385,35 @@ pub fn modifiers(models: &Table, tables: [&Table; 3]) -> Result<Vec<Modifier>> {
         }
         let mut fields = Vec::new();
         for (key, value) in parameters {
-            if m9n && key == "m9n" {
+            if vendor == Some(key.as_str()) {
                 continue;
             }
             fields.push(Modifier::Bind(key.clone(), crate::lower::literal(value)?));
         }
-        if m9n {
-            let params = parameters.get("m9n").and_then(Value::as_table)
+        if let Some(vendor) = vendor {
+            let params = parameters.get(vendor).and_then(Value::as_table)
                 .cloned().unwrap_or_default();
             let mut config = params.iter()
                 .map(|(k, v)| Ok(Modifier::Bind(k.clone(), crate::lower::literal(v)?)))
                 .collect::<Result<Vec<_>>>()?;
-            config.push(Modifier::Bind(
-                "configCommand".into(),
-                ModelicaValue::Reference("gnss_ubx_command".into()),
-            ));
+            if vendor == "m9n" {
+                config.push(Modifier::Bind(
+                    "configCommand".into(),
+                    ModelicaValue::Reference("gnss_ubx_command".into()),
+                ));
+            } else {
+                for (index, name) in ["commandSequence", "commandRegister", "commandValue"].iter().enumerate() {
+                    config.push(Modifier::Bind((*name).into(), ModelicaValue::Reference(
+                        format!("baro_bmp280_command[{}]", index + 1))));
+                }
+            }
             fields.push(Modifier::RedeclareModel {
                 name: "VendorConfigModel".into(),
-                class: "ModelicaCPSLibrary.Systems.Sensing.GNSS.VendorConfig.M9N".into(),
+                class: if vendor == "m9n" {
+                    "ModelicaCPSLibrary.Systems.Sensing.GNSS.VendorConfig.M9N"
+                } else {
+                    "ModelicaCPSLibrary.Systems.Sensing.Barometer.VendorConfig.BMP280"
+                }.into(),
                 modifiers: vec![],
             });
             fields.push(Modifier::Nested("vendorConfig".into(), config));
@@ -484,6 +525,34 @@ mod tests {
         }
     }
 
+    #[test]
+    fn bmp280_parameters_are_forwarded_and_scoped() {
+        let config = crate::config::parse(
+            "schema_version=3\n[models.barometer]\nmodel=\"ideal\"\nvendor=\"bmp280\"\n\
+             [barometer]\npressureBias=1.5\n[barometer.bmp280]\ninitialFilter=16\n\
+             normalModeConfigWritesAccepted=false\npressureNoiseStd=1.3\n",
+        ).unwrap();
+        let source = crate::lower::compose(&config, "vio").unwrap().emit().unwrap();
+        assert!(source.contains("redeclare model BarometerModel=ModelicaCPSLibrary.Systems.Sensing.Barometer.Device("));
+        assert!(source.contains("redeclare model PhysicsModel=ModelicaCPSLibrary.Systems.Sensing.Barometer.Sensor("));
+        assert!(source.contains("redeclare model VendorConfigModel=ModelicaCPSLibrary.Systems.Sensing.Barometer.VendorConfig.BMP280("));
+        assert!(source.contains("initialFilter=16"));
+        assert!(source.contains("normalModeConfigWritesAccepted=false"));
+        assert!(source.contains("pressureNoiseStd=1.3"));
+        assert_eq!(source.matches("pressureBias=1.5").count(), 1);
+        assert!(source.contains("commandSequence=baro_bmp280_command[1]"));
+        assert!(crate::lower::compose(&config, "plant").unwrap_err().contains("barometer vendor bmp280 requires"));
+        let invalid_selection: Value = toml::from_str("model=\"sampled\"\nvendor=\"bmp280\"").unwrap();
+        assert!(selection(&BAROMETER, &invalid_selection).is_err());
+        for raw in ["[bmp280]\ninitialFilter=3", "[bmp280]\ninitialFilter=4.0",
+            "[bmp280]\nnormalModeConfigWritesAccepted=1", "[bmp280]\npressureNoiseStd=-1",
+            "[bmp280]\nunknown=1", "initialFilter=16"] {
+            assert!(resolve(&BAROMETER, &toml::from_str(raw).unwrap(), &config.models).is_err(), "{raw}");
+        }
+        let params: Value = toml::from_str("[bmp280]\ninitialFilter=16").unwrap();
+        assert!(resolve(&BAROMETER, &params, &models("barometer", "ideal")).is_err());
+    }
+
     /// Every parameter a level accepts is declared by its Modelica class.
     #[test]
     fn parameters_are_declared_by_the_classes() {
@@ -509,17 +578,17 @@ mod tests {
                 }
             }
         }
-        let source =
-            std::fs::read_to_string(root.join("Systems/Sensing/GNSS/VendorConfig/M9N.mo")).unwrap();
-        for &(key, _) in M9N_PARAMETERS {
-            assert!(
-                source.lines().any(|line| {
+        for (file, keys) in [
+            ("Systems/Sensing/GNSS/VendorConfig/M9N.mo", M9N_PARAMETERS.iter().map(|p| p.0).collect::<Vec<_>>()),
+            ("Systems/Sensing/Barometer/VendorConfig/BMP280.mo", vec!["initialFilter", "normalModeConfigWritesAccepted", "pressureNoiseStd"]),
+        ] {
+            let source = std::fs::read_to_string(root.join(file)).unwrap();
+            for key in keys {
+                assert!(source.lines().any(|line| {
                     line.trim_start().starts_with("parameter")
-                        && line.split(|c: char| !c.is_alphanumeric() && c != '_')
-                            .any(|word| word == key)
-                }),
-                "M9N does not declare {key}"
-            );
+                        && line.split(|c: char| !c.is_alphanumeric() && c != '_').any(|word| word == key)
+                }), "{file} does not declare {key}");
+            }
         }
     }
 

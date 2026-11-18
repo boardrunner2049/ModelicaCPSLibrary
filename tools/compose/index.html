@@ -331,7 +331,7 @@ function el(tag, attrs = {}, ...kids) {
 }
 const frame = () => catalog.airframes[state.airframe];
 const level = (part) => part.levels.find((l) => l.id === state.levels[part.id]) || part.levels[0];
-const fieldsOf = (part) => [...level(part).fields, ...(part.fields || [])];
+const fieldsOf = (part) => [...level(part).fields, ...(part.fields || []), ...(device(part)?.fields || [])];
 const dotted = (f) => f.path.join(".");
 const device = (part) => (part.devices || []).find((d) => d.id === state.devices[part.id]) ||
   (Object.keys(state.slots[part.id] || {}).length ? { slotted: true } : null);
@@ -360,7 +360,7 @@ function pickAirframe(name) {
 function startLevel(part) {
   // A device fills its level from the datasheet: the fields start empty and
   // only what is typed overrides it.
-  for (const f of level(part).fields) initial[dotted(f)] = state.values[dotted(f)] = device(part) ? "" : f.value;
+  for (const f of level(part).fields) initial[dotted(f)] = state.values[dotted(f)] = device(part) && !device(part).vendor ? "" : f.value;
 }
 
 function pickLevel(part, id) {
@@ -371,14 +371,21 @@ function pickLevel(part, id) {
 }
 
 function pickDevice(part, id) {
-  for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
+  const previous = device(part);
+  for (const f of previous?.fields || []) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
   if (id) state.devices[part.id] = id; else delete state.devices[part.id];
   const d = device(part);
-  if (d) {
+  if (d?.vendor) {
+    // Vendor behavior wraps the chosen physics; it does not select a fidelity level.
+    for (const f of d.fields) initial[dotted(f)] = state.values[dotted(f)] = f.value;
+  } else if (d) {
+    for (const f of level(part).fields) { delete state.values[dotted(f)]; delete initial[dotted(f)]; }
     const best = d.default_level in d.levels ? d.default_level : Object.keys(d.levels).pop();
     state.levels[part.id] = best;
+    startLevel(part);
+  } else if (!previous?.vendor) {
+    startLevel(part);
   }
-  startLevel(part);
   render();
 }
 
@@ -489,7 +496,11 @@ function deviceBlock(part) {
     part.devices.map((x) => el("option", { value: x.id, selected: x.id === state.devices[part.id] },
       `${x.name}`)));
   const out = [el("div", { class: "device" }, el("label", {}, "Device"), select)];
-  if (d && info) {
+  if (d?.vendor) {
+    out.push(el("p", { class: "about" + (d.supported_levels.includes(level(part).id) ? "" : " slow") },
+      `${d.name} configuration over the selected physics. Supported physics: ${d.supported_levels.join(", ")}. ` +
+      "Device fields include initial settings and the described modeling assumptions. Accepted driver commands update supported live registers."));
+  } else if (d && info) {
     const gaps = [...Object.entries(info.not_stated).map(([k, v]) => `${k}: ${v}`),
                   ...Object.entries(info.not_represented).map(([k, v]) => `${k}: ${v}`)];
     out.push(el("p", { class: "about" }, `${d.source}`));
@@ -569,7 +580,7 @@ function render() {
     }
     cards.push(el("section", { class: "card", "data-part": part.id },
       el("h2", {}, part.title, el("span", { class: "tag" },
-        part.levels.length > 1 ? `${part.levels.length} levels` : "")),
+        part.levels.length > 1 ? `${part.levels.length} physics levels` : "")),
       part.levels.length > 1 ? el("div", { class: "seg", role: "group", "aria-label": part.title },
         part.levels.map((l) => el("button", { "aria-pressed": String(l.id === lv.id),
           onclick: () => pickLevel(part, l.id) }, l.label))) : null,

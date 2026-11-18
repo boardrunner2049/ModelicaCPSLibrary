@@ -117,6 +117,14 @@ static void compare_run(const cpv_model_t *m) {
     CHECK(cpv_set_gnss_ubx_command(a, poll, 20) == CPV_OK, "%s: linked M9N poll", m->name);
     CHECK(cpv_set_gnss_ubx_command(b, poll, 20) == CPV_OK, "%s: descriptor M9N poll", m->name);
   }
+  double baro_response[20] = {0};
+  const int bmp280 = cpv_get_field(a, "baro_bmp280_response", baro_response, 20) == CPV_OK;
+  const double initial_filter = baro_response[3];
+  if (bmp280) {
+    const double normal[3] = {1, 0xF4, 0x57};
+    CHECK(cpv_set_baro_bmp280_command(a, normal, 3) == CPV_OK, "%s: linked BMP280 start", m->name);
+    CHECK(cpv_set_baro_bmp280_command(b, normal, 3) == CPV_OK, "%s: descriptor BMP280 start", m->name);
+  }
   size_t n = cpv_pwm_count(a);
   double pwm[16];
   int frames = 0, mismatches = 0;
@@ -150,6 +158,26 @@ static void compare_run(const cpv_model_t *m) {
             response_a[10] == 3 && response_a[14] == 0, "%s: initial M9N readback", m->name);
       CHECK(pvt_a[0] == 1 && pvt_a[1] == 0 && pvt_a[3] == 3 && pvt_a[4] == 1,
             "%s: initial coherent valid M9N acquisition", m->name);
+    }
+    if (bmp280 && (i == 1 || i == 2 || i == 12)) {
+      double other[20] = {0};
+      CHECK(cpv_get_field(a, "baro_bmp280_response", baro_response, 20) == CPV_OK &&
+            cpv_get_field(b, "baro_bmp280_response", other, 20) == CPV_OK,
+            "%s: BMP280 readback", m->name);
+      CHECK(memcmp(baro_response, other, sizeof(other)) == 0, "%s: BMP280 readback differs", m->name);
+      if (i == 1) {
+        CHECK(baro_response[0] == 1 && baro_response[1] == 1 && baro_response[2] == 0x57 &&
+              baro_response[19] > t && baro_response[19] < 0.05, "%s: BMP280 start did not schedule ADC", m->name);
+        const double filter[3] = {2, 0xF5, 0x08};
+        CHECK(cpv_set_baro_bmp280_command(a, filter, 3) == CPV_OK &&
+              cpv_set_baro_bmp280_command(b, filter, 3) == CPV_OK, "%s: BMP280 configure", m->name);
+      } else if (i == 2) {
+        CHECK(baro_response[0] == 2 &&
+              ((baro_response[1] == 1 && baro_response[3] == 8) ||
+               (baro_response[1] == 2 && baro_response[3] == initial_filter)), "%s: BMP280 write outcome", m->name);
+      } else {
+        CHECK(baro_response[4] != 524288, "%s: BMP280 first conversion never completed", m->name);
+      }
     }
     snapshot_t x, y;
     cpv_status_t ra = snapshot(a, &x), rb = snapshot(b, &y);

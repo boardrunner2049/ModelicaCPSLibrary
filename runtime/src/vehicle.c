@@ -1312,6 +1312,22 @@ cpv_status_t cpv_set_gnss_ubx_command(cpv_vehicle_t *v, const double *values, si
                     "fmi3SetFloat64(gnss_ubx_command)");
 }
 
+cpv_status_t cpv_set_baro_bmp280_command(cpv_vehicle_t *v, const double *values, size_t count) {
+  if (!v || !values || count != 3 || !finite_all(values, count))
+    return CPV_ERR_ARGUMENT;
+  if (v->state != STATE_INITIALIZED) {
+    set_error(v, "Barometer command requires an initialized, healthy instance");
+    return CPV_ERR_STATE;
+  }
+  const field_t *f = find_field(v, "baro_bmp280_command");
+  if (!f)
+    return CPV_UNSUPPORTED;
+  if (f->count != count || strcmp(f->capability, "barometer_v1") != 0)
+    return CPV_ERR_CAPABILITY;
+  return fmi_result(v, v->set_float64(v->instance, &f->vr, 1, values, count),
+                    "fmi3SetFloat64(baro_bmp280_command)");
+}
+
 const char *cpv_last_error(const cpv_vehicle_t *v) { return v ? v->error : ""; }
 
 const char *cpv_status_string(cpv_status_t s) {
